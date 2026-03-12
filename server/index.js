@@ -847,14 +847,17 @@ app.delete('/api/category-rules/:id', ...tenanted, authorize('admin'), (req, res
 // GET-based login (bypasses POST issues with port forwarding)
 app.get('/api/auth/get-login', (req, res) => {
   const { username, password } = req.query;
-  console.log('[GET-LOGIN]', username);
+  console.log('[GET-LOGIN]', username, 'pw-len:', password?.length);
   const user = db.prepare('SELECT * FROM users WHERE username = ? AND active = 1').get(username);
-  if (!user || !bcrypt.compareSync(password, user.password)) {
-    return res.status(401).json({ error: 'Neplatné přihlašovací údaje' });
-  }
+  console.log('[GET-LOGIN] user found:', !!user);
+  if (!user) { console.log('[GET-LOGIN] FAIL: no user'); return res.status(401).json({ error: 'Neplatné přihlašovací údaje' }); }
+  const match = bcrypt.compareSync(password, user.password);
+  console.log('[GET-LOGIN] bcrypt match:', match);
+  if (!match) { return res.status(401).json({ error: 'Neplatné přihlašovací údaje' }); }
   const token = generateToken(user);
   const { password: _, ...safeUser } = user;
   const tenant = user.tenant_id ? db.prepare('SELECT * FROM tenants WHERE id = ?').get(user.tenant_id) : null;
+  console.log('[GET-LOGIN] SUCCESS, sending token');
   res.json({ token, user: safeUser, tenant });
 });
 
