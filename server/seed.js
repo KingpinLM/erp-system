@@ -72,5 +72,8 @@ const evidenceData = [
 ];
 evidenceData.forEach(e => insertEvidence.run(...e));
 
+// Company
+db.prepare(`INSERT OR IGNORE INTO company (id, name, ico, dic, email, phone, address, city, zip, country) VALUES (1, 'Rainbow Family Investment', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'CZ')`).run();
+
 console.log('Database seeded successfully!');
 console.log('Users: admin/admin123, ucetni/ucetni123, manager/manager123, viewer/viewer123');

@@ -261,6 +261,17 @@ app.put('/api/users/:id', authenticate, authorize('admin'), (req, res) => {
   res.json({ ok: true });
 });
 
+// ─── COMPANY ─────────────────────────────────────────────────
+app.get('/api/company', authenticate, (req, res) => {
+  res.json(db.prepare('SELECT * FROM company WHERE id = 1').get() || {});
+});
+
+app.put('/api/company', authenticate, authorize('admin'), (req, res) => {
+  const { name, ico, dic, email, phone, address, city, zip, country, bank_account, iban, swift } = req.body;
+  db.prepare('INSERT OR REPLACE INTO company (id,name,ico,dic,email,phone,address,city,zip,country,bank_account,iban,swift) VALUES (1,?,?,?,?,?,?,?,?,?,?,?,?)').run(name,ico||null,dic||null,email||null,phone||null,address||null,city||null,zip||null,country||'CZ',bank_account||null,iban||null,swift||null);
+  res.json({ ok: true });
+});
+
 // ─── AUDIT LOG ───────────────────────────────────────────────
 app.get('/api/audit-log', authenticate, authorize('admin'), (req, res) => {
   res.json(db.prepare('SELECT a.*, u.full_name as user_name FROM audit_log a LEFT JOIN users u ON a.user_id = u.id ORDER BY a.created_at DESC LIMIT 100').all());

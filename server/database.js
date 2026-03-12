@@ -96,6 +96,22 @@ db.exec(`
     details TEXT,
     created_at TEXT DEFAULT (datetime('now'))
   );
+
+  CREATE TABLE IF NOT EXISTS company (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    name TEXT NOT NULL,
+    ico TEXT,
+    dic TEXT,
+    email TEXT,
+    phone TEXT,
+    address TEXT,
+    city TEXT,
+    zip TEXT,
+    country TEXT DEFAULT 'CZ',
+    bank_account TEXT,
+    iban TEXT,
+    swift TEXT
+  );
 `);
 
 module.exports = db;

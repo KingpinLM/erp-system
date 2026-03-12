@@ -55,4 +55,6 @@ export const api = {
   createUser: (data) => request('/users', { method: 'POST', body: JSON.stringify(data) }),
   updateUser: (id, data) => request(`/users/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   getAuditLog: () => request('/audit-log'),
+  getCompany: () => request('/company'),
+  updateCompany: (data) => request('/company', { method: 'PUT', body: JSON.stringify(data) }),
 };

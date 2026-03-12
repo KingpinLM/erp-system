@@ -10,6 +10,7 @@ import Evidence from './pages/Evidence';
 import Clients from './pages/Clients';
 import Users from './pages/Users';
 import Currencies from './pages/Currencies';
+import Company from './pages/Company';
 import './styles.css';
 
 export const AuthContext = createContext(null);
@@ -65,6 +66,7 @@ function Sidebar({ open, onClose }) {
     { to: '/currencies', label: 'Měny', icon: '💱' },
   ];
   if (can('admin')) {
+    links.push({ to: '/company', label: 'Společnost', icon: '🏢' });
     links.push({ to: '/users', label: 'Uživatelé', icon: '⚙️' });
   }
 
@@ -140,6 +142,7 @@ export default function App() {
                   <Route path="/evidence" element={<Evidence />} />
                   <Route path="/clients" element={<Clients />} />
                   <Route path="/currencies" element={<Currencies />} />
+                  <Route path="/company" element={<Company />} />
                   <Route path="/users" element={<Users />} />
                 </Routes>
               </Layout>

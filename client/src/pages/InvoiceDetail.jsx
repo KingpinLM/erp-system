@@ -9,11 +9,16 @@ const fmt = (n, cur = 'CZK') => new Intl.NumberFormat('cs-CZ', { style: 'currenc
 export default function InvoiceDetail() {
   const { id } = useParams();
   const [invoice, setInvoice] = useState(null);
+  const [company, setCompany] = useState(null);
   const [loading, setLoading] = useState(true);
   const { can } = useAuth();
   const navigate = useNavigate();
 
-  useEffect(() => { api.getInvoice(id).then(setInvoice).finally(() => setLoading(false)); }, [id]);
+  useEffect(() => {
+    Promise.all([api.getInvoice(id), api.getCompany()])
+      .then(([inv, comp]) => { setInvoice(inv); setCompany(comp); })
+      .finally(() => setLoading(false));
+  }, [id]);
 
   const changeStatus = async (status) => {
     const paid_date = status === 'paid' ? new Date().toISOString().slice(0, 10) : undefined;
@@ -65,7 +70,8 @@ export default function InvoiceDetail() {
         </div>
 
         <div className="invoice-meta">
-          <div><dt>Klient</dt><dd>{invoice.client_name || '—'}</dd></div>
+          <div><dt>Dodavatel</dt><dd><strong>{company?.name || 'Rainbow Family Investment'}</strong>{company?.ico && <><br/>IČO: {company.ico}</>}{company?.dic && <><br/>DIČ: {company.dic}</>}{company?.address && <><br/>{company.address}, {company.city} {company.zip}</>}</dd></div>
+          <div><dt>Odběratel</dt><dd>{invoice.client_name || '—'}</dd></div>
           <div><dt>Měna</dt><dd>{invoice.currency}</dd></div>
           <div><dt>Datum vystavení</dt><dd>{invoice.issue_date}</dd></div>
           <div><dt>Datum splatnosti</dt><dd>{invoice.due_date}</dd></div>
