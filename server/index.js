@@ -281,6 +281,12 @@ app.put('/api/users/:id', authenticate, authorize('admin'), (req, res) => {
   res.json({ ok: true });
 });
 
+app.put('/api/users/:id/signature', authenticate, authorize('admin'), (req, res) => {
+  const { signature } = req.body;
+  db.prepare("UPDATE users SET signature = ?, updated_at = datetime('now') WHERE id = ?").run(signature || null, req.params.id);
+  res.json({ ok: true });
+});
+
 // ─── COMPANY ─────────────────────────────────────────────────
 app.get('/api/company', authenticate, (req, res) => {
   res.json(db.prepare('SELECT * FROM company WHERE id = 1').get() || {});

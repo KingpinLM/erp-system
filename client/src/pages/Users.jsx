@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../api';
+import SignaturePad from '../components/SignaturePad';
 
 const roleLabels = { admin: 'Administrátor', accountant: 'Účetní', manager: 'Manažer', viewer: 'Náhled' };
 
@@ -10,12 +11,20 @@ export default function Users() {
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({ username: '', email: '', password: '', full_name: '', role: 'viewer', active: 1 });
   const [error, setError] = useState('');
+  const [signature, setSignature] = useState(null);
+  const [sigMode, setSigMode] = useState(null);
+  const [sigMsg, setSigMsg] = useState('');
+  const fileRef = useRef();
 
   const load = () => { setLoading(true); api.getUsers().then(setUsers).finally(() => setLoading(false)); };
   useEffect(load, []);
 
-  const openNew = () => { setEditing(null); setForm({ username: '', email: '', password: '', full_name: '', role: 'viewer', active: 1 }); setError(''); setShowModal(true); };
-  const openEdit = (u) => { setEditing(u); setForm({ username: u.username, email: u.email, password: '', full_name: u.full_name, role: u.role, active: u.active }); setError(''); setShowModal(true); };
+  const openNew = () => { setEditing(null); setForm({ username: '', email: '', password: '', full_name: '', role: 'viewer', active: 1 }); setSignature(null); setSigMode(null); setSigMsg(''); setError(''); setShowModal(true); };
+  const openEdit = (u) => {
+    setEditing(u); setForm({ username: u.username, email: u.email, password: '', full_name: u.full_name, role: u.role, active: u.active });
+    setSignature(null); setSigMode(null); setSigMsg(''); setError(''); setShowModal(true);
+    api.getUserSignature(u.id).then(r => setSignature(r.signature)).catch(() => {});
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -112,6 +121,59 @@ export default function Users() {
                   </div>
                 )}
               </div>
+              {editing && (
+                <div className="form-group" style={{ borderTop: '1px solid #e2e8f0', paddingTop: '1rem', marginTop: '0.5rem' }}>
+                  <label className="form-label" style={{ fontWeight: 700 }}>Podpis</label>
+                  {sigMsg && <div style={{ padding: '6px 12px', background: '#d1fae5', borderRadius: 8, color: '#059669', fontSize: 13, marginBottom: 8 }}>{sigMsg}</div>}
+                  {signature && !sigMode && (
+                    <div>
+                      <div style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: 12, background: '#fff', textAlign: 'center', marginBottom: 8 }}>
+                        <img src={signature} alt="Podpis" style={{ maxWidth: '100%', maxHeight: 100 }} />
+                      </div>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button type="button" className="btn btn-outline btn-sm" onClick={() => setSigMode('draw')}>Překreslit</button>
+                        <button type="button" className="btn btn-outline btn-sm" onClick={() => setSigMode('upload')}>Nahrát nový</button>
+                        <button type="button" className="btn btn-sm" style={{ background: '#fee2e2', color: '#dc2626' }} onClick={async () => {
+                          await api.updateUserSignature(editing.id, null);
+                          setSignature(null); setSigMsg('Podpis odstraněn'); setTimeout(() => setSigMsg(''), 3000);
+                        }}>Odstranit</button>
+                      </div>
+                    </div>
+                  )}
+                  {!signature && !sigMode && (
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button type="button" className="btn btn-primary btn-sm" onClick={() => setSigMode('draw')}>Nakreslit podpis</button>
+                      <button type="button" className="btn btn-outline btn-sm" onClick={() => setSigMode('upload')}>Nahrát obrázek</button>
+                    </div>
+                  )}
+                  {sigMode === 'draw' && (
+                    <div>
+                      <SignaturePad onSave={async (dataUrl) => {
+                        await api.updateUserSignature(editing.id, dataUrl);
+                        setSignature(dataUrl); setSigMode(null); setSigMsg('Podpis uložen!'); setTimeout(() => setSigMsg(''), 3000);
+                      }} />
+                      <button type="button" className="btn btn-outline btn-sm" onClick={() => setSigMode(null)} style={{ marginTop: 6 }}>Zrušit</button>
+                    </div>
+                  )}
+                  {sigMode === 'upload' && (
+                    <div>
+                      <input type="file" accept="image/*" ref={fileRef} onChange={async (e) => {
+                        const file = e.target.files[0];
+                        if (!file) return;
+                        if (file.size > 2 * 1024 * 1024) { setSigMsg('Max 2 MB'); return; }
+                        const reader = new FileReader();
+                        reader.onload = async (ev) => {
+                          await api.updateUserSignature(editing.id, ev.target.result);
+                          setSignature(ev.target.result); setSigMode(null); setSigMsg('Podpis uložen!'); setTimeout(() => setSigMsg(''), 3000);
+                        };
+                        reader.readAsDataURL(file);
+                      }} style={{ marginBottom: 6 }} />
+                      <br />
+                      <button type="button" className="btn btn-outline btn-sm" onClick={() => setSigMode(null)}>Zrušit</button>
+                    </div>
+                  )}
+                </div>
+              )}
               <div className="btn-group" style={{ marginTop: '0.5rem' }}>
                 <button type="submit" className="btn btn-primary">{editing ? 'Uložit' : 'Vytvořit'}</button>
                 <button type="button" className="btn btn-outline" onClick={() => setShowModal(false)}>Zrušit</button>

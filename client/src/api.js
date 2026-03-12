@@ -59,4 +59,5 @@ export const api = {
   updateCompany: (data) => request('/company', { method: 'PUT', body: JSON.stringify(data) }),
   updateSignature: (signature) => request('/profile/signature', { method: 'PUT', body: JSON.stringify({ signature }) }),
   getUserSignature: (id) => request(`/users/${id}/signature`),
+  updateUserSignature: (id, signature) => request(`/users/${id}/signature`, { method: 'PUT', body: JSON.stringify({ signature }) }),
 };
