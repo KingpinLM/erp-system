@@ -2,3 +2,4 @@ node_modules/
 erp.db
 erp.db-wal
 erp.db-shm
+uploads/
