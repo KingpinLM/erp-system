@@ -56,6 +56,7 @@ setInterval(updateRates, 6 * 60 * 60 * 1000);
 
 const app = express();
 app.use(cors());
+app.use((req, res, next) => { console.log(`[REQ] ${req.method} ${req.url}`); next(); });
 app.use(express.json({ limit: '5mb' }));
 app.use(express.static(path.join(__dirname, '..', 'client', 'dist'), {
   etag: false,
@@ -153,8 +154,11 @@ app.delete('/api/superadmin/tenants/:id', authenticate, requireSuperadmin, (req,
 // ─── AUTH (login without tenant slug — globally unique usernames) ──
 app.post('/api/auth/login', (req, res) => {
   const { username, password } = req.body;
+  console.log('[LOGIN]', JSON.stringify({ username, passwordLength: password?.length, bodyKeys: Object.keys(req.body) }));
   const user = db.prepare('SELECT * FROM users WHERE username = ? AND active = 1').get(username);
+  console.log('[LOGIN] user found:', !!user, user ? `id=${user.id} active=${user.active}` : 'null');
   if (!user || !bcrypt.compareSync(password, user.password)) {
+    console.log('[LOGIN] FAILED - user:', !!user, 'bcrypt match:', user ? bcrypt.compareSync(password, user.password) : 'N/A');
     return res.status(401).json({ error: 'Neplatné přihlašovací údaje' });
   }
   const token = generateToken(user);
