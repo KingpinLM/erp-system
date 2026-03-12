@@ -65,8 +65,12 @@
 }
 .sidebar-icon { font-size: 1.1rem; }
 
+.sidebar-profile-link {
+  margin-top: auto; border-top: 1px solid rgba(255,255,255,0.08);
+  padding-top: 0.9rem !important; padding-bottom: 0.9rem !important;
+}
 .sidebar-logout {
-  margin: 1rem; padding: 0.6rem; background: rgba(255,255,255,0.06);
+  margin: 0.5rem 1rem 1rem; padding: 0.6rem; background: rgba(255,255,255,0.06);
   color: rgba(255,255,255,0.7); border: none; border-radius: var(--radius); cursor: pointer;
   font-size: 0.85rem; transition: all 0.2s;
 }
