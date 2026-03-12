@@ -35,6 +35,7 @@ export const api = {
   createClient: (data) => request('/clients', { method: 'POST', body: JSON.stringify(data) }),
   updateClient: (id, data) => request(`/clients/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteClient: (id) => request(`/clients/${id}`, { method: 'DELETE' }),
+  getNextInvoiceNumber: () => request('/invoices/next-number'),
   getInvoices: (params = {}) => {
     const qs = new URLSearchParams(params).toString();
     return request(`/invoices${qs ? '?' + qs : ''}`);

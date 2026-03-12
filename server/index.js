@@ -125,6 +125,15 @@ app.delete('/api/clients/:id', authenticate, authorize('admin'), (req, res) => {
 });
 
 // ─── INVOICES ────────────────────────────────────────────────
+app.get('/api/invoices/next-number', authenticate, (req, res) => {
+  const comp = db.prepare('SELECT invoice_prefix, invoice_counter FROM company WHERE id = 1').get();
+  const prefix = comp?.invoice_prefix || 'FV';
+  const counter = comp?.invoice_counter || 1;
+  const year = new Date().getFullYear();
+  const number = `${prefix}-${year}-${String(counter).padStart(3, '0')}`;
+  res.json({ number });
+});
+
 app.get('/api/invoices', authenticate, (req, res) => {
   const { type, status, currency } = req.query;
   let sql = `SELECT i.*, c.name as client_name FROM invoices i LEFT JOIN clients c ON i.client_id = c.id WHERE 1=1`;
@@ -152,9 +161,20 @@ app.get('/api/invoices/:id', authenticate, (req, res) => {
 });
 
 app.post('/api/invoices', authenticate, authorize('admin', 'accountant'), (req, res) => {
-  const { invoice_number, type, client_id, issue_date, due_date, status, currency, tax_rate, note, items } = req.body;
+  const { invoice_number, client_id, issue_date, due_date, status, currency, tax_rate, note, items } = req.body;
   const curr = db.prepare('SELECT rate_to_czk FROM currencies WHERE code = ?').get(currency || 'CZK');
   const rate = curr ? curr.rate_to_czk : 1;
+
+  // Auto-generate invoice number if not provided
+  let finalNumber = invoice_number;
+  if (!finalNumber) {
+    const comp = db.prepare('SELECT invoice_prefix, invoice_counter FROM company WHERE id = 1').get();
+    const prefix = comp?.invoice_prefix || 'FV';
+    const counter = comp?.invoice_counter || 1;
+    const year = new Date().getFullYear();
+    finalNumber = `${prefix}-${year}-${String(counter).padStart(3, '0')}`;
+    db.prepare('UPDATE company SET invoice_counter = ? WHERE id = 1').run(counter + 1);
+  }
 
   let subtotal = 0;
   if (items) items.forEach(i => { subtotal += (i.quantity || 1) * (i.unit_price || 0); });
@@ -165,7 +185,7 @@ app.post('/api/invoices', authenticate, authorize('admin', 'accountant'), (req, 
   const result = db.prepare(`
     INSERT INTO invoices (invoice_number, type, client_id, issue_date, due_date, status, currency, subtotal, tax_rate, tax_amount, total, total_czk, note, created_by)
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-  `).run(invoice_number, type || 'issued', client_id, issue_date, due_date, status || 'draft', currency || 'CZK', subtotal, tax_rate || 21, taxAmt, total, totalCzk, note || null, req.user.id);
+  `).run(finalNumber, 'issued', client_id, issue_date, due_date, status || 'draft', currency || 'CZK', subtotal, tax_rate || 21, taxAmt, total, totalCzk, note || null, req.user.id);
 
   const invoiceId = result.lastInsertRowid;
   const insertItem = db.prepare('INSERT INTO invoice_items (invoice_id, description, quantity, unit, unit_price, total) VALUES (?,?,?,?,?,?)');
@@ -175,12 +195,12 @@ app.post('/api/invoices', authenticate, authorize('admin', 'accountant'), (req, 
     });
   }
 
-  db.prepare("INSERT INTO audit_log (user_id, action, entity, entity_id, details) VALUES (?, 'create', 'invoice', ?, ?)").run(req.user.id, invoiceId, `Vytvořena faktura ${invoice_number}`);
+  db.prepare("INSERT INTO audit_log (user_id, action, entity, entity_id, details) VALUES (?, 'create', 'invoice', ?, ?)").run(req.user.id, invoiceId, `Vytvořena faktura ${finalNumber}`);
   res.json({ id: invoiceId });
 });
 
 app.put('/api/invoices/:id', authenticate, authorize('admin', 'accountant'), (req, res) => {
-  const { client_id, issue_date, due_date, paid_date, status, currency, tax_rate, note, items } = req.body;
+  const { invoice_number, client_id, issue_date, due_date, paid_date, status, currency, tax_rate, note, items } = req.body;
   const curr = db.prepare('SELECT rate_to_czk FROM currencies WHERE code = ?').get(currency || 'CZK');
   const rate = curr ? curr.rate_to_czk : 1;
 
@@ -190,11 +210,20 @@ app.put('/api/invoices/:id', authenticate, authorize('admin', 'accountant'), (re
   const total = subtotal + taxAmt;
   const totalCzk = total * rate;
 
-  db.prepare(`
-    UPDATE invoices SET client_id=?, issue_date=?, due_date=?, paid_date=?, status=?, currency=?,
-    subtotal=?, tax_rate=?, tax_amount=?, total=?, total_czk=?, note=?, updated_at=datetime('now')
-    WHERE id=?
-  `).run(client_id, issue_date, due_date, paid_date || null, status, currency || 'CZK', subtotal, tax_rate || 21, taxAmt, total, totalCzk, note || null, req.params.id);
+  // Admin can change invoice number
+  if (invoice_number && req.user.role === 'admin') {
+    db.prepare(`
+      UPDATE invoices SET invoice_number=?, client_id=?, issue_date=?, due_date=?, paid_date=?, status=?, currency=?,
+      subtotal=?, tax_rate=?, tax_amount=?, total=?, total_czk=?, note=?, updated_at=datetime('now')
+      WHERE id=?
+    `).run(invoice_number, client_id, issue_date, due_date, paid_date || null, status, currency || 'CZK', subtotal, tax_rate || 21, taxAmt, total, totalCzk, note || null, req.params.id);
+  } else {
+    db.prepare(`
+      UPDATE invoices SET client_id=?, issue_date=?, due_date=?, paid_date=?, status=?, currency=?,
+      subtotal=?, tax_rate=?, tax_amount=?, total=?, total_czk=?, note=?, updated_at=datetime('now')
+      WHERE id=?
+    `).run(client_id, issue_date, due_date, paid_date || null, status, currency || 'CZK', subtotal, tax_rate || 21, taxAmt, total, totalCzk, note || null, req.params.id);
+  }
 
   db.prepare('DELETE FROM invoice_items WHERE invoice_id = ?').run(req.params.id);
   const insertItem = db.prepare('INSERT INTO invoice_items (invoice_id, description, quantity, unit, unit_price, total) VALUES (?,?,?,?,?,?)');
@@ -293,8 +322,8 @@ app.get('/api/company', authenticate, (req, res) => {
 });
 
 app.put('/api/company', authenticate, authorize('admin'), (req, res) => {
-  const { name, ico, dic, email, phone, address, city, zip, country, bank_account, iban, swift } = req.body;
-  db.prepare('INSERT OR REPLACE INTO company (id,name,ico,dic,email,phone,address,city,zip,country,bank_account,iban,swift) VALUES (1,?,?,?,?,?,?,?,?,?,?,?,?)').run(name,ico||null,dic||null,email||null,phone||null,address||null,city||null,zip||null,country||'CZ',bank_account||null,iban||null,swift||null);
+  const { name, ico, dic, email, phone, address, city, zip, country, bank_account, iban, swift, invoice_prefix, invoice_counter } = req.body;
+  db.prepare('INSERT OR REPLACE INTO company (id,name,ico,dic,email,phone,address,city,zip,country,bank_account,iban,swift,invoice_prefix,invoice_counter) VALUES (1,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run(name,ico||null,dic||null,email||null,phone||null,address||null,city||null,zip||null,country||'CZ',bank_account||null,iban||null,swift||null,invoice_prefix||'FV',invoice_counter||1);
   res.json({ ok: true });
 });
 

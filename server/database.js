@@ -111,11 +111,23 @@ db.exec(`
     country TEXT DEFAULT 'CZ',
     bank_account TEXT,
     iban TEXT,
-    swift TEXT
+    swift TEXT,
+    invoice_prefix TEXT DEFAULT 'FV',
+    invoice_counter INTEGER DEFAULT 1
   );
 `);
 
 // Migrations - add columns to existing tables
 try { db.exec('ALTER TABLE users ADD COLUMN signature TEXT'); } catch (e) { /* already exists */ }
+try { db.exec('ALTER TABLE company ADD COLUMN invoice_prefix TEXT DEFAULT \'FV\''); } catch (e) { /* already exists */ }
+try { db.exec('ALTER TABLE company ADD COLUMN invoice_counter INTEGER DEFAULT 1'); } catch (e) { /* already exists */ }
+// Set counter based on existing invoices
+try {
+  const maxNum = db.prepare("SELECT COUNT(*) as cnt FROM invoices").get().cnt;
+  const comp = db.prepare("SELECT invoice_counter FROM company WHERE id = 1").get();
+  if (comp && comp.invoice_counter <= 1 && maxNum > 0) {
+    db.prepare("UPDATE company SET invoice_counter = ? WHERE id = 1").run(maxNum + 1);
+  }
+} catch (e) { /* ok */ }
 
 module.exports = db;

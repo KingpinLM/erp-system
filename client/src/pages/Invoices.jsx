@@ -4,19 +4,17 @@ import { api } from '../api';
 import { useAuth } from '../App';
 
 const statusLabels = { draft: 'Koncept', sent: 'Odesláno', paid: 'Zaplaceno', overdue: 'Po splatnosti', cancelled: 'Zrušeno' };
-const typeLabels = { issued: 'Vydaná', received: 'Přijatá' };
 const fmt = (n, cur = 'CZK') => new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: cur, maximumFractionDigits: 2 }).format(n);
 
 export default function Invoices() {
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState({ type: '', status: '', currency: '' });
+  const [filters, setFilters] = useState({ status: '', currency: '' });
   const { can } = useAuth();
 
   const load = () => {
     setLoading(true);
     const params = {};
-    if (filters.type) params.type = filters.type;
     if (filters.status) params.status = filters.status;
     if (filters.currency) params.currency = filters.currency;
     api.getInvoices(params).then(setInvoices).finally(() => setLoading(false));
@@ -40,11 +38,6 @@ export default function Invoices() {
       </div>
 
       <div className="filters">
-        <select className="form-select" value={filters.type} onChange={e => setFilters(f => ({ ...f, type: e.target.value }))}>
-          <option value="">Všechny typy</option>
-          <option value="issued">Vydané</option>
-          <option value="received">Přijaté</option>
-        </select>
         <select className="form-select" value={filters.status} onChange={e => setFilters(f => ({ ...f, status: e.target.value }))}>
           <option value="">Všechny stavy</option>
           <option value="draft">Koncept</option>
@@ -68,7 +61,7 @@ export default function Invoices() {
             <table>
               <thead>
                 <tr>
-                  <th>Číslo</th><th>Typ</th><th>Klient</th><th>Datum vystavení</th>
+                  <th>Číslo</th><th>Klient</th><th>Datum vystavení</th>
                   <th>Splatnost</th><th className="text-right">Částka</th><th>Měna</th>
                   <th className="text-right">CZK</th><th>Stav</th><th>Akce</th>
                 </tr>
@@ -77,7 +70,6 @@ export default function Invoices() {
                 {invoices.map(inv => (
                   <tr key={inv.id}>
                     <td><Link to={`/invoices/${inv.id}`} style={{ color: 'var(--primary)', fontWeight: 600 }}>{inv.invoice_number}</Link></td>
-                    <td>{typeLabels[inv.type]}</td>
                     <td>{inv.client_name}</td>
                     <td>{inv.issue_date}</td>
                     <td>{inv.due_date}</td>

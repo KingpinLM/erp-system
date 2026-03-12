@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../api';
 
 export default function Company() {
-  const [form, setForm] = useState({ name: 'Rainbow Family Investment', ico: '', dic: '', email: '', phone: '', address: '', city: '', zip: '', country: 'CZ', bank_account: '', iban: '', swift: '' });
+  const [form, setForm] = useState({ name: 'Rainbow Family Investment', ico: '', dic: '', email: '', phone: '', address: '', city: '', zip: '', country: 'CZ', bank_account: '', iban: '', swift: '', invoice_prefix: 'FV', invoice_counter: 1 });
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(false);
 
@@ -57,6 +57,22 @@ export default function Company() {
           <div className="form-row">
             <div className="form-group"><label className="form-label">IBAN</label><input className="form-input" value={form.iban || ''} onChange={e => setForm(f => ({ ...f, iban: e.target.value }))} /></div>
             <div className="form-group"><label className="form-label">SWIFT/BIC</label><input className="form-input" value={form.swift || ''} onChange={e => setForm(f => ({ ...f, swift: e.target.value }))} /></div>
+          </div>
+        </div>
+        <div className="card">
+          <div className="card-title" style={{ marginBottom: '1rem' }}>Číselná řada faktur</div>
+          <p style={{ fontSize: '0.85rem', color: 'var(--gray-500)', marginBottom: '1rem' }}>
+            Faktury se automaticky číslují ve formátu: <strong>{form.invoice_prefix || 'FV'}-{new Date().getFullYear()}-{String(form.invoice_counter || 1).padStart(3, '0')}</strong>
+          </p>
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">Prefix</label>
+              <input className="form-input" value={form.invoice_prefix || ''} onChange={e => setForm(f => ({ ...f, invoice_prefix: e.target.value }))} placeholder="FV" />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Další číslo</label>
+              <input className="form-input" type="number" min="1" value={form.invoice_counter || 1} onChange={e => setForm(f => ({ ...f, invoice_counter: parseInt(e.target.value) || 1 }))} />
+            </div>
           </div>
         </div>
         <button type="submit" className="btn btn-primary">Uložit nastavení</button>

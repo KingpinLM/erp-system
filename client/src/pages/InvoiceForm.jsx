@@ -1,36 +1,44 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../api';
+import { useAuth } from '../App';
 
 export default function InvoiceForm() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { can } = useAuth();
   const isEdit = !!id;
 
   const [clients, setClients] = useState([]);
   const [currencies, setCurrencies] = useState([]);
   const [form, setForm] = useState({
-    invoice_number: '', type: 'issued', client_id: '', issue_date: new Date().toISOString().slice(0, 10),
+    invoice_number: '', client_id: '', issue_date: new Date().toISOString().slice(0, 10),
     due_date: '', status: 'draft', currency: 'CZK', tax_rate: 21, note: '',
     items: [{ description: '', quantity: 1, unit: 'ks', unit_price: 0 }]
   });
   const [error, setError] = useState('');
 
   useEffect(() => {
-    Promise.all([api.getClients(), api.getCurrencies()]).then(([c, cur]) => {
+    const promises = [api.getClients(), api.getCurrencies()];
+    if (isEdit) {
+      promises.push(api.getInvoice(id));
+    } else {
+      promises.push(api.getNextInvoiceNumber());
+    }
+    Promise.all(promises).then(([c, cur, data]) => {
       setClients(c);
       setCurrencies(cur);
-    });
-    if (isEdit) {
-      api.getInvoice(id).then(inv => {
+      if (isEdit) {
         setForm({
-          invoice_number: inv.invoice_number, type: inv.type, client_id: inv.client_id || '',
-          issue_date: inv.issue_date, due_date: inv.due_date, status: inv.status,
-          currency: inv.currency, tax_rate: inv.tax_rate, note: inv.note || '',
-          items: inv.items?.length ? inv.items.map(i => ({ description: i.description, quantity: i.quantity, unit: i.unit, unit_price: i.unit_price })) : [{ description: '', quantity: 1, unit: 'ks', unit_price: 0 }]
+          invoice_number: data.invoice_number, client_id: data.client_id || '',
+          issue_date: data.issue_date, due_date: data.due_date, status: data.status,
+          currency: data.currency, tax_rate: data.tax_rate, note: data.note || '',
+          items: data.items?.length ? data.items.map(i => ({ description: i.description, quantity: i.quantity, unit: i.unit, unit_price: i.unit_price })) : [{ description: '', quantity: 1, unit: 'ks', unit_price: 0 }]
         });
-      });
-    }
+      } else {
+        setForm(f => ({ ...f, invoice_number: data.number }));
+      }
+    });
   }, [id]);
 
   const updateField = (field, value) => setForm(f => ({ ...f, [field]: value }));
@@ -79,26 +87,25 @@ export default function InvoiceForm() {
           <div className="card-title" style={{ marginBottom: '1rem' }}>Základní údaje</div>
           <div className="form-row">
             <div className="form-group">
-              <label className="form-label">Číslo faktury *</label>
-              <input className="form-input" value={form.invoice_number} onChange={e => updateField('invoice_number', e.target.value)} required disabled={isEdit} />
+              <label className="form-label">Číslo faktury</label>
+              <input className="form-input" value={form.invoice_number} onChange={e => updateField('invoice_number', e.target.value)}
+                disabled={!can('admin')}
+                style={!can('admin') ? { background: '#f1f5f9', color: '#64748b' } : {}}
+              />
+              {!can('admin') && <small style={{ color: 'var(--gray-500)', fontSize: '0.75rem' }}>Generováno automaticky</small>}
             </div>
-            <div className="form-group">
-              <label className="form-label">Typ</label>
-              <select className="form-select" value={form.type} onChange={e => updateField('type', e.target.value)}>
-                <option value="issued">Vydaná</option>
-                <option value="received">Přijatá</option>
-              </select>
-            </div>
-            <div className="form-group">
-              <label className="form-label">Stav</label>
-              <select className="form-select" value={form.status} onChange={e => updateField('status', e.target.value)}>
-                <option value="draft">Koncept</option>
-                <option value="sent">Odesláno</option>
-                <option value="paid">Zaplaceno</option>
-                <option value="overdue">Po splatnosti</option>
-                <option value="cancelled">Zrušeno</option>
-              </select>
-            </div>
+            {can('admin') && isEdit && (
+              <div className="form-group">
+                <label className="form-label">Stav</label>
+                <select className="form-select" value={form.status} onChange={e => updateField('status', e.target.value)}>
+                  <option value="draft">Koncept</option>
+                  <option value="sent">Odesláno</option>
+                  <option value="paid">Zaplaceno</option>
+                  <option value="overdue">Po splatnosti</option>
+                  <option value="cancelled">Zrušeno</option>
+                </select>
+              </div>
+            )}
           </div>
           <div className="form-row">
             <div className="form-group">

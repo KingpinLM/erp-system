@@ -73,7 +73,7 @@ const evidenceData = [
 evidenceData.forEach(e => insertEvidence.run(...e));
 
 // Company
-db.prepare(`INSERT OR REPLACE INTO company (id, name, ico, dic, email, phone, address, city, zip, country) VALUES (1, 'Rainbow Family Investment s.r.o.', '23486899', 'CZ23486899', NULL, NULL, 'Krejčího 2279/6, Libeň', 'Praha 8', '180 00', 'CZ')`).run();
+db.prepare(`INSERT OR REPLACE INTO company (id, name, ico, dic, email, phone, address, city, zip, country, invoice_prefix, invoice_counter) VALUES (1, 'Rainbow Family Investment s.r.o.', '23486899', 'CZ23486899', NULL, NULL, 'Krejčího 2279/6, Libeň', 'Praha 8', '180 00', 'CZ', 'FV', 11)`).run();
 
 console.log('Database seeded successfully!');
 console.log('Users: admin/admin123, ucetni/ucetni123, manager/manager123, viewer/viewer123');
