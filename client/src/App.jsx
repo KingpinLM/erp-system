@@ -77,7 +77,7 @@ function Sidebar({ open, onClose }) {
       {open && <div className="sidebar-overlay" onClick={onClose} />}
       <aside className={`sidebar ${open ? 'open' : ''}`}>
         <div className="sidebar-header">
-          <h2>ERP System</h2>
+          <h2>RFI ERP</h2>
           <button className="sidebar-close" onClick={onClose}>&times;</button>
         </div>
         <div className="sidebar-user">
@@ -116,7 +116,7 @@ function Layout({ children }) {
       <div className="main-area">
         <header className="topbar">
           <button className="menu-btn" onClick={() => setSidebarOpen(true)}>☰</button>
-          <h1 className="topbar-title">ERP System</h1>
+          <h1 className="topbar-title">RFI ERP</h1>
         </header>
         <main className="content">{children}</main>
       </div>

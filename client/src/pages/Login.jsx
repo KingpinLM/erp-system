@@ -27,7 +27,7 @@ export default function Login() {
   return (
     <div className="login-page">
       <div className="login-card">
-        <h1 className="login-title">ERP System</h1>
+        <h1 className="login-title">RFI ERP</h1>
         <p className="login-subtitle">Přihlaste se do systému</p>
         {error && <div className="login-error">{error}</div>}
         <form onSubmit={handleSubmit}>
