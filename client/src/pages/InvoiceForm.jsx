@@ -23,7 +23,7 @@ export default function InvoiceForm() {
   const [defaultDueDays, setDefaultDueDays] = useState(14);
   const [vatPayer, setVatPayer] = useState(false);
   const [form, setForm] = useState({
-    invoice_number: '', client_id: '', issue_date: new Date().toISOString().slice(0, 10),
+    invoice_number: '', variable_symbol: '', client_id: '', issue_date: new Date().toISOString().slice(0, 10),
     due_date: '', supply_date: '', status: 'draft', currency: 'CZK',
     payment_method: 'bank_transfer', note: '',
     items: [{ description: '', quantity: 1, unit: 'ks', unit_price: 0, tax_rate: 21 }]
@@ -47,7 +47,8 @@ export default function InvoiceForm() {
 
       if (isEdit) {
         setForm({
-          invoice_number: data.invoice_number, client_id: data.client_id || '',
+          invoice_number: data.invoice_number, variable_symbol: data.variable_symbol || '',
+          client_id: data.client_id || '',
           issue_date: data.issue_date, due_date: data.due_date,
           supply_date: data.supply_date || data.issue_date,
           status: data.status, currency: data.currency,
@@ -65,6 +66,7 @@ export default function InvoiceForm() {
         setForm(f => ({
           ...f,
           invoice_number: data.number,
+          variable_symbol: data.variable_symbol || '',
           supply_date: issueDate,
           due_date: due.toISOString().slice(0, 10),
           items: [{ description: '', quantity: 1, unit: 'ks', unit_price: 0, tax_rate: isVatPayer ? 21 : 0 }]
@@ -148,6 +150,14 @@ export default function InvoiceForm() {
                 style={!can('admin') ? { background: '#f1f5f9', color: '#64748b' } : {}}
               />
               {!can('admin') && <small style={{ color: 'var(--gray-500)', fontSize: '0.75rem' }}>Generováno automaticky</small>}
+            </div>
+            <div className="form-group">
+              <label className="form-label">Variabilní symbol</label>
+              <input className="form-input" value={form.variable_symbol} onChange={e => updateField('variable_symbol', e.target.value)}
+                style={{ fontFamily: 'monospace', letterSpacing: 1 }}
+                placeholder="Generováno automaticky"
+              />
+              <small style={{ color: 'var(--gray-500)', fontSize: '0.75rem' }}>Unikátní identifikátor platby</small>
             </div>
             {can('admin') && isEdit && (
               <div className="form-group">

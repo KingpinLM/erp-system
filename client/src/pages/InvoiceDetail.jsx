@@ -17,13 +17,18 @@ export default function InvoiceDetail() {
   const { id } = useParams();
   const [invoice, setInvoice] = useState(null);
   const [company, setCompany] = useState(null);
+  const [qrData, setQrData] = useState(null);
   const [loading, setLoading] = useState(true);
   const { can } = useAuth();
   const invoiceRef = useRef();
 
   useEffect(() => {
     Promise.all([api.getInvoice(id), api.getCompany()])
-      .then(([inv, comp]) => { setInvoice(inv); setCompany(comp); })
+      .then(([inv, comp]) => {
+        setInvoice(inv); setCompany(comp);
+        // Load QR code
+        api.getInvoiceQR(id).then(setQrData).catch(() => {});
+      })
       .finally(() => setLoading(false));
   }, [id]);
 
@@ -81,6 +86,15 @@ export default function InvoiceDetail() {
       .inv-issuer-name { font-size: 14px; font-weight: 600; color: #1a1a2e; margin-bottom: 8px; }
       .inv-signature-img { max-width: 180px; max-height: 80px; }
       .inv-gradient-bar-bottom { height: 4px; background: linear-gradient(90deg, #ff6b6b, #ffa500, #ffd93d, #6bcb77, #4d96ff, #9b59b6); border-radius: 2px; margin-top: 24px; }
+      .inv-bank { padding: 20px; background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 10px; margin-bottom: 24px; }
+      .inv-bank-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #0284c7; font-weight: 700; margin-bottom: 12px; }
+      .inv-bank-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 13px; }
+      .inv-bank-label { color: #64748b; }
+      .inv-bank-value { font-weight: 600; color: #1a1a2e; }
+      .inv-payment-section { display: flex; gap: 24px; align-items: flex-start; margin-bottom: 24px; }
+      .inv-qr { text-align: center; }
+      .inv-qr img { width: 150px; height: 150px; }
+      .inv-qr-label { font-size: 10px; color: #9ca3af; margin-top: 4px; }
       @media print { body { padding: 0; } .invoice-pdf { padding: 20px; } }
     </style>
     </head><body>${content.innerHTML}
@@ -94,6 +108,7 @@ export default function InvoiceDetail() {
 
   const companyName = company?.name || 'Rainbow Family Investment';
   const isVatPayer = !!company?.vat_payer;
+  const fullBankAccount = company?.bank_account ? (company.bank_code ? `${company.bank_account}/${company.bank_code}` : company.bank_account) : null;
 
   // Group tax by rate for summary
   const taxByRate = {};
@@ -168,8 +183,6 @@ export default function InvoiceDetail() {
                 {company?.city && <>{company.city} {company?.zip}</>}
                 {company?.email && <><br/>{company.email}</>}
                 {company?.phone && <><br/>{company.phone}</>}
-                {company?.bank_account && <><br/>Účet: {company.bank_account}</>}
-                {company?.iban && <><br/>IBAN: {company.iban}</>}
               </div>
             </div>
             <div>
@@ -183,6 +196,41 @@ export default function InvoiceDetail() {
                 {invoice.client_email && <><br/>{invoice.client_email}</>}
               </div>
             </div>
+          </div>
+
+          {/* Bank details + QR code section */}
+          <div className="inv-payment-section">
+            <div className="inv-bank" style={{ flex: 1 }}>
+              <div className="inv-bank-title">Platební údaje</div>
+              <div className="inv-bank-grid">
+                {fullBankAccount && <>
+                  <div className="inv-bank-label">Číslo účtu:</div>
+                  <div className="inv-bank-value">{fullBankAccount}</div>
+                </>}
+                {company?.iban && <>
+                  <div className="inv-bank-label">IBAN:</div>
+                  <div className="inv-bank-value">{company.iban}</div>
+                </>}
+                {company?.swift && <>
+                  <div className="inv-bank-label">SWIFT/BIC:</div>
+                  <div className="inv-bank-value">{company.swift}</div>
+                </>}
+                {invoice.variable_symbol && <>
+                  <div className="inv-bank-label">Variabilní symbol:</div>
+                  <div className="inv-bank-value" style={{ fontSize: '1.1em', letterSpacing: 1 }}>{invoice.variable_symbol}</div>
+                </>}
+                <div className="inv-bank-label">Částka k úhradě:</div>
+                <div className="inv-bank-value" style={{ fontSize: '1.1em' }}>{fmt(invoice.total, invoice.currency)}</div>
+                <div className="inv-bank-label">Splatnost:</div>
+                <div className="inv-bank-value">{fmtDate(invoice.due_date)}</div>
+              </div>
+            </div>
+            {qrData?.qr && (
+              <div className="inv-qr">
+                <img src={qrData.qr} alt="QR Platba" />
+                <div className="inv-qr-label">QR Platba</div>
+              </div>
+            )}
           </div>
 
           <div className="inv-meta">
@@ -204,6 +252,12 @@ export default function InvoiceDetail() {
               <label>Způsob úhrady</label>
               <span>{paymentLabels[invoice.payment_method] || 'Bankovní převod'}</span>
             </div>
+            {invoice.variable_symbol && (
+              <div className="inv-meta-item">
+                <label>Variabilní symbol</label>
+                <span style={{ fontFamily: 'monospace', letterSpacing: 1 }}>{invoice.variable_symbol}</span>
+              </div>
+            )}
             <div className="inv-meta-item">
               <label>Měna</label>
               <span>{invoice.currency}</span>

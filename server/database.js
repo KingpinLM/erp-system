@@ -146,6 +146,14 @@ try { db.exec(`CREATE TABLE IF NOT EXISTS category_rules (
   weight INTEGER DEFAULT 1,
   created_at TEXT DEFAULT (datetime('now'))
 )`); } catch (e) { /* already exists */ }
+// Invoice: variable symbol
+try { db.exec('ALTER TABLE invoices ADD COLUMN variable_symbol TEXT'); } catch (e) { /* already exists */ }
+// Users: pending status for registration, password reset
+try { db.exec("ALTER TABLE users ADD COLUMN status TEXT DEFAULT 'active'"); } catch (e) { /* already exists */ }
+try { db.exec('ALTER TABLE users ADD COLUMN reset_token TEXT'); } catch (e) { /* already exists */ }
+try { db.exec('ALTER TABLE users ADD COLUMN reset_token_expires TEXT'); } catch (e) { /* already exists */ }
+// Company: bank_code separate field
+try { db.exec('ALTER TABLE company ADD COLUMN bank_code TEXT'); } catch (e) { /* already exists */ }
 // Migrate full_name → first_name + last_name
 try {
   const users = db.prepare("SELECT id, full_name, first_name FROM users WHERE first_name IS NULL AND full_name IS NOT NULL").all();

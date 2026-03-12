@@ -81,4 +81,12 @@ export const api = {
   getCategories: () => request('/categories'),
   getCategoryRules: () => request('/category-rules'),
   deleteCategoryRule: (id) => request(`/category-rules/${id}`, { method: 'DELETE' }),
+  getInvoiceQR: (id) => request(`/invoices/${id}/qr`),
+  updateProfile: (data) => request('/profile', { method: 'PUT', body: JSON.stringify(data) }),
+  register: (data) => request('/auth/register', { method: 'POST', body: JSON.stringify(data) }),
+  forgotPassword: (email) => request('/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) }),
+  resetPassword: (token, password) => request('/auth/reset-password', { method: 'POST', body: JSON.stringify({ token, password }) }),
+  getPendingUsers: () => request('/users/pending'),
+  approveUser: (id, role) => request(`/users/${id}/approve`, { method: 'POST', body: JSON.stringify({ role }) }),
+  rejectUser: (id) => request(`/users/${id}/reject`, { method: 'POST' }),
 };

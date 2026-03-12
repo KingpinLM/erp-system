@@ -18,7 +18,7 @@ const separatorOptions = [
 export default function Company() {
   const [form, setForm] = useState({
     name: 'Rainbow Family Investment', ico: '', dic: '', email: '', phone: '',
-    address: '', city: '', zip: '', country: 'CZ', bank_account: '', iban: '', swift: '',
+    address: '', city: '', zip: '', country: 'CZ', bank_account: '', bank_code: '', iban: '', swift: '',
     invoice_prefix: 'FV', invoice_counter: 1, default_due_days: 14, vat_payer: 0,
     invoice_format: '{prefix}{sep}{year}{sep}{num}', invoice_separator: '-',
     invoice_padding: 3, invoice_year_format: 'full'
@@ -84,11 +84,80 @@ export default function Company() {
         <div className="card">
           <div className="card-title" style={{ marginBottom: '1rem' }}>Bankovní údaje</div>
           <div className="form-row">
-            <div className="form-group"><label className="form-label">Číslo účtu</label><input className="form-input" value={form.bank_account || ''} onChange={e => setForm(f => ({ ...f, bank_account: e.target.value }))} /></div>
+            <div className="form-group" style={{ flex: 2 }}>
+              <label className="form-label">Číslo účtu</label>
+              <input className="form-input" value={form.bank_account || ''} onChange={e => setForm(f => ({ ...f, bank_account: e.target.value }))} placeholder="123456789" />
+            </div>
+            <div className="form-group" style={{ flex: 1 }}>
+              <label className="form-label">Kód banky</label>
+              <select className="form-select" value={form.bank_code || ''} onChange={e => setForm(f => ({ ...f, bank_code: e.target.value }))}>
+                <option value="">— Vyberte —</option>
+                <option value="0100">0100 — Komerční banka</option>
+                <option value="0300">0300 — ČSOB</option>
+                <option value="0600">0600 — MONETA Money Bank</option>
+                <option value="0710">0710 — Česká národní banka</option>
+                <option value="0800">0800 — Česká spořitelna</option>
+                <option value="2010">2010 — Fio banka</option>
+                <option value="2020">2020 — BANCO</option>
+                <option value="2060">2060 — Citfin</option>
+                <option value="2070">2070 — Moravský Peněžní Ústav</option>
+                <option value="2100">2100 — Hypoteční banka</option>
+                <option value="2200">2200 — Creditas</option>
+                <option value="2220">2220 — Artesa</option>
+                <option value="2240">2240 — Poštová banka</option>
+                <option value="2250">2250 — Banka CREDITAS</option>
+                <option value="2260">2260 — NEY spořitelní družstvo</option>
+                <option value="2275">2275 — Podnikatelská družstevní záložna</option>
+                <option value="2600">2600 — Citibank Europe</option>
+                <option value="2700">2700 — UniCredit Bank</option>
+                <option value="3030">3030 — Air Bank</option>
+                <option value="3050">3050 — BNP Paribas Personal Finance</option>
+                <option value="3060">3060 — PKO BP S.A.</option>
+                <option value="3500">3500 — ING Bank</option>
+                <option value="4000">4000 — Expobank CZ</option>
+                <option value="4300">4300 — Českomoravská záruční a rozvojová banka</option>
+                <option value="5500">5500 — Raiffeisenbank</option>
+                <option value="5800">5800 — J&T Banka</option>
+                <option value="6000">6000 — PPF banka</option>
+                <option value="6100">6100 — Equa bank (Raiffeisenbank)</option>
+                <option value="6200">6200 — COMMERZBANK</option>
+                <option value="6210">6210 — mBank</option>
+                <option value="6300">6300 — BNP Paribas</option>
+                <option value="6700">6700 — Všeobecná úverová banka</option>
+                <option value="6800">6800 — Sberbank CZ (Česká spořitelna)</option>
+                <option value="7910">7910 — Deutsche Bank</option>
+                <option value="7940">7940 — Waldviertler Sparkasse Bank</option>
+                <option value="7950">7950 — Raiffeisen stavební spořitelna</option>
+                <option value="7960">7960 — Českomoravská stavební spořitelna</option>
+                <option value="7970">7970 — Modrá pyramida stavební spořitelna</option>
+                <option value="7990">7990 — Stavební spořitelna České spořitelny</option>
+                <option value="8030">8030 — Volksbank Raiffeisenbank Nordoberpfalz</option>
+                <option value="8040">8040 — Oberbank</option>
+                <option value="8060">8060 — Stavební spořitelna HYPO</option>
+                <option value="8090">8090 — Česká exportní banka</option>
+                <option value="8150">8150 — HSBC Continental Europe</option>
+                <option value="8200">8200 — PRIVAT BANK</option>
+                <option value="8220">8220 — Payment Execution</option>
+                <option value="8230">8230 — EEPAYS</option>
+                <option value="8240">8240 — Družstevní záložna Kredit</option>
+                <option value="8250">8250 — Bank of China</option>
+                <option value="8255">8255 — Bank of Communications</option>
+                <option value="8265">8265 — Industrial and Commercial Bank of China</option>
+                <option value="8270">8270 — Fairplay Pay</option>
+                <option value="8280">8280 — B-Efekt</option>
+                <option value="8293">8293 — Revolut</option>
+                <option value="8299">8299 — Partners banka</option>
+              </select>
+            </div>
           </div>
-          <div className="form-row">
-            <div className="form-group"><label className="form-label">IBAN</label><input className="form-input" value={form.iban || ''} onChange={e => setForm(f => ({ ...f, iban: e.target.value }))} /></div>
-            <div className="form-group"><label className="form-label">SWIFT/BIC</label><input className="form-input" value={form.swift || ''} onChange={e => setForm(f => ({ ...f, swift: e.target.value }))} /></div>
+          {form.bank_account && form.bank_code && (
+            <div style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: 'var(--gray-500)' }}>
+              Celé číslo účtu: <strong>{form.bank_account}/{form.bank_code}</strong>
+            </div>
+          )}
+          <div className="form-row" style={{ marginTop: '1rem' }}>
+            <div className="form-group"><label className="form-label">IBAN</label><input className="form-input" value={form.iban || ''} onChange={e => setForm(f => ({ ...f, iban: e.target.value }))} placeholder="CZ65 0800 0000 1920 0014 5399" /></div>
+            <div className="form-group"><label className="form-label">SWIFT/BIC</label><input className="form-input" value={form.swift || ''} onChange={e => setForm(f => ({ ...f, swift: e.target.value }))} placeholder="GIBACZPX" /></div>
           </div>
         </div>
         <div className="card">

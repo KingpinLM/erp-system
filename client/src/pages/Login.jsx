@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../App';
 
 export default function Login() {
@@ -43,6 +43,10 @@ export default function Login() {
             {loading ? 'Přihlašování...' : 'Přihlásit se'}
           </button>
         </form>
+        <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+          <Link to="/forgot-password" style={{ color: 'var(--primary)' }}>Zapomenuté heslo?</Link>
+          <Link to="/register" style={{ color: 'var(--primary)' }}>Zaregistrovat se</Link>
+        </div>
         <div style={{ marginTop: '1.5rem', fontSize: '0.8rem', color: '#64748b' }}>
           <strong>Demo účty:</strong><br />
           admin / admin123 (Administrátor)<br />

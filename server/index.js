@@ -6,6 +6,8 @@ const https = require('https');
 const multer = require('multer');
 const pdfParse = require('pdf-parse');
 const AdmZip = require('adm-zip');
+const crypto = require('crypto');
+const QRCode = require('qrcode');
 const db = require('./database');
 const bcrypt = require('bcryptjs');
 const { generateToken, authenticate, authorize } = require('./auth');
@@ -72,12 +74,87 @@ app.post('/api/auth/login', (req, res) => {
   res.json({ token, user: safeUser });
 });
 
+// ─── REGISTRATION ─────────────────────────────────────────────
+app.post('/api/auth/register', (req, res) => {
+  const { username, email, password, first_name, last_name } = req.body;
+  if (!username || !email || !password || !first_name) {
+    return res.status(400).json({ error: 'Vyplňte všechna povinná pole' });
+  }
+  const existing = db.prepare('SELECT id FROM users WHERE username = ? OR email = ?').get(username, email);
+  if (existing) return res.status(400).json({ error: 'Uživatel s tímto jménem nebo emailem již existuje' });
+  const hash = bcrypt.hashSync(password, 10);
+  const full_name = `${first_name} ${last_name || ''}`.trim();
+  try {
+    db.prepare('INSERT INTO users (username, email, password, full_name, first_name, last_name, role, active, status) VALUES (?,?,?,?,?,?,?,?,?)')
+      .run(username, email, hash, full_name, first_name, last_name || '', 'viewer', 0, 'pending');
+    res.json({ ok: true, message: 'Registrace úspěšná. Vyčkejte na schválení administrátorem.' });
+  } catch (e) {
+    res.status(400).json({ error: 'Chyba při registraci' });
+  }
+});
+
+// ─── PASSWORD RESET ───────────────────────────────────────────
+app.post('/api/auth/forgot-password', (req, res) => {
+  const { email } = req.body;
+  const user = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
+  if (!user) return res.json({ ok: true }); // Don't reveal if email exists
+  const token = crypto.randomBytes(32).toString('hex');
+  const expires = new Date(Date.now() + 3600000).toISOString(); // 1 hour
+  db.prepare('UPDATE users SET reset_token = ?, reset_token_expires = ? WHERE id = ?').run(token, expires, user.id);
+  // In production, send email. For now, store token and allow admin to see it.
+  res.json({ ok: true, message: 'Pokud existuje účet s tímto emailem, byl zaslán odkaz pro reset hesla.' });
+});
+
+app.post('/api/auth/reset-password', (req, res) => {
+  const { token, password } = req.body;
+  if (!token || !password) return res.status(400).json({ error: 'Neplatný požadavek' });
+  const user = db.prepare('SELECT id, reset_token_expires FROM users WHERE reset_token = ?').get(token);
+  if (!user) return res.status(400).json({ error: 'Neplatný nebo expirovaný token' });
+  if (new Date(user.reset_token_expires) < new Date()) {
+    return res.status(400).json({ error: 'Token expiroval. Požádejte o nový.' });
+  }
+  const hash = bcrypt.hashSync(password, 10);
+  db.prepare("UPDATE users SET password = ?, reset_token = NULL, reset_token_expires = NULL, updated_at = datetime('now') WHERE id = ?").run(hash, user.id);
+  res.json({ ok: true });
+});
+
+// ─── PENDING USERS (admin approval) ──────────────────────────
+app.get('/api/users/pending', authenticate, authorize('admin'), (req, res) => {
+  res.json(db.prepare("SELECT id, username, email, full_name, first_name, last_name, created_at FROM users WHERE status = 'pending'").all());
+});
+
+app.post('/api/users/:id/approve', authenticate, authorize('admin'), (req, res) => {
+  const { role } = req.body;
+  db.prepare("UPDATE users SET active = 1, status = 'active', role = ?, updated_at = datetime('now') WHERE id = ?").run(role || 'viewer', req.params.id);
+  res.json({ ok: true });
+});
+
+app.post('/api/users/:id/reject', authenticate, authorize('admin'), (req, res) => {
+  db.prepare("DELETE FROM users WHERE id = ? AND status = 'pending'").run(req.params.id);
+  res.json({ ok: true });
+});
+
 app.get('/api/auth/me', authenticate, (req, res) => {
   const user = db.prepare('SELECT id, username, email, full_name, first_name, last_name, role, active, signature, created_at FROM users WHERE id = ?').get(req.user.id);
   res.json(user);
 });
 
-// ─── PROFILE / SIGNATURE ───────────────────────────────────
+// ─── PROFILE ──────────────────────────────────────────────
+app.put('/api/profile', authenticate, (req, res) => {
+  const { first_name, last_name, email, password } = req.body;
+  const full_name = `${first_name || ''} ${last_name || ''}`.trim();
+  if (password) {
+    const hash = bcrypt.hashSync(password, 10);
+    db.prepare("UPDATE users SET email=?, full_name=?, first_name=?, last_name=?, password=?, updated_at=datetime('now') WHERE id=?")
+      .run(email, full_name, first_name || '', last_name || '', hash, req.user.id);
+  } else {
+    db.prepare("UPDATE users SET email=?, full_name=?, first_name=?, last_name=?, updated_at=datetime('now') WHERE id=?")
+      .run(email, full_name, first_name || '', last_name || '', req.user.id);
+  }
+  const user = db.prepare('SELECT id, username, email, full_name, first_name, last_name, role, active, signature, created_at FROM users WHERE id = ?').get(req.user.id);
+  res.json(user);
+});
+
 app.put('/api/profile/signature', authenticate, (req, res) => {
   const { signature } = req.body;
   db.prepare("UPDATE users SET signature = ?, updated_at = datetime('now') WHERE id = ?").run(signature || null, req.user.id);
@@ -131,9 +208,49 @@ app.get('/api/dashboard', authenticate, (req, res) => {
     WHERE type='issued' GROUP BY currency
   `).all();
 
+  // Monthly chart data - issued invoices by issue month (current year)
+  const currentYear = new Date().getFullYear();
+  const monthlyIssued = db.prepare(`
+    SELECT strftime('%m', issue_date) as month, SUM(total_czk) as total, SUM(tax_amount) as tax
+    FROM invoices WHERE type='issued' AND strftime('%Y', issue_date) = ?
+    GROUP BY month ORDER BY month
+  `).all(String(currentYear));
+
+  const monthlyExpenses = db.prepare(`
+    SELECT strftime('%m', date) as month, SUM(amount) as total
+    FROM evidence WHERE type='expense' AND strftime('%Y', date) = ?
+    GROUP BY month ORDER BY month
+  `).all(String(currentYear));
+
+  // Pending items (K vyřízení)
+  const pendingItems = [];
+  const overdueList = db.prepare(`
+    SELECT i.id, i.invoice_number, i.total, i.currency, i.due_date, c.name as client_name
+    FROM invoices i LEFT JOIN clients c ON i.client_id = c.id
+    WHERE i.status = 'overdue' ORDER BY i.due_date
+  `).all();
+  overdueList.forEach(i => pendingItems.push({ type: 'overdue', ...i }));
+
+  const draftList = db.prepare(`
+    SELECT i.id, i.invoice_number, i.total, i.currency, c.name as client_name
+    FROM invoices i LEFT JOIN clients c ON i.client_id = c.id
+    WHERE i.status = 'draft' ORDER BY i.created_at DESC
+  `).all();
+  draftList.forEach(i => pendingItems.push({ type: 'draft', ...i }));
+
+  const unpaidList = db.prepare(`
+    SELECT i.id, i.invoice_number, i.total, i.currency, i.due_date, c.name as client_name
+    FROM invoices i LEFT JOIN clients c ON i.client_id = c.id
+    WHERE i.status = 'sent' ORDER BY i.due_date
+  `).all();
+  unpaidList.forEach(i => pendingItems.push({ type: 'unpaid', ...i }));
+
+  const pendingUsers = db.prepare("SELECT COUNT(*) as val FROM users WHERE status = 'pending'").get().val;
+
   res.json({
-    kpis: { totalRevenue, totalExpenses, profit: totalRevenue - totalExpenses, unpaidInvoices, overdueInvoices, totalClients, draftInvoices },
-    revenueByMonth, expensesByCategory, invoicesByStatus, recentInvoices, topClients, currencyBreakdown
+    kpis: { totalRevenue, totalExpenses, profit: totalRevenue - totalExpenses, unpaidInvoices, overdueInvoices, totalClients, draftInvoices, pendingUsers },
+    revenueByMonth, expensesByCategory, invoicesByStatus, recentInvoices, topClients, currencyBreakdown,
+    monthlyIssued, monthlyExpenses, pendingItems
   });
 });
 
@@ -196,9 +313,46 @@ function generateInvoiceNumber(comp) {
   return format.replace(/\{prefix\}/g, prefix).replace(/\{sep\}/g, sep).replace(/\{year\}/g, year).replace(/\{num\}/g, num);
 }
 
+// Variable symbol = year (last 2 digits) + counter padded to 8 digits total
+function generateVariableSymbol(comp) {
+  const counter = comp?.invoice_counter || 1;
+  const year = new Date().getFullYear() % 100;
+  return String(year) + String(counter).padStart(6, '0');
+}
+
 app.get('/api/invoices/next-number', authenticate, (req, res) => {
   const comp = db.prepare('SELECT * FROM company WHERE id = 1').get();
-  res.json({ number: generateInvoiceNumber(comp) });
+  res.json({ number: generateInvoiceNumber(comp), variable_symbol: generateVariableSymbol(comp) });
+});
+
+// QR payment code (SPD - Short Payment Descriptor, Czech standard)
+app.get('/api/invoices/:id/qr', authenticate, async (req, res) => {
+  try {
+    const invoice = db.prepare('SELECT * FROM invoices WHERE id = ?').get(req.params.id);
+    if (!invoice) return res.status(404).json({ error: 'Faktura nenalezena' });
+    const company = db.prepare('SELECT * FROM company WHERE id = 1').get();
+    if (!company) return res.status(400).json({ error: 'Není nastavena společnost' });
+
+    // Build SPD string (Czech QR payment standard)
+    const parts = ['SPD*1.0'];
+    if (company.iban) {
+      parts.push(`ACC:${company.iban.replace(/\s/g, '')}`);
+    } else if (company.bank_account) {
+      // Convert Czech account number to IBAN-like format or use directly
+      parts.push(`ACC:${company.bank_account.replace(/\s/g, '')}`);
+    }
+    parts.push(`AM:${invoice.total.toFixed(2)}`);
+    parts.push(`CC:${invoice.currency}`);
+    if (invoice.variable_symbol) parts.push(`X-VS:${invoice.variable_symbol}`);
+    if (company.name) parts.push(`RN:${company.name.slice(0, 35)}`);
+    if (invoice.due_date) parts.push(`DT:${invoice.due_date.replace(/-/g, '')}`);
+
+    const spdString = parts.join('*');
+    const qrDataUrl = await QRCode.toDataURL(spdString, { width: 200, margin: 1, errorCorrectionLevel: 'M' });
+    res.json({ qr: qrDataUrl, spd: spdString });
+  } catch (e) {
+    res.status(500).json({ error: 'Chyba při generování QR kódu' });
+  }
 });
 
 app.get('/api/invoices', authenticate, (req, res) => {
@@ -228,16 +382,20 @@ app.get('/api/invoices/:id', authenticate, (req, res) => {
 });
 
 app.post('/api/invoices', authenticate, authorize('admin', 'accountant'), (req, res) => {
-  const { invoice_number, client_id, issue_date, due_date, supply_date, payment_method, status, currency, note, items } = req.body;
+  const { invoice_number, client_id, issue_date, due_date, supply_date, payment_method, status, currency, note, items, variable_symbol } = req.body;
   const curr = db.prepare('SELECT rate_to_czk FROM currencies WHERE code = ?').get(currency || 'CZK');
   const rate = curr ? curr.rate_to_czk : 1;
 
-  // Auto-generate invoice number if not provided
+  // Auto-generate invoice number and variable symbol if not provided
   let finalNumber = invoice_number;
+  let finalVS = variable_symbol;
+  const comp = db.prepare('SELECT * FROM company WHERE id = 1').get();
   if (!finalNumber) {
-    const comp = db.prepare('SELECT * FROM company WHERE id = 1').get();
     finalNumber = generateInvoiceNumber(comp);
     db.prepare('UPDATE company SET invoice_counter = ? WHERE id = 1').run((comp?.invoice_counter || 1) + 1);
+  }
+  if (!finalVS) {
+    finalVS = generateVariableSymbol(comp);
   }
 
   // Calculate totals from per-item tax rates
@@ -253,9 +411,9 @@ app.post('/api/invoices', authenticate, authorize('admin', 'accountant'), (req, 
   const totalCzk = total * rate;
 
   const result = db.prepare(`
-    INSERT INTO invoices (invoice_number, type, client_id, issue_date, due_date, supply_date, payment_method, status, currency, subtotal, tax_rate, tax_amount, total, total_czk, note, created_by)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-  `).run(finalNumber, 'issued', client_id, issue_date, due_date, supply_date || issue_date, payment_method || 'bank_transfer', status || 'draft', currency || 'CZK', subtotal, 0, totalTax, total, totalCzk, note || null, req.user.id);
+    INSERT INTO invoices (invoice_number, type, client_id, issue_date, due_date, supply_date, payment_method, status, currency, subtotal, tax_rate, tax_amount, total, total_czk, note, created_by, variable_symbol)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+  `).run(finalNumber, 'issued', client_id, issue_date, due_date, supply_date || issue_date, payment_method || 'bank_transfer', status || 'draft', currency || 'CZK', subtotal, 0, totalTax, total, totalCzk, note || null, req.user.id, finalVS);
 
   const invoiceId = result.lastInsertRowid;
   const insertItem = db.prepare('INSERT INTO invoice_items (invoice_id, description, quantity, unit, unit_price, total, tax_rate, tax_amount, total_with_tax) VALUES (?,?,?,?,?,?,?,?,?)');
@@ -410,8 +568,8 @@ app.get('/api/company', authenticate, (req, res) => {
 });
 
 app.put('/api/company', authenticate, authorize('admin'), (req, res) => {
-  const { name, ico, dic, email, phone, address, city, zip, country, bank_account, iban, swift, invoice_prefix, invoice_counter, default_due_days, vat_payer, invoice_format, invoice_separator, invoice_padding, invoice_year_format } = req.body;
-  db.prepare('INSERT OR REPLACE INTO company (id,name,ico,dic,email,phone,address,city,zip,country,bank_account,iban,swift,invoice_prefix,invoice_counter,default_due_days,vat_payer,invoice_format,invoice_separator,invoice_padding,invoice_year_format) VALUES (1,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run(name,ico||null,dic||null,email||null,phone||null,address||null,city||null,zip||null,country||'CZ',bank_account||null,iban||null,swift||null,invoice_prefix||'FV',invoice_counter||1,default_due_days||14,vat_payer?1:0,invoice_format||'{prefix}{sep}{year}{sep}{num}',invoice_separator||'-',invoice_padding||3,invoice_year_format||'full');
+  const { name, ico, dic, email, phone, address, city, zip, country, bank_account, bank_code, iban, swift, invoice_prefix, invoice_counter, default_due_days, vat_payer, invoice_format, invoice_separator, invoice_padding, invoice_year_format } = req.body;
+  db.prepare('INSERT OR REPLACE INTO company (id,name,ico,dic,email,phone,address,city,zip,country,bank_account,bank_code,iban,swift,invoice_prefix,invoice_counter,default_due_days,vat_payer,invoice_format,invoice_separator,invoice_padding,invoice_year_format) VALUES (1,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run(name,ico||null,dic||null,email||null,phone||null,address||null,city||null,zip||null,country||'CZ',bank_account||null,bank_code||null,iban||null,swift||null,invoice_prefix||'FV',invoice_counter||1,default_due_days||14,vat_payer?1:0,invoice_format||'{prefix}{sep}{year}{sep}{num}',invoice_separator||'-',invoice_padding||3,invoice_year_format||'full');
   res.json({ ok: true });
 });
 

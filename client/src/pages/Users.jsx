@@ -6,13 +6,19 @@ const roleLabels = { admin: 'Administrátor', accountant: 'Účetní', manager: 
 
 export default function Users() {
   const [users, setUsers] = useState([]);
+  const [pending, setPending] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({ username: '', email: '', password: '', first_name: '', last_name: '', role: 'viewer', active: 1 });
   const [error, setError] = useState('');
 
-  const load = () => { setLoading(true); api.getUsers().then(setUsers).finally(() => setLoading(false)); };
+  const load = () => {
+    setLoading(true);
+    Promise.all([api.getUsers(), api.getPendingUsers().catch(() => [])])
+      .then(([u, p]) => { setUsers(u); setPending(p); })
+      .finally(() => setLoading(false));
+  };
   useEffect(load, []);
 
   const openNew = () => { setEditing(null); setForm({ username: '', email: '', password: '', first_name: '', last_name: '', role: 'viewer', active: 1 }); setError(''); setShowModal(true); };
@@ -45,6 +51,45 @@ export default function Users() {
         <h1 className="page-title">Správa uživatelů</h1>
         <button className="btn btn-primary" onClick={openNew}>+ Nový uživatel</button>
       </div>
+
+      {pending.length > 0 && (
+        <div className="card" style={{ marginBottom: '1rem', borderLeft: '4px solid var(--warning)' }}>
+          <div className="card-title" style={{ marginBottom: '0.75rem', color: 'var(--warning)' }}>Čekající na schválení ({pending.length})</div>
+          <div className="table-responsive">
+            <table>
+              <thead><tr><th>Jméno</th><th>Uživatel</th><th>Email</th><th>Registrován</th><th>Akce</th></tr></thead>
+              <tbody>
+                {pending.map(u => (
+                  <tr key={u.id}>
+                    <td><strong>{u.full_name}</strong></td>
+                    <td>{u.username}</td>
+                    <td>{u.email}</td>
+                    <td>{u.created_at?.slice(0, 10)}</td>
+                    <td>
+                      <div className="btn-group">
+                        <select className="form-select" id={`role-${u.id}`} defaultValue="viewer" style={{ width: 130, display: 'inline-block', marginRight: 8 }}>
+                          <option value="viewer">Náhled</option>
+                          <option value="manager">Manažer</option>
+                          <option value="accountant">Účetní</option>
+                          <option value="admin">Administrátor</option>
+                        </select>
+                        <button className="btn btn-success btn-sm" onClick={async () => {
+                          const role = document.getElementById(`role-${u.id}`).value;
+                          await api.approveUser(u.id, role);
+                          load();
+                        }}>Schválit</button>
+                        <button className="btn btn-danger btn-sm" onClick={async () => {
+                          if (confirm('Opravdu zamítnout registraci?')) { await api.rejectUser(u.id); load(); }
+                        }}>Zamítnout</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       <div className="card">
         {loading ? <div className="loading">Načítání...</div> : (
