@@ -55,8 +55,16 @@ updateRates();
 setInterval(updateRates, 6 * 60 * 60 * 1000);
 
 const app = express();
+app.disable('etag');
 app.use(cors());
-app.use((req, res, next) => { console.log(`[REQ] ${req.method} ${req.url}`); next(); });
+app.use((req, res, next) => {
+  console.log(`[REQ] ${req.method} ${req.url}`);
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
+  res.set('Surrogate-Control', 'no-store');
+  next();
+});
 app.use(express.json({ limit: '5mb' }));
 app.use(express.static(path.join(__dirname, '..', 'client', 'dist'), {
   etag: false,
@@ -151,6 +159,24 @@ app.delete('/api/superadmin/tenants/:id', authenticate, requireSuperadmin, (req,
   res.json({ ok: true });
 });
 
+// ─── FORM-BASED LOGIN (no fetch, no JS - direct form POST + redirect) ──
+app.post('/api/auth/form-login', express.urlencoded({ extended: false }), (req, res) => {
+  const { username, password } = req.body;
+  console.log('[FORM-LOGIN]', username);
+  const user = db.prepare('SELECT * FROM users WHERE username = ? AND active = 1').get(username);
+  if (!user || !bcrypt.compareSync(password, user.password)) {
+    return res.redirect('/login?error=1');
+  }
+  const token = generateToken(user);
+  const { password: _, ...safeUser } = user;
+  const tenant = user.tenant_id ? db.prepare('SELECT id, name, slug FROM tenants WHERE id = ? AND active = 1').get(user.tenant_id) : null;
+  // Set data via cookie, then redirect - the SPA will read cookies on load
+  res.cookie('erp_token', token, { httpOnly: false, maxAge: 8*60*60*1000, sameSite: 'lax' });
+  res.cookie('erp_user', JSON.stringify(safeUser), { httpOnly: false, maxAge: 8*60*60*1000, sameSite: 'lax' });
+  if (tenant) res.cookie('erp_tenant', JSON.stringify(tenant), { httpOnly: false, maxAge: 8*60*60*1000, sameSite: 'lax' });
+  res.redirect('/?loggedin=1');
+});
+
 // ─── AUTH (login without tenant slug — globally unique usernames) ──
 app.post('/api/auth/login', (req, res) => {
   const { username, password } = req.body;
@@ -167,7 +193,9 @@ app.post('/api/auth/login', (req, res) => {
   if (user.tenant_id) {
     tenant = db.prepare('SELECT id, name, slug FROM tenants WHERE id = ? AND active = 1').get(user.tenant_id);
   }
-  res.json({ token, user: safeUser, tenant });
+  console.log('[LOGIN] SUCCESS - sending 200 with token for', username);
+  const response = { token, user: safeUser, tenant };
+  res.status(200).json(response);
 });
 
 // ─── REGISTRATION (no tenant — user joins/creates tenant via onboarding) ──

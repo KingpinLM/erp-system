@@ -1,34 +1,18 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { api } from '../api';
+import React, { useState, useEffect } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 
 export default function Login() {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+  const [searchParams] = useSearchParams();
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
-    try {
-      const data = await api.login(username, password);
-      // Store in localStorage directly
-      localStorage.setItem('erp_token', data.token);
-      localStorage.setItem('erp_user', JSON.stringify(data.user));
-      if (data.tenant) {
-        localStorage.setItem('erp_tenant', JSON.stringify(data.tenant));
-      } else {
-        localStorage.removeItem('erp_tenant');
-      }
-      // Full page reload to guarantee fresh state
-      window.location.href = data.user.tenant_id ? '/' : '/onboarding';
-    } catch (err) {
-      setError(err.message || 'Neplatné přihlašovací údaje');
-      setLoading(false);
+  useEffect(() => {
+    // Check for error from form-login redirect
+    if (searchParams.get('error')) {
+      setError('Neplatné přihlašovací údaje');
     }
-  };
+    // Check for cookies set by form-login (after redirect to /?loggedin=1)
+    // This is handled in App.jsx
+  }, [searchParams]);
 
   return (
     <div className="login-page">
@@ -36,17 +20,17 @@ export default function Login() {
         <h1 className="login-title">RFI ERP</h1>
         <p className="login-subtitle">Přihlaste se do systému</p>
         {error && <div className="login-error">{error}</div>}
-        <form onSubmit={handleSubmit}>
+        <form method="POST" action="/api/auth/form-login">
           <div className="form-group">
             <label className="form-label">Uživatelské jméno</label>
-            <input className="form-input" value={username} onChange={e => setUsername(e.target.value)} placeholder="uzivatel" required />
+            <input className="form-input" name="username" placeholder="uzivatel" required autoComplete="username" />
           </div>
           <div className="form-group">
             <label className="form-label">Heslo</label>
-            <input className="form-input" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••" required />
+            <input className="form-input" type="password" name="password" placeholder="••••••" required autoComplete="current-password" />
           </div>
-          <button className="btn btn-primary login-btn" type="submit" disabled={loading}>
-            {loading ? 'Přihlašování...' : 'Přihlásit se'}
+          <button className="btn btn-primary login-btn" type="submit">
+            Přihlásit se
           </button>
         </form>
         <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
