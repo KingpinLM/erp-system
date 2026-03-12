@@ -5,6 +5,7 @@ import { useAuth } from '../App';
 
 const statusLabels = { draft: 'Koncept', sent: 'Odesláno', paid: 'Zaplaceno', overdue: 'Po splatnosti', cancelled: 'Zrušeno' };
 const fmt = (n, cur = 'CZK') => new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: cur, maximumFractionDigits: 2 }).format(n);
+const fmtDate = (d) => { if (!d) return '—'; const p = d.slice(0,10).split('-'); return p.length === 3 ? `${p[2]}.${p[1]}.${p[0]}` : d; };
 
 export default function Invoices() {
   const [invoices, setInvoices] = useState([]);
@@ -71,8 +72,8 @@ export default function Invoices() {
                   <tr key={inv.id}>
                     <td><Link to={`/invoices/${inv.id}`} style={{ color: 'var(--primary)', fontWeight: 600 }}>{inv.invoice_number}</Link></td>
                     <td>{inv.client_name}</td>
-                    <td>{inv.issue_date}</td>
-                    <td>{inv.due_date}</td>
+                    <td>{fmtDate(inv.issue_date)}</td>
+                    <td>{fmtDate(inv.due_date)}</td>
                     <td className="text-right">{fmt(inv.total, inv.currency)}</td>
                     <td>{inv.currency}</td>
                     <td className="text-right">{fmt(inv.total_czk, 'CZK')}</td>

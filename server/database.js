@@ -121,6 +121,16 @@ db.exec(`
 try { db.exec('ALTER TABLE users ADD COLUMN signature TEXT'); } catch (e) { /* already exists */ }
 try { db.exec('ALTER TABLE users ADD COLUMN first_name TEXT'); } catch (e) { /* already exists */ }
 try { db.exec('ALTER TABLE users ADD COLUMN last_name TEXT'); } catch (e) { /* already exists */ }
+// Invoice: DUZP, payment_method
+try { db.exec('ALTER TABLE invoices ADD COLUMN supply_date TEXT'); } catch (e) { /* already exists */ }
+try { db.exec('ALTER TABLE invoices ADD COLUMN payment_method TEXT DEFAULT \'bank_transfer\''); } catch (e) { /* already exists */ }
+// Invoice items: per-item VAT
+try { db.exec('ALTER TABLE invoice_items ADD COLUMN tax_rate REAL DEFAULT 21'); } catch (e) { /* already exists */ }
+try { db.exec('ALTER TABLE invoice_items ADD COLUMN tax_amount REAL DEFAULT 0'); } catch (e) { /* already exists */ }
+try { db.exec('ALTER TABLE invoice_items ADD COLUMN total_with_tax REAL DEFAULT 0'); } catch (e) { /* already exists */ }
+// Company: default due days
+try { db.exec('ALTER TABLE company ADD COLUMN default_due_days INTEGER DEFAULT 14'); } catch (e) { /* already exists */ }
+try { db.exec('ALTER TABLE company ADD COLUMN vat_payer INTEGER DEFAULT 0'); } catch (e) { /* already exists */ }
 // Migrate full_name → first_name + last_name
 try {
   const users = db.prepare("SELECT id, full_name, first_name FROM users WHERE first_name IS NULL AND full_name IS NOT NULL").all();

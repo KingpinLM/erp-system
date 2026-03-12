@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../api';
 
 export default function Company() {
-  const [form, setForm] = useState({ name: 'Rainbow Family Investment', ico: '', dic: '', email: '', phone: '', address: '', city: '', zip: '', country: 'CZ', bank_account: '', iban: '', swift: '', invoice_prefix: 'FV', invoice_counter: 1 });
+  const [form, setForm] = useState({ name: 'Rainbow Family Investment', ico: '', dic: '', email: '', phone: '', address: '', city: '', zip: '', country: 'CZ', bank_account: '', iban: '', swift: '', invoice_prefix: 'FV', invoice_counter: 1, default_due_days: 14, vat_payer: 0 });
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(false);
 
@@ -57,6 +57,31 @@ export default function Company() {
           <div className="form-row">
             <div className="form-group"><label className="form-label">IBAN</label><input className="form-input" value={form.iban || ''} onChange={e => setForm(f => ({ ...f, iban: e.target.value }))} /></div>
             <div className="form-group"><label className="form-label">SWIFT/BIC</label><input className="form-input" value={form.swift || ''} onChange={e => setForm(f => ({ ...f, swift: e.target.value }))} /></div>
+          </div>
+        </div>
+        <div className="card">
+          <div className="card-title" style={{ marginBottom: '1rem' }}>DPH</div>
+          <div className="form-group">
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}>
+              <input type="checkbox" checked={!!form.vat_payer} onChange={e => setForm(f => ({ ...f, vat_payer: e.target.checked ? 1 : 0 }))} style={{ width: 20, height: 20 }} />
+              <div>
+                <div style={{ fontWeight: 600 }}>Plátce DPH</div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--gray-500)' }}>
+                  {form.vat_payer ? 'Nové faktury budou obsahovat DPH dle zákonných sazeb (0%, 12%, 21%)' : 'Nové faktury budou bez DPH (neplátce)'}
+                </div>
+              </div>
+            </label>
+          </div>
+        </div>
+        <div className="card">
+          <div className="card-title" style={{ marginBottom: '1rem' }}>Fakturace</div>
+          <div className="form-group">
+            <label className="form-label">Výchozí splatnost (dnů)</label>
+            <input className="form-input" type="number" min="1" max="365" value={form.default_due_days || 14}
+              onChange={e => setForm(f => ({ ...f, default_due_days: parseInt(e.target.value) || 14 }))}
+              style={{ maxWidth: 150 }}
+            />
+            <small style={{ color: 'var(--gray-500)', fontSize: '0.75rem' }}>Automaticky se nastaví datum splatnosti při vytvoření faktury</small>
           </div>
         </div>
         <div className="card">

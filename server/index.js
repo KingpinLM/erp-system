@@ -1,9 +1,49 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const https = require('https');
 const db = require('./database');
 const bcrypt = require('bcryptjs');
 const { generateToken, authenticate, authorize } = require('./auth');
+
+// ─── CNB EXCHANGE RATES ─────────────────────────────────────
+function fetchCnbRates() {
+  return new Promise((resolve, reject) => {
+    https.get('https://www.cnb.cz/cs/financni-trhy/devizovy-trh/kurzy-devizoveho-trhu/kurzy-devizoveho-trhu/denni_kurz.txt', (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        const lines = data.split('\n').slice(2); // skip header lines
+        const rates = {};
+        lines.forEach(line => {
+          const parts = line.split('|');
+          if (parts.length >= 5) {
+            const code = parts[3];
+            const amount = parseFloat(parts[2]);
+            const rate = parseFloat(parts[4].replace(',', '.'));
+            if (code && rate && amount) rates[code] = rate / amount;
+          }
+        });
+        resolve(rates);
+      });
+      res.on('error', reject);
+    }).on('error', reject);
+  });
+}
+
+// Update rates on startup and every 6 hours
+async function updateRates() {
+  try {
+    const rates = await fetchCnbRates();
+    const update = db.prepare("UPDATE currencies SET rate_to_czk = ?, updated_at = datetime('now') WHERE code = ?");
+    Object.entries(rates).forEach(([code, rate]) => update.run(rate, code));
+    console.log('CNB exchange rates updated');
+  } catch (e) {
+    console.log('Failed to fetch CNB rates:', e.message);
+  }
+}
+updateRates();
+setInterval(updateRates, 6 * 60 * 60 * 1000);
 
 const app = express();
 app.use(cors());
@@ -161,7 +201,7 @@ app.get('/api/invoices/:id', authenticate, (req, res) => {
 });
 
 app.post('/api/invoices', authenticate, authorize('admin', 'accountant'), (req, res) => {
-  const { invoice_number, client_id, issue_date, due_date, status, currency, tax_rate, note, items } = req.body;
+  const { invoice_number, client_id, issue_date, due_date, supply_date, payment_method, status, currency, note, items } = req.body;
   const curr = db.prepare('SELECT rate_to_czk FROM currencies WHERE code = ?').get(currency || 'CZK');
   const rate = curr ? curr.rate_to_czk : 1;
 
@@ -176,22 +216,31 @@ app.post('/api/invoices', authenticate, authorize('admin', 'accountant'), (req, 
     db.prepare('UPDATE company SET invoice_counter = ? WHERE id = 1').run(counter + 1);
   }
 
+  // Calculate totals from per-item tax rates
   let subtotal = 0;
-  if (items) items.forEach(i => { subtotal += (i.quantity || 1) * (i.unit_price || 0); });
-  const taxAmt = subtotal * ((tax_rate || 21) / 100);
-  const total = subtotal + taxAmt;
+  let totalTax = 0;
+  if (items) items.forEach(i => {
+    const lineTotal = (i.quantity || 1) * (i.unit_price || 0);
+    const lineTax = lineTotal * ((i.tax_rate ?? 21) / 100);
+    subtotal += lineTotal;
+    totalTax += lineTax;
+  });
+  const total = subtotal + totalTax;
   const totalCzk = total * rate;
 
   const result = db.prepare(`
-    INSERT INTO invoices (invoice_number, type, client_id, issue_date, due_date, status, currency, subtotal, tax_rate, tax_amount, total, total_czk, note, created_by)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-  `).run(finalNumber, 'issued', client_id, issue_date, due_date, status || 'draft', currency || 'CZK', subtotal, tax_rate || 21, taxAmt, total, totalCzk, note || null, req.user.id);
+    INSERT INTO invoices (invoice_number, type, client_id, issue_date, due_date, supply_date, payment_method, status, currency, subtotal, tax_rate, tax_amount, total, total_czk, note, created_by)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+  `).run(finalNumber, 'issued', client_id, issue_date, due_date, supply_date || issue_date, payment_method || 'bank_transfer', status || 'draft', currency || 'CZK', subtotal, 0, totalTax, total, totalCzk, note || null, req.user.id);
 
   const invoiceId = result.lastInsertRowid;
-  const insertItem = db.prepare('INSERT INTO invoice_items (invoice_id, description, quantity, unit, unit_price, total) VALUES (?,?,?,?,?,?)');
+  const insertItem = db.prepare('INSERT INTO invoice_items (invoice_id, description, quantity, unit, unit_price, total, tax_rate, tax_amount, total_with_tax) VALUES (?,?,?,?,?,?,?,?,?)');
   if (items) {
     items.forEach(i => {
-      insertItem.run(invoiceId, i.description, i.quantity || 1, i.unit || 'ks', i.unit_price || 0, (i.quantity || 1) * (i.unit_price || 0));
+      const lineTotal = (i.quantity || 1) * (i.unit_price || 0);
+      const lineTaxRate = i.tax_rate ?? 21;
+      const lineTax = lineTotal * (lineTaxRate / 100);
+      insertItem.run(invoiceId, i.description, i.quantity || 1, i.unit || 'ks', i.unit_price || 0, lineTotal, lineTaxRate, lineTax, lineTotal + lineTax);
     });
   }
 
@@ -200,36 +249,38 @@ app.post('/api/invoices', authenticate, authorize('admin', 'accountant'), (req, 
 });
 
 app.put('/api/invoices/:id', authenticate, authorize('admin', 'accountant'), (req, res) => {
-  const { invoice_number, client_id, issue_date, due_date, paid_date, status, currency, tax_rate, note, items } = req.body;
+  const { invoice_number, client_id, issue_date, due_date, supply_date, payment_method, paid_date, status, currency, note, items } = req.body;
   const curr = db.prepare('SELECT rate_to_czk FROM currencies WHERE code = ?').get(currency || 'CZK');
   const rate = curr ? curr.rate_to_czk : 1;
 
   let subtotal = 0;
-  if (items) items.forEach(i => { subtotal += (i.quantity || 1) * (i.unit_price || 0); });
-  const taxAmt = subtotal * ((tax_rate || 21) / 100);
-  const total = subtotal + taxAmt;
+  let totalTax = 0;
+  if (items) items.forEach(i => {
+    const lineTotal = (i.quantity || 1) * (i.unit_price || 0);
+    const lineTax = lineTotal * ((i.tax_rate ?? 21) / 100);
+    subtotal += lineTotal;
+    totalTax += lineTax;
+  });
+  const total = subtotal + totalTax;
   const totalCzk = total * rate;
 
-  // Admin can change invoice number
+  const baseFields = 'client_id=?, issue_date=?, due_date=?, supply_date=?, payment_method=?, paid_date=?, status=?, currency=?, subtotal=?, tax_rate=?, tax_amount=?, total=?, total_czk=?, note=?, updated_at=datetime(\'now\')';
+  const baseParams = [client_id, issue_date, due_date, supply_date || issue_date, payment_method || 'bank_transfer', paid_date || null, status, currency || 'CZK', subtotal, 0, totalTax, total, totalCzk, note || null];
+
   if (invoice_number && req.user.role === 'admin') {
-    db.prepare(`
-      UPDATE invoices SET invoice_number=?, client_id=?, issue_date=?, due_date=?, paid_date=?, status=?, currency=?,
-      subtotal=?, tax_rate=?, tax_amount=?, total=?, total_czk=?, note=?, updated_at=datetime('now')
-      WHERE id=?
-    `).run(invoice_number, client_id, issue_date, due_date, paid_date || null, status, currency || 'CZK', subtotal, tax_rate || 21, taxAmt, total, totalCzk, note || null, req.params.id);
+    db.prepare(`UPDATE invoices SET invoice_number=?, ${baseFields} WHERE id=?`).run(invoice_number, ...baseParams, req.params.id);
   } else {
-    db.prepare(`
-      UPDATE invoices SET client_id=?, issue_date=?, due_date=?, paid_date=?, status=?, currency=?,
-      subtotal=?, tax_rate=?, tax_amount=?, total=?, total_czk=?, note=?, updated_at=datetime('now')
-      WHERE id=?
-    `).run(client_id, issue_date, due_date, paid_date || null, status, currency || 'CZK', subtotal, tax_rate || 21, taxAmt, total, totalCzk, note || null, req.params.id);
+    db.prepare(`UPDATE invoices SET ${baseFields} WHERE id=?`).run(...baseParams, req.params.id);
   }
 
   db.prepare('DELETE FROM invoice_items WHERE invoice_id = ?').run(req.params.id);
-  const insertItem = db.prepare('INSERT INTO invoice_items (invoice_id, description, quantity, unit, unit_price, total) VALUES (?,?,?,?,?,?)');
+  const insertItem = db.prepare('INSERT INTO invoice_items (invoice_id, description, quantity, unit, unit_price, total, tax_rate, tax_amount, total_with_tax) VALUES (?,?,?,?,?,?,?,?,?)');
   if (items) {
     items.forEach(i => {
-      insertItem.run(req.params.id, i.description, i.quantity || 1, i.unit || 'ks', i.unit_price || 0, (i.quantity || 1) * (i.unit_price || 0));
+      const lineTotal = (i.quantity || 1) * (i.unit_price || 0);
+      const lineTaxRate = i.tax_rate ?? 21;
+      const lineTax = lineTotal * (lineTaxRate / 100);
+      insertItem.run(req.params.id, i.description, i.quantity || 1, i.unit || 'ks', i.unit_price || 0, lineTotal, lineTaxRate, lineTax, lineTotal + lineTax);
     });
   }
 
@@ -333,9 +384,20 @@ app.get('/api/company', authenticate, (req, res) => {
 });
 
 app.put('/api/company', authenticate, authorize('admin'), (req, res) => {
-  const { name, ico, dic, email, phone, address, city, zip, country, bank_account, iban, swift, invoice_prefix, invoice_counter } = req.body;
-  db.prepare('INSERT OR REPLACE INTO company (id,name,ico,dic,email,phone,address,city,zip,country,bank_account,iban,swift,invoice_prefix,invoice_counter) VALUES (1,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run(name,ico||null,dic||null,email||null,phone||null,address||null,city||null,zip||null,country||'CZ',bank_account||null,iban||null,swift||null,invoice_prefix||'FV',invoice_counter||1);
+  const { name, ico, dic, email, phone, address, city, zip, country, bank_account, iban, swift, invoice_prefix, invoice_counter, default_due_days, vat_payer } = req.body;
+  db.prepare('INSERT OR REPLACE INTO company (id,name,ico,dic,email,phone,address,city,zip,country,bank_account,iban,swift,invoice_prefix,invoice_counter,default_due_days,vat_payer) VALUES (1,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run(name,ico||null,dic||null,email||null,phone||null,address||null,city||null,zip||null,country||'CZ',bank_account||null,iban||null,swift||null,invoice_prefix||'FV',invoice_counter||1,default_due_days||14,vat_payer?1:0);
   res.json({ ok: true });
+});
+
+// ─── CNB RATES REFRESH ──────────────────────────────────────
+app.post('/api/currencies/refresh', authenticate, authorize('admin'), async (req, res) => {
+  try {
+    await updateRates();
+    const currencies = db.prepare('SELECT * FROM currencies ORDER BY code').all();
+    res.json(currencies);
+  } catch (e) {
+    res.status(500).json({ error: 'Nepodařilo se aktualizovat kurzy' });
+  }
 });
 
 // ─── AUDIT LOG ───────────────────────────────────────────────

@@ -5,6 +5,7 @@ import { useAuth } from '../App';
 export default function Currencies() {
   const [currencies, setCurrencies] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [editingCode, setEditingCode] = useState(null);
   const [newRate, setNewRate] = useState('');
   const { can } = useAuth();
@@ -18,15 +19,36 @@ export default function Currencies() {
     load();
   };
 
+  const refreshRates = async () => {
+    setRefreshing(true);
+    try {
+      const updated = await api.refreshCurrencies();
+      setCurrencies(updated);
+    } catch (e) { /* ignore */ }
+    setRefreshing(false);
+  };
+
+  const fmtDate = (d) => {
+    if (!d) return '—';
+    const parts = d.slice(0, 10).split('-');
+    if (parts.length !== 3) return d;
+    return `${parts[2]}.${parts[1]}.${parts[0]}`;
+  };
+
   return (
     <div>
       <div className="page-header">
         <h1 className="page-title">Správa měn</h1>
+        {can('admin') && (
+          <button className="btn btn-primary" onClick={refreshRates} disabled={refreshing}>
+            {refreshing ? 'Aktualizuji...' : 'Aktualizovat z ČNB'}
+          </button>
+        )}
       </div>
 
       <div className="card">
         <p style={{ marginBottom: '1rem', fontSize: '0.85rem', color: 'var(--gray-500)' }}>
-          Kurzy jsou vztaženy k CZK (Česká koruna). Např. 1 EUR = 25.20 CZK.
+          Kurzy jsou vztaženy k CZK (Česká koruna). Např. 1 EUR = 25.20 CZK. Kurzy se automaticky aktualizují z ČNB.
         </p>
         {loading ? <div className="loading">Načítání...</div> : (
           <div className="table-responsive">
@@ -46,7 +68,7 @@ export default function Currencies() {
                         <strong>{c.rate_to_czk.toFixed(2)}</strong>
                       )}
                     </td>
-                    <td>{c.updated_at?.slice(0, 10)}</td>
+                    <td>{fmtDate(c.updated_at)}</td>
                     <td>
                       {can('admin', 'accountant') && c.code !== 'CZK' && (
                         editingCode === c.code ? (

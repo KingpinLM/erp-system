@@ -4,7 +4,14 @@ import { api } from '../api';
 import { useAuth } from '../App';
 
 const statusLabels = { draft: 'Koncept', sent: 'Odesláno', paid: 'Zaplaceno', overdue: 'Po splatnosti', cancelled: 'Zrušeno' };
+const paymentLabels = { bank_transfer: 'Bankovní převod', cash: 'Hotově', card: 'Kartou', other: 'Jiný' };
 const fmt = (n, cur = 'CZK') => new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: cur, maximumFractionDigits: 2 }).format(n);
+const fmtDate = (d) => {
+  if (!d) return '—';
+  const parts = d.slice(0, 10).split('-');
+  if (parts.length !== 3) return d;
+  return `${parts[2]}.${parts[1]}.${parts[0]}`;
+};
 
 export default function InvoiceDetail() {
   const { id } = useParams();
@@ -50,7 +57,7 @@ export default function InvoiceDetail() {
       .inv-party-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: #9ca3af; font-weight: 700; margin-bottom: 8px; }
       .inv-party-name { font-size: 16px; font-weight: 700; color: #1a1a2e; margin-bottom: 4px; }
       .inv-party-info { font-size: 12px; color: #64748b; line-height: 1.6; }
-      .inv-meta { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 32px; padding: 20px; background: #f8f9fa; border-radius: 10px; }
+      .inv-meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 16px; margin-bottom: 32px; padding: 20px; background: #f8f9fa; border-radius: 10px; }
       .inv-meta-item label { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: #9ca3af; font-weight: 700; margin-bottom: 4px; }
       .inv-meta-item span { font-size: 14px; font-weight: 600; color: #1a1a2e; }
       .inv-table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
@@ -86,6 +93,18 @@ export default function InvoiceDetail() {
   if (!invoice) return <div className="empty-state">Faktura nenalezena</div>;
 
   const companyName = company?.name || 'Rainbow Family Investment';
+  const isVatPayer = !!company?.vat_payer;
+
+  // Group tax by rate for summary
+  const taxByRate = {};
+  (invoice.items || []).forEach(item => {
+    const rate = item.tax_rate ?? 21;
+    const base = item.total || (item.quantity * item.unit_price);
+    const tax = item.tax_amount || (base * rate / 100);
+    if (!taxByRate[rate]) taxByRate[rate] = { base: 0, tax: 0 };
+    taxByRate[rate].base += base;
+    taxByRate[rate].tax += tax;
+  });
 
   return (
     <div>
@@ -169,11 +188,21 @@ export default function InvoiceDetail() {
           <div className="inv-meta">
             <div className="inv-meta-item">
               <label>Datum vystavení</label>
-              <span>{invoice.issue_date}</span>
+              <span>{fmtDate(invoice.issue_date)}</span>
             </div>
+            {isVatPayer && (
+              <div className="inv-meta-item">
+                <label>DÚZP</label>
+                <span>{fmtDate(invoice.supply_date || invoice.issue_date)}</span>
+              </div>
+            )}
             <div className="inv-meta-item">
               <label>Datum splatnosti</label>
-              <span>{invoice.due_date}</span>
+              <span>{fmtDate(invoice.due_date)}</span>
+            </div>
+            <div className="inv-meta-item">
+              <label>Způsob úhrady</label>
+              <span>{paymentLabels[invoice.payment_method] || 'Bankovní převod'}</span>
             </div>
             <div className="inv-meta-item">
               <label>Měna</label>
@@ -181,7 +210,7 @@ export default function InvoiceDetail() {
             </div>
             <div className="inv-meta-item">
               <label>{invoice.paid_date ? 'Zaplaceno' : 'Stav'}</label>
-              <span>{invoice.paid_date || statusLabels[invoice.status]}</span>
+              <span>{invoice.paid_date ? fmtDate(invoice.paid_date) : statusLabels[invoice.status]}</span>
             </div>
           </div>
 
@@ -192,26 +221,36 @@ export default function InvoiceDetail() {
                 <th className="right">Množství</th>
                 <th>Jednotka</th>
                 <th className="right">Cena/ks</th>
-                <th className="right">Celkem</th>
+                {isVatPayer && <th className="right">DPH</th>}
+                <th className="right">Celkem{isVatPayer ? ' bez DPH' : ''}</th>
+                {isVatPayer && <th className="right">Celkem s DPH</th>}
               </tr>
             </thead>
             <tbody>
-              {(invoice.items || []).map((item, i) => (
-                <tr key={i}>
-                  <td>{item.description}</td>
-                  <td className="right">{item.quantity}</td>
-                  <td>{item.unit}</td>
-                  <td className="right">{fmt(item.unit_price, invoice.currency)}</td>
-                  <td className="right">{fmt(item.total, invoice.currency)}</td>
-                </tr>
-              ))}
+              {(invoice.items || []).map((item, i) => {
+                const lineBase = item.total || (item.quantity * item.unit_price);
+                const lineTax = item.tax_amount || (lineBase * (item.tax_rate ?? 21) / 100);
+                return (
+                  <tr key={i}>
+                    <td>{item.description}</td>
+                    <td className="right">{item.quantity}</td>
+                    <td>{item.unit}</td>
+                    <td className="right">{fmt(item.unit_price, invoice.currency)}</td>
+                    {isVatPayer && <td className="right">{item.tax_rate ?? 21}%</td>}
+                    <td className="right">{fmt(lineBase, invoice.currency)}</td>
+                    {isVatPayer && <td className="right">{fmt(lineBase + lineTax, invoice.currency)}</td>}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
 
           <div className="inv-totals">
             <div className="inv-totals-box">
-              <div className="inv-totals-row"><span>Základ</span><span>{fmt(invoice.subtotal, invoice.currency)}</span></div>
-              <div className="inv-totals-row"><span>DPH {invoice.tax_rate}%</span><span>{fmt(invoice.tax_amount, invoice.currency)}</span></div>
+              {isVatPayer && <div className="inv-totals-row"><span>Základ</span><span>{fmt(invoice.subtotal, invoice.currency)}</span></div>}
+              {isVatPayer && Object.entries(taxByRate).map(([rate, vals]) => (
+                <div className="inv-totals-row" key={rate}><span>DPH {rate}%</span><span>{fmt(vals.tax, invoice.currency)}</span></div>
+              ))}
               <div className="inv-totals-total"><span>Celkem</span><span>{fmt(invoice.total, invoice.currency)}</span></div>
               {invoice.currency !== 'CZK' && (
                 <div className="inv-totals-czk"><span>Celkem v CZK</span><span>{fmt(invoice.total_czk, 'CZK')}</span></div>
@@ -233,6 +272,12 @@ export default function InvoiceDetail() {
               {invoice.created_by_signature && (
                 <img src={invoice.created_by_signature} alt="Podpis" className="inv-signature-img" />
               )}
+            </div>
+          )}
+
+          {!isVatPayer && (
+            <div className="inv-note" style={{ marginBottom: 24 }}>
+              <div className="inv-note-text">Dodavatel není plátce DPH.</div>
             </div>
           )}
 

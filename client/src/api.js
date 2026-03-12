@@ -62,4 +62,5 @@ export const api = {
   updateSignature: (signature) => request('/profile/signature', { method: 'PUT', body: JSON.stringify({ signature }) }),
   getUserSignature: (id) => request(`/users/${id}/signature`),
   updateUserSignature: (id, signature) => request(`/users/${id}/signature`, { method: 'PUT', body: JSON.stringify({ signature }) }),
+  refreshCurrencies: () => request('/currencies/refresh', { method: 'POST' }),
 };

@@ -4,6 +4,7 @@ import { useAuth } from '../App';
 
 const typeLabels = { income: 'Příjem', expense: 'Výdaj', asset: 'Majetek', document: 'Dokument' };
 const fmt = (n, cur = 'CZK') => n != null ? new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: cur, maximumFractionDigits: 2 }).format(n) : '—';
+const fmtDate = (d) => { if (!d) return '—'; const p = d.slice(0,10).split('-'); return p.length === 3 ? `${p[2]}.${p[1]}.${p[0]}` : d; };
 
 export default function Evidence() {
   const [records, setRecords] = useState([]);
@@ -96,7 +97,7 @@ export default function Evidence() {
                     <td><span className={`badge badge-${r.type}`}>{typeLabels[r.type]}</span></td>
                     <td><strong>{r.title}</strong>{r.description && <div className="text-muted" style={{ fontSize: '0.8rem' }}>{r.description}</div>}</td>
                     <td>{r.category || '—'}</td>
-                    <td>{r.date}</td>
+                    <td>{fmtDate(r.date)}</td>
                     <td className="text-right" style={{ fontWeight: 600, color: r.type === 'income' ? 'var(--success)' : r.type === 'expense' ? 'var(--danger)' : 'inherit' }}>{fmt(r.amount, r.currency)}</td>
                     <td>{r.currency}</td>
                     <td>{r.created_by_name}</td>

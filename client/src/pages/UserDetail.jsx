@@ -80,7 +80,7 @@ export default function UserDetail() {
             </div>
             <div>
               <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--gray-500)', marginBottom: 4 }}>Vytvořen</div>
-              <div style={{ fontSize: '1rem' }}>{user.created_at?.slice(0, 10)}</div>
+              <div style={{ fontSize: '1rem' }}>{user.created_at ? (() => { const p = user.created_at.slice(0,10).split('-'); return p.length === 3 ? `${p[2]}.${p[1]}.${p[0]}` : user.created_at; })() : '—'}</div>
             </div>
             <div>
               <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--gray-500)', marginBottom: 4 }}>Vystavených faktur</div>

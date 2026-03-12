@@ -4,6 +4,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { api } from '../api';
 
 const fmt = (n) => new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: 'CZK', maximumFractionDigits: 0 }).format(n);
+const fmtDate = (d) => { if (!d) return '—'; const p = d.slice(0,10).split('-'); return p.length === 3 ? `${p[2]}.${p[1]}.${p[0]}` : d; };
 const COLORS = ['#4361ee', '#2ec4b6', '#ff9f1c', '#e63946', '#9333ea', '#64748b'];
 
 export default function Dashboard() {
@@ -131,7 +132,7 @@ export default function Dashboard() {
                 <tr key={inv.id}>
                   <td><Link to={`/invoices/${inv.id}`} style={{ color: 'var(--primary)', fontWeight: 600 }}>{inv.invoice_number}</Link></td>
                   <td>{inv.client_name}</td>
-                  <td>{inv.issue_date}</td>
+                  <td>{fmtDate(inv.issue_date)}</td>
                   <td className="text-right">{new Intl.NumberFormat('cs-CZ').format(inv.total)}</td>
                   <td>{inv.currency}</td>
                   <td><span className={`badge badge-${inv.status}`}>{statusLabels[inv.status] || inv.status}</span></td>
