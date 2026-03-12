@@ -143,41 +143,41 @@ app.delete('/api/superadmin/tenants/:id', authenticate, requireSuperadmin, (req,
   res.json({ ok: true });
 });
 
-// ─── TENANT AUTH (login with slug) ──────────────────────────
+// ─── AUTH (login without tenant slug — globally unique usernames) ──
 app.post('/api/auth/login', (req, res) => {
-  const { username, password, tenant_slug } = req.body;
-  if (!tenant_slug) return res.status(400).json({ error: 'Zadejte identifikátor firmy' });
-
-  const tenant = db.prepare('SELECT * FROM tenants WHERE slug = ? AND active = 1').get(tenant_slug);
-  if (!tenant) return res.status(400).json({ error: 'Firma nenalezena nebo není aktivní' });
-
-  const user = db.prepare('SELECT * FROM users WHERE username = ? AND tenant_id = ? AND active = 1').get(username, tenant.id);
+  const { username, password } = req.body;
+  const user = db.prepare('SELECT * FROM users WHERE username = ? AND active = 1').get(username);
   if (!user || !bcrypt.compareSync(password, user.password)) {
     return res.status(401).json({ error: 'Neplatné přihlašovací údaje' });
   }
   const token = generateToken(user);
   const { password: _, ...safeUser } = user;
-  res.json({ token, user: safeUser, tenant: { id: tenant.id, name: tenant.name, slug: tenant.slug } });
+  let tenant = null;
+  if (user.tenant_id) {
+    tenant = db.prepare('SELECT id, name, slug FROM tenants WHERE id = ? AND active = 1').get(user.tenant_id);
+  }
+  res.json({ token, user: safeUser, tenant });
 });
 
-// ─── REGISTRATION (with tenant slug) ────────────────────────
+// ─── REGISTRATION (no tenant — user joins/creates tenant via onboarding) ──
 app.post('/api/auth/register', (req, res) => {
-  const { username, email, password, first_name, last_name, tenant_slug } = req.body;
-  if (!username || !email || !password || !first_name || !tenant_slug) {
+  const { username, email, password, first_name, last_name } = req.body;
+  if (!username || !email || !password || !first_name) {
     return res.status(400).json({ error: 'Vyplňte všechna povinná pole' });
   }
-  const tenant = db.prepare('SELECT * FROM tenants WHERE slug = ? AND active = 1').get(tenant_slug);
-  if (!tenant) return res.status(400).json({ error: 'Firma nenalezena' });
-
-  const existing = db.prepare('SELECT id FROM users WHERE (username = ? OR email = ?) AND tenant_id = ?').get(username, email, tenant.id);
+  const existing = db.prepare('SELECT id FROM users WHERE username = ? OR email = ?').get(username, email);
   if (existing) return res.status(400).json({ error: 'Uživatel s tímto jménem nebo emailem již existuje' });
 
   const hash = bcrypt.hashSync(password, 10);
   const full_name = `${first_name} ${last_name || ''}`.trim();
   try {
-    db.prepare('INSERT INTO users (tenant_id, username, email, password, full_name, first_name, last_name, role, active, status) VALUES (?,?,?,?,?,?,?,?,?,?)')
-      .run(tenant.id, username, email, hash, full_name, first_name, last_name || '', 'viewer', 0, 'pending');
-    res.json({ ok: true, message: 'Registrace úspěšná. Vyčkejte na schválení administrátorem.' });
+    db.prepare('INSERT INTO users (username, email, password, full_name, first_name, last_name, role, active, status) VALUES (?,?,?,?,?,?,?,?,?)')
+      .run(username, email, hash, full_name, first_name, last_name || '', 'viewer', 1, 'active');
+    // Auto-login after registration
+    const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
+    const token = generateToken(user);
+    const { password: _, ...safeUser } = user;
+    res.json({ token, user: safeUser, tenant: null });
   } catch (e) {
     res.status(400).json({ error: 'Chyba při registraci' });
   }
@@ -185,11 +185,8 @@ app.post('/api/auth/register', (req, res) => {
 
 // ─── PASSWORD RESET ───────────────────────────────────────────
 app.post('/api/auth/forgot-password', (req, res) => {
-  const { email, tenant_slug } = req.body;
-  if (!tenant_slug) return res.json({ ok: true });
-  const tenant = db.prepare('SELECT id FROM tenants WHERE slug = ?').get(tenant_slug);
-  if (!tenant) return res.json({ ok: true });
-  const user = db.prepare('SELECT id FROM users WHERE email = ? AND tenant_id = ?').get(email, tenant.id);
+  const { email } = req.body;
+  const user = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
   if (!user) return res.json({ ok: true });
   const token = crypto.randomBytes(32).toString('hex');
   const expires = new Date(Date.now() + 3600000).toISOString();
@@ -210,11 +207,49 @@ app.post('/api/auth/reset-password', (req, res) => {
   res.json({ ok: true });
 });
 
-// ─── RESOLVE TENANT SLUG (public, for login form) ──────────
-app.get('/api/tenants/resolve/:slug', (req, res) => {
-  const tenant = db.prepare('SELECT id, name, slug FROM tenants WHERE slug = ? AND active = 1').get(req.params.slug);
-  if (!tenant) return res.status(404).json({ error: 'Firma nenalezena' });
-  res.json(tenant);
+// ─── ONBOARDING (create or join tenant) ──────────────────────
+app.post('/api/onboarding/create-tenant', authenticate, (req, res) => {
+  const { name, slug } = req.body;
+  if (!name || !slug) return res.status(400).json({ error: 'Vyplňte název a identifikátor firmy' });
+  if (!/^[a-z0-9-]+$/.test(slug)) return res.status(400).json({ error: 'Identifikátor může obsahovat pouze malá písmena, čísla a pomlčky' });
+  if (req.user.tenant_id) return res.status(400).json({ error: 'Již jste členem firmy' });
+
+  const existing = db.prepare('SELECT id FROM tenants WHERE slug = ?').get(slug);
+  if (existing) return res.status(400).json({ error: 'Firma s tímto identifikátorem již existuje' });
+
+  const inviteCode = crypto.randomBytes(6).toString('hex');
+  const tenantResult = db.prepare('INSERT INTO tenants (name, slug, invite_code) VALUES (?, ?, ?)').run(name, slug, inviteCode);
+  const tenantId = tenantResult.lastInsertRowid;
+
+  // Create company record
+  db.prepare('INSERT INTO company (tenant_id, name) VALUES (?, ?)').run(tenantId, name);
+
+  // Assign user as admin of new tenant
+  db.prepare("UPDATE users SET tenant_id = ?, role = 'admin', updated_at = datetime('now') WHERE id = ?").run(tenantId, req.user.id);
+
+  // Return new token with tenant_id
+  const updatedUser = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
+  const token = generateToken(updatedUser);
+  const { password: _, ...safeUser } = updatedUser;
+  const tenant = { id: tenantId, name, slug };
+  res.json({ token, user: safeUser, tenant });
+});
+
+app.post('/api/onboarding/join-tenant', authenticate, (req, res) => {
+  const { invite_code } = req.body;
+  if (!invite_code) return res.status(400).json({ error: 'Zadejte kód pozvánky' });
+  if (req.user.tenant_id) return res.status(400).json({ error: 'Již jste členem firmy' });
+
+  const tenant = db.prepare('SELECT * FROM tenants WHERE invite_code = ? AND active = 1').get(invite_code);
+  if (!tenant) return res.status(400).json({ error: 'Neplatný kód pozvánky' });
+
+  // Assign user to tenant as viewer (pending approval)
+  db.prepare("UPDATE users SET tenant_id = ?, role = 'viewer', status = 'pending', active = 0, updated_at = datetime('now') WHERE id = ?").run(tenant.id, req.user.id);
+
+  const updatedUser = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
+  const token = generateToken(updatedUser);
+  const { password: _, ...safeUser } = updatedUser;
+  res.json({ token, user: safeUser, tenant: { id: tenant.id, name: tenant.name, slug: tenant.slug }, pending: true });
 });
 
 // ─── PENDING USERS (admin approval, tenant-scoped) ──────────

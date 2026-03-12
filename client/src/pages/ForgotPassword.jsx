@@ -12,18 +12,15 @@ export default function ForgotPassword() {
 
 function RequestForm() {
   const [email, setEmail] = useState('');
-  const [tenantSlug, setTenantSlug] = useState(localStorage.getItem('erp_tenant_slug') || '');
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!tenantSlug.trim()) { setError('Zadejte identifikátor firmy'); return; }
     setLoading(true);
     setError('');
     try {
-      localStorage.setItem('erp_tenant_slug', tenantSlug.trim());
       await api.forgotPassword(email);
       setSent(true);
     } catch (err) {
@@ -48,11 +45,6 @@ function RequestForm() {
           <>
             {error && <div className="login-error">{error}</div>}
             <form onSubmit={handleSubmit}>
-              <div className="form-group">
-                <label className="form-label">Firma (identifikátor)</label>
-                <input className="form-input" value={tenantSlug} onChange={e => setTenantSlug(e.target.value)} placeholder="napr. moje-firma" required
-                  style={{ fontFamily: 'monospace', letterSpacing: '0.5px' }} />
-              </div>
               <div className="form-group">
                 <label className="form-label">Emailová adresa</label>
                 <input className="form-input" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="vas@email.cz" required />

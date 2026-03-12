@@ -4,10 +4,6 @@ function getToken() {
   return localStorage.getItem('erp_token');
 }
 
-function getTenantSlug() {
-  return localStorage.getItem('erp_tenant_slug') || '';
-}
-
 async function request(path, options = {}) {
   const token = getToken();
   const res = await fetch(`${API}${path}`, {
@@ -19,13 +15,11 @@ async function request(path, options = {}) {
     },
   });
   if (res.status === 401 || res.status === 403) {
-    // Check if it's a tenant context error (stale token from pre-multi-tenant)
     const data = await res.json().catch(() => ({}));
-    if (res.status === 401 || data.error === 'Chybí tenant kontext') {
+    if (res.status === 401) {
       localStorage.removeItem('erp_token');
       localStorage.removeItem('erp_user');
       localStorage.removeItem('erp_tenant');
-      localStorage.removeItem('erp_tenant_slug');
       window.location.href = '/login';
       throw new Error('Unauthorized');
     }
@@ -38,13 +32,16 @@ async function request(path, options = {}) {
 }
 
 export const api = {
-  // Auth (tenant-scoped)
-  login: (username, password, tenant_slug) => request('/auth/login', { method: 'POST', body: JSON.stringify({ username, password, tenant_slug }) }),
+  // Auth
+  login: (username, password) => request('/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
   me: () => request('/auth/me'),
-  register: (data) => request('/auth/register', { method: 'POST', body: JSON.stringify({ ...data, tenant_slug: getTenantSlug() }) }),
-  forgotPassword: (email) => request('/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email, tenant_slug: getTenantSlug() }) }),
+  register: (data) => request('/auth/register', { method: 'POST', body: JSON.stringify(data) }),
+  forgotPassword: (email) => request('/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) }),
   resetPassword: (token, password) => request('/auth/reset-password', { method: 'POST', body: JSON.stringify({ token, password }) }),
-  resolveTenant: (slug) => request(`/tenants/resolve/${encodeURIComponent(slug)}`),
+
+  // Onboarding
+  createTenantOnboarding: (data) => request('/onboarding/create-tenant', { method: 'POST', body: JSON.stringify(data) }),
+  joinTenant: (invite_code) => request('/onboarding/join-tenant', { method: 'POST', body: JSON.stringify({ invite_code }) }),
 
   // Dashboard
   dashboard: () => request('/dashboard'),
@@ -122,7 +119,7 @@ export const api = {
   getCategoryRules: () => request('/category-rules'),
   deleteCategoryRule: (id) => request(`/category-rules/${id}`, { method: 'DELETE' }),
 
-  // ─── SUPERADMIN ─────────────────────────────────────────
+  // Superadmin
   superadminLogin: (username, password) => request('/superadmin/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
   getTenants: () => request('/superadmin/tenants'),
   getTenant: (id) => request(`/superadmin/tenants/${id}`),

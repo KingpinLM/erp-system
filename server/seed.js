@@ -1,5 +1,6 @@
 const db = require('./database');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 
 const hash = (pw) => bcrypt.hashSync(pw, 10);
 
@@ -7,17 +8,24 @@ const hash = (pw) => bcrypt.hashSync(pw, 10);
 db.prepare(`INSERT OR IGNORE INTO superadmins (username, email, password, full_name) VALUES (?, ?, ?, ?)`)
   .run('superadmin', 'superadmin@erp.cz', hash('super123'), 'Super Admin');
 
-// ─── DEFAULT TENANT ─────────────────────────────────────────
+// ─── DEFAULT TENANT (RFI) ───────────────────────────────────
 const existingTenant = db.prepare("SELECT id FROM tenants WHERE slug = 'rfi'").get();
 let tenantId;
 if (!existingTenant) {
-  const r = db.prepare("INSERT INTO tenants (name, slug) VALUES ('Rainbow Family Investment s.r.o.', 'rfi')").run();
+  const inviteCode = crypto.randomBytes(6).toString('hex');
+  const r = db.prepare("INSERT INTO tenants (name, slug, invite_code) VALUES ('Rainbow Family Investment s.r.o.', 'rfi', ?)").run(inviteCode);
   tenantId = r.lastInsertRowid;
 } else {
   tenantId = existingTenant.id;
+  // Ensure invite_code exists
+  const t = db.prepare("SELECT invite_code FROM tenants WHERE id = ?").get(tenantId);
+  if (!t.invite_code) {
+    const inviteCode = crypto.randomBytes(6).toString('hex');
+    db.prepare("UPDATE tenants SET invite_code = ? WHERE id = ?").run(inviteCode, tenantId);
+  }
 }
 
-// ─── USERS (tenant-scoped) ──────────────────────────────────
+// ─── USERS (globally unique usernames) ──────────────────────
 const insertUser = db.prepare(`INSERT OR IGNORE INTO users (tenant_id, username, email, password, full_name, first_name, last_name, role) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
 insertUser.run(tenantId, 'admin', 'admin@firma.cz', hash('admin123'), 'Jan Novák', 'Jan', 'Novák', 'admin');
 insertUser.run(tenantId, 'ucetni', 'ucetni@firma.cz', hash('ucetni123'), 'Marie Dvořáková', 'Marie', 'Dvořáková', 'accountant');
@@ -55,7 +63,6 @@ const insertInvoice = db.prepare(`
 `);
 const insertItem = db.prepare(`INSERT INTO invoice_items (invoice_id, description, quantity, unit, unit_price, total) VALUES (?, ?, ?, ?, ?, ?)`);
 
-// Get client IDs by name
 const getClientId = (name) => {
   const c = db.prepare("SELECT id FROM clients WHERE name = ? AND tenant_id = ?").get(name, tenantId);
   return c?.id;
@@ -104,20 +111,26 @@ if (!existingCompany) {
   db.prepare(`INSERT INTO company (tenant_id, name, ico, dic, invoice_prefix, invoice_counter) VALUES (?, 'Rainbow Family Investment s.r.o.', '23486899', 'CZ23486899', 'FV', 11)`).run(tenantId);
 }
 
-// ─── DEMO TENANT 2 ──────────────────────────────────────────
+// ─── DEMO TENANT 2 (globally unique usernames!) ─────────────
 const existingDemo = db.prepare("SELECT id FROM tenants WHERE slug = 'demo'").get();
 let demoTenantId;
 if (!existingDemo) {
-  const r = db.prepare("INSERT INTO tenants (name, slug) VALUES ('Demo firma s.r.o.', 'demo')").run();
+  const demoInviteCode = crypto.randomBytes(6).toString('hex');
+  const r = db.prepare("INSERT INTO tenants (name, slug, invite_code) VALUES ('Demo firma s.r.o.', 'demo', ?)").run(demoInviteCode);
   demoTenantId = r.lastInsertRowid;
-  // Admin user
+  // Unique username: demo-admin (not 'admin' — that's taken by RFI tenant)
   db.prepare('INSERT INTO users (tenant_id, username, email, password, full_name, first_name, last_name, role) VALUES (?,?,?,?,?,?,?,?)')
-    .run(demoTenantId, 'admin', 'admin@demo.cz', hash('admin123'), 'Demo Admin', 'Demo', 'Admin', 'admin');
-  // Company
+    .run(demoTenantId, 'demo-admin', 'admin@demo.cz', hash('admin123'), 'Demo Admin', 'Demo', 'Admin', 'admin');
   db.prepare("INSERT INTO company (tenant_id, name, ico, dic, invoice_prefix, invoice_counter) VALUES (?, 'Demo firma s.r.o.', '99887766', 'CZ99887766', 'DF', 1)").run(demoTenantId);
 }
+
+// Print invite codes
+const rfiTenant = db.prepare("SELECT invite_code FROM tenants WHERE slug = 'rfi'").get();
+const demoTenant = db.prepare("SELECT invite_code FROM tenants WHERE slug = 'demo'").get();
 
 console.log('Database seeded successfully!');
 console.log('Superadmin: superadmin / super123');
 console.log('Tenant "rfi": admin/admin123, ucetni/ucetni123, manager/manager123, viewer/viewer123');
-console.log('Tenant "demo": admin/admin123');
+console.log(`  Invite code: ${rfiTenant?.invite_code || 'N/A'}`);
+console.log('Tenant "demo": demo-admin/admin123');
+console.log(`  Invite code: ${demoTenant?.invite_code || 'N/A'}`);

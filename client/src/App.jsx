@@ -4,6 +4,7 @@ import { api } from './api';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
+import Onboarding from './pages/Onboarding';
 import Dashboard from './pages/Dashboard';
 import Invoices from './pages/Invoices';
 import InvoiceDetail from './pages/InvoiceDetail';
@@ -22,27 +23,6 @@ import './styles.css';
 export const AuthContext = createContext(null);
 export const useAuth = () => useContext(AuthContext);
 
-function clearStaleSession() {
-  // Clear old pre-multi-tenant sessions that lack tenant info
-  const savedUser = localStorage.getItem('erp_user');
-  const savedTenant = localStorage.getItem('erp_tenant');
-  const savedToken = localStorage.getItem('erp_token');
-  if (savedToken && savedUser && !savedTenant) {
-    try {
-      const user = JSON.parse(savedUser);
-      if (user.role !== 'superadmin') {
-        localStorage.removeItem('erp_token');
-        localStorage.removeItem('erp_user');
-        localStorage.removeItem('erp_tenant');
-        localStorage.removeItem('erp_tenant_slug');
-        return true;
-      }
-    } catch { /* ignore */ }
-  }
-  return false;
-}
-clearStaleSession();
-
 function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
     const saved = localStorage.getItem('erp_user');
@@ -54,15 +34,23 @@ function AuthProvider({ children }) {
     return saved ? JSON.parse(saved) : null;
   });
 
-  const login = async (username, password, tenant_slug) => {
-    const data = await api.login(username, password, tenant_slug);
-    localStorage.setItem('erp_token', data.token);
-    localStorage.setItem('erp_user', JSON.stringify(data.user));
-    localStorage.setItem('erp_tenant', JSON.stringify(data.tenant));
-    localStorage.setItem('erp_tenant_slug', data.tenant.slug);
-    setToken(data.token);
-    setUser(data.user);
-    setTenant(data.tenant);
+  const setSession = (newToken, newUser, newTenant) => {
+    localStorage.setItem('erp_token', newToken);
+    localStorage.setItem('erp_user', JSON.stringify(newUser));
+    if (newTenant) {
+      localStorage.setItem('erp_tenant', JSON.stringify(newTenant));
+    } else {
+      localStorage.removeItem('erp_tenant');
+    }
+    setToken(newToken);
+    setUser(newUser);
+    setTenant(newTenant);
+  };
+
+  const login = async (username, password) => {
+    const data = await api.login(username, password);
+    setSession(data.token, data.user, data.tenant);
+    return data;
   };
 
   const superadminLogin = async (username, password) => {
@@ -70,17 +58,22 @@ function AuthProvider({ children }) {
     localStorage.setItem('erp_token', data.token);
     localStorage.setItem('erp_user', JSON.stringify(data.user));
     localStorage.removeItem('erp_tenant');
-    localStorage.removeItem('erp_tenant_slug');
     setToken(data.token);
     setUser(data.user);
     setTenant(null);
+    return data;
+  };
+
+  const registerAndLogin = async (form) => {
+    const data = await api.register(form);
+    setSession(data.token, data.user, data.tenant);
+    return data;
   };
 
   const logout = () => {
     localStorage.removeItem('erp_token');
     localStorage.removeItem('erp_user');
     localStorage.removeItem('erp_tenant');
-    localStorage.removeItem('erp_tenant_slug');
     setToken(null);
     setUser(null);
     setTenant(null);
@@ -90,7 +83,7 @@ function AuthProvider({ children }) {
   const isSuperadmin = user?.role === 'superadmin';
 
   return (
-    <AuthContext.Provider value={{ user, token, tenant, login, superadminLogin, logout, can, isSuperadmin }}>
+    <AuthContext.Provider value={{ user, token, tenant, login, superadminLogin, registerAndLogin, logout, can, isSuperadmin, setSession }}>
       {children}
     </AuthContext.Provider>
   );
@@ -110,9 +103,20 @@ function SuperadminRoute({ children }) {
 }
 
 function TenantRoute({ children }) {
-  const { token, isSuperadmin } = useAuth();
+  const { token, user, isSuperadmin, tenant } = useAuth();
   if (!token) return <Navigate to="/login" replace />;
   if (isSuperadmin) return <Navigate to="/superadmin" replace />;
+  // If user has no tenant, redirect to onboarding
+  if (!user?.tenant_id) return <Navigate to="/onboarding" replace />;
+  return children;
+}
+
+function OnboardingRoute({ children }) {
+  const { token, user, isSuperadmin } = useAuth();
+  if (!token) return <Navigate to="/login" replace />;
+  if (isSuperadmin) return <Navigate to="/superadmin" replace />;
+  // If user already has a tenant, go to dashboard
+  if (user?.tenant_id) return <Navigate to="/" replace />;
   return children;
 }
 
@@ -203,6 +207,9 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/onboarding" element={
+            <OnboardingRoute><Onboarding /></OnboardingRoute>
+          } />
           <Route path="/superadmin" element={
             <SuperadminRoute><SuperAdmin /></SuperadminRoute>
           } />

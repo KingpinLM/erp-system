@@ -1,44 +1,28 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { api } from '../api';
+import { useNavigate, Link } from 'react-router-dom';
+import { useAuth } from '../App';
 
 export default function Register() {
-  const [form, setForm] = useState({ username: '', email: '', password: '', password2: '', first_name: '', last_name: '', tenant_slug: localStorage.getItem('erp_tenant_slug') || '' });
+  const [form, setForm] = useState({ username: '', email: '', password: '', password2: '', first_name: '', last_name: '' });
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
+  const { registerAndLogin } = useAuth();
+  const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    if (!form.tenant_slug.trim()) { setError('Zadejte identifikátor firmy'); return; }
     if (form.password !== form.password2) { setError('Hesla se neshodují'); return; }
     if (form.password.length < 6) { setError('Heslo musí mít alespoň 6 znaků'); return; }
     setLoading(true);
     try {
-      await api.register({ username: form.username, email: form.email, password: form.password, first_name: form.first_name, last_name: form.last_name, tenant_slug: form.tenant_slug.trim() });
-      setSuccess(true);
+      await registerAndLogin(form);
+      navigate('/onboarding');
     } catch (err) {
       setError(err.message);
     }
     setLoading(false);
   };
-
-  if (success) {
-    return (
-      <div className="login-page">
-        <div className="login-card">
-          <h1 className="login-title">RFI ERP</h1>
-          <div style={{ background: '#d1fae5', color: '#059669', padding: '1rem', borderRadius: 8, marginBottom: '1rem', textAlign: 'center' }}>
-            <strong>Registrace úspěšná!</strong><br />
-            Váš účet čeká na schválení administrátorem.<br />
-            Po schválení se budete moci přihlásit.
-          </div>
-          <Link to="/login" className="btn btn-primary" style={{ display: 'block', textAlign: 'center' }}>Zpět na přihlášení</Link>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="login-page">
@@ -47,11 +31,6 @@ export default function Register() {
         <p className="login-subtitle">Vytvořte si účet</p>
         {error && <div className="login-error">{error}</div>}
         <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label className="form-label">Firma (identifikátor) *</label>
-            <input className="form-input" value={form.tenant_slug} onChange={e => setForm(f => ({ ...f, tenant_slug: e.target.value }))} required
-              style={{ fontFamily: 'monospace', letterSpacing: '0.5px' }} placeholder="napr. moje-firma" />
-          </div>
           <div className="form-row">
             <div className="form-group">
               <label className="form-label">Jméno *</label>
