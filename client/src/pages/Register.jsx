@@ -1,13 +1,11 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../App';
+import { Link } from 'react-router-dom';
+import { api } from '../api';
 
 export default function Register() {
   const [form, setForm] = useState({ username: '', email: '', password: '', password2: '', first_name: '', last_name: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { registerAndLogin } = useAuth();
-  const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -16,12 +14,15 @@ export default function Register() {
     if (form.password.length < 6) { setError('Heslo musí mít alespoň 6 znaků'); return; }
     setLoading(true);
     try {
-      await registerAndLogin(form);
-      navigate('/onboarding');
+      const data = await api.register(form);
+      localStorage.setItem('erp_token', data.token);
+      localStorage.setItem('erp_user', JSON.stringify(data.user));
+      localStorage.removeItem('erp_tenant');
+      window.location.href = '/onboarding';
     } catch (err) {
       setError(err.message);
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (

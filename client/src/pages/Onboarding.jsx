@@ -1,15 +1,11 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../App';
 import { api } from '../api';
 
 export default function Onboarding() {
-  const [mode, setMode] = useState(null); // 'create' | 'join'
-  const { setSession } = useAuth();
-  const navigate = useNavigate();
+  const [mode, setMode] = useState(null);
 
-  if (mode === 'create') return <CreateTenant onBack={() => setMode(null)} setSession={setSession} navigate={navigate} />;
-  if (mode === 'join') return <JoinTenant onBack={() => setMode(null)} setSession={setSession} navigate={navigate} />;
+  if (mode === 'create') return <CreateTenant onBack={() => setMode(null)} />;
+  if (mode === 'join') return <JoinTenant onBack={() => setMode(null)} />;
 
   return (
     <div className="login-page">
@@ -27,12 +23,18 @@ export default function Onboarding() {
         <div style={{ marginTop: '1.5rem', fontSize: '0.8rem', color: '#64748b', textAlign: 'center' }}>
           Pro připojení k existující firmě budete potřebovat kód pozvánky od administrátora.
         </div>
+        <div style={{ marginTop: '1rem', textAlign: 'center' }}>
+          <button onClick={() => { localStorage.clear(); window.location.href = '/login'; }}
+            style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '0.8rem', textDecoration: 'underline' }}>
+            Odhlásit se
+          </button>
+        </div>
       </div>
     </div>
   );
 }
 
-function CreateTenant({ onBack, setSession, navigate }) {
+function CreateTenant({ onBack }) {
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
   const [error, setError] = useState('');
@@ -40,7 +42,6 @@ function CreateTenant({ onBack, setSession, navigate }) {
 
   const handleNameChange = (val) => {
     setName(val);
-    // Auto-generate slug from name
     setSlug(val.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''));
   };
 
@@ -50,12 +51,14 @@ function CreateTenant({ onBack, setSession, navigate }) {
     setLoading(true);
     try {
       const data = await api.createTenantOnboarding({ name, slug });
-      setSession(data.token, data.user, data.tenant);
-      navigate('/');
+      localStorage.setItem('erp_token', data.token);
+      localStorage.setItem('erp_user', JSON.stringify(data.user));
+      localStorage.setItem('erp_tenant', JSON.stringify(data.tenant));
+      window.location.href = '/';
     } catch (err) {
       setError(err.message);
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
@@ -89,7 +92,7 @@ function CreateTenant({ onBack, setSession, navigate }) {
   );
 }
 
-function JoinTenant({ onBack, setSession, navigate }) {
+function JoinTenant({ onBack }) {
   const [inviteCode, setInviteCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -103,15 +106,16 @@ function JoinTenant({ onBack, setSession, navigate }) {
       const data = await api.joinTenant(inviteCode.trim());
       if (data.pending) {
         setPending(true);
-        setSession(data.token, data.user, data.tenant);
       } else {
-        setSession(data.token, data.user, data.tenant);
-        navigate('/');
+        localStorage.setItem('erp_token', data.token);
+        localStorage.setItem('erp_user', JSON.stringify(data.user));
+        localStorage.setItem('erp_tenant', JSON.stringify(data.tenant));
+        window.location.href = '/';
       }
     } catch (err) {
       setError(err.message);
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   if (pending) {
@@ -124,7 +128,7 @@ function JoinTenant({ onBack, setSession, navigate }) {
             Váš účet čeká na schválení administrátorem firmy.<br />
             Po schválení se budete moci přihlásit a používat systém.
           </div>
-          <button onClick={() => { localStorage.removeItem('erp_token'); localStorage.removeItem('erp_user'); localStorage.removeItem('erp_tenant'); window.location.href = '/login'; }}
+          <button onClick={() => { localStorage.clear(); window.location.href = '/login'; }}
             className="btn btn-primary" style={{ width: '100%' }}>
             Zpět na přihlášení
           </button>

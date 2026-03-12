@@ -1,29 +1,31 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../App';
+import { Link } from 'react-router-dom';
+import { api } from '../api';
 
 export default function Login() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
-  const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
     try {
-      const result = await login(username, password);
-      if (result?.user?.tenant_id) {
-        navigate('/');
+      const data = await api.login(username, password);
+      // Store in localStorage directly
+      localStorage.setItem('erp_token', data.token);
+      localStorage.setItem('erp_user', JSON.stringify(data.user));
+      if (data.tenant) {
+        localStorage.setItem('erp_tenant', JSON.stringify(data.tenant));
       } else {
-        navigate('/onboarding');
+        localStorage.removeItem('erp_tenant');
       }
+      // Full page reload to guarantee fresh state
+      window.location.href = data.user.tenant_id ? '/' : '/onboarding';
     } catch (err) {
       setError(err.message || 'Neplatné přihlašovací údaje');
-    } finally {
       setLoading(false);
     }
   };
