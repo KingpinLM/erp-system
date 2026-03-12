@@ -7,7 +7,7 @@ const { generateToken, authenticate, authorize } = require('./auth');
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '5mb' }));
 
 // Serve static frontend in production
 app.use(express.static(path.join(__dirname, '..', 'client', 'dist')));
@@ -25,8 +25,20 @@ app.post('/api/auth/login', (req, res) => {
 });
 
 app.get('/api/auth/me', authenticate, (req, res) => {
-  const user = db.prepare('SELECT id, username, email, full_name, role, active, created_at FROM users WHERE id = ?').get(req.user.id);
+  const user = db.prepare('SELECT id, username, email, full_name, role, active, signature, created_at FROM users WHERE id = ?').get(req.user.id);
   res.json(user);
+});
+
+// ─── PROFILE / SIGNATURE ───────────────────────────────────
+app.put('/api/profile/signature', authenticate, (req, res) => {
+  const { signature } = req.body;
+  db.prepare("UPDATE users SET signature = ?, updated_at = datetime('now') WHERE id = ?").run(signature || null, req.user.id);
+  res.json({ ok: true });
+});
+
+app.get('/api/users/:id/signature', authenticate, (req, res) => {
+  const row = db.prepare('SELECT signature FROM users WHERE id = ?').get(req.params.id);
+  res.json({ signature: row?.signature || null });
 });
 
 // ─── DASHBOARD ───────────────────────────────────────────────
@@ -125,7 +137,15 @@ app.get('/api/invoices', authenticate, (req, res) => {
 });
 
 app.get('/api/invoices/:id', authenticate, (req, res) => {
-  const invoice = db.prepare('SELECT i.*, c.name as client_name FROM invoices i LEFT JOIN clients c ON i.client_id = c.id WHERE i.id = ?').get(req.params.id);
+  const invoice = db.prepare(`
+    SELECT i.*, c.name as client_name, c.ico as client_ico, c.dic as client_dic,
+      c.address as client_address, c.city as client_city, c.zip as client_zip, c.email as client_email,
+      u.full_name as created_by_name, u.signature as created_by_signature
+    FROM invoices i
+    LEFT JOIN clients c ON i.client_id = c.id
+    LEFT JOIN users u ON i.created_by = u.id
+    WHERE i.id = ?
+  `).get(req.params.id);
   if (!invoice) return res.status(404).json({ error: 'Faktura nenalezena' });
   invoice.items = db.prepare('SELECT * FROM invoice_items WHERE invoice_id = ?').all(req.params.id);
   res.json(invoice);

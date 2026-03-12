@@ -57,4 +57,6 @@ export const api = {
   getAuditLog: () => request('/audit-log'),
   getCompany: () => request('/company'),
   updateCompany: (data) => request('/company', { method: 'PUT', body: JSON.stringify(data) }),
+  updateSignature: (signature) => request('/profile/signature', { method: 'PUT', body: JSON.stringify({ signature }) }),
+  getUserSignature: (id) => request(`/users/${id}/signature`),
 };

@@ -11,6 +11,7 @@ import Clients from './pages/Clients';
 import Users from './pages/Users';
 import Currencies from './pages/Currencies';
 import Company from './pages/Company';
+import Profile from './pages/Profile';
 import './styles.css';
 
 export const AuthContext = createContext(null);
@@ -100,6 +101,9 @@ function Sidebar({ open, onClose }) {
             </Link>
           ))}
         </nav>
+        <Link to="/profile" className="sidebar-link sidebar-profile-link" onClick={onClose} style={{ marginTop: 'auto' }}>
+          <span className="sidebar-icon">👤</span> Můj profil
+        </Link>
         <button className="sidebar-logout" onClick={() => { logout(); navigate('/login'); }}>
           Odhlásit se
         </button>
@@ -144,6 +148,7 @@ export default function App() {
                   <Route path="/currencies" element={<Currencies />} />
                   <Route path="/company" element={<Company />} />
                   <Route path="/users" element={<Users />} />
+                  <Route path="/profile" element={<Profile />} />
                 </Routes>
               </Layout>
             </ProtectedRoute>

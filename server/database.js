@@ -15,6 +15,7 @@ db.exec(`
     full_name TEXT NOT NULL,
     role TEXT NOT NULL DEFAULT 'viewer' CHECK(role IN ('admin','accountant','manager','viewer')),
     active INTEGER NOT NULL DEFAULT 1,
+    signature TEXT,
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now'))
   );

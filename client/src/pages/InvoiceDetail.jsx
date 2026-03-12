@@ -69,6 +69,10 @@ export default function InvoiceDetail() {
       .inv-note-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: #9ca3af; font-weight: 700; margin-bottom: 6px; }
       .inv-note-text { font-size: 13px; color: #64748b; line-height: 1.5; }
       .inv-footer { text-align: center; padding-top: 24px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #9ca3af; }
+      .inv-issuer { margin-bottom: 24px; text-align: right; }
+      .inv-issuer-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: #9ca3af; font-weight: 700; margin-bottom: 4px; }
+      .inv-issuer-name { font-size: 14px; font-weight: 600; color: #1a1a2e; margin-bottom: 8px; }
+      .inv-signature-img { max-width: 180px; max-height: 80px; }
       .inv-gradient-bar-bottom { height: 4px; background: linear-gradient(90deg, #ff6b6b, #ffa500, #ffd93d, #6bcb77, #4d96ff, #9b59b6); border-radius: 2px; margin-top: 24px; }
       @media print { body { padding: 0; } .invoice-pdf { padding: 20px; } }
     </style>
@@ -143,6 +147,8 @@ export default function InvoiceDetail() {
                 {company?.dic && <>DIČ: {company.dic}<br/></>}
                 {company?.address && <>{company.address}<br/></>}
                 {company?.city && <>{company.city} {company?.zip}</>}
+                {company?.email && <><br/>{company.email}</>}
+                {company?.phone && <><br/>{company.phone}</>}
                 {company?.bank_account && <><br/>Účet: {company.bank_account}</>}
                 {company?.iban && <><br/>IBAN: {company.iban}</>}
               </div>
@@ -150,7 +156,13 @@ export default function InvoiceDetail() {
             <div>
               <div className="inv-party-label">Odběratel</div>
               <div className="inv-party-name">{invoice.client_name || '—'}</div>
-              <div className="inv-party-info"></div>
+              <div className="inv-party-info">
+                {invoice.client_ico && <>IČO: {invoice.client_ico}<br/></>}
+                {invoice.client_dic && <>DIČ: {invoice.client_dic}<br/></>}
+                {invoice.client_address && <>{invoice.client_address}<br/></>}
+                {invoice.client_city && <>{invoice.client_city} {invoice.client_zip}</>}
+                {invoice.client_email && <><br/>{invoice.client_email}</>}
+              </div>
             </div>
           </div>
 
@@ -211,6 +223,16 @@ export default function InvoiceDetail() {
             <div className="inv-note">
               <div className="inv-note-label">Poznámka</div>
               <div className="inv-note-text">{invoice.note}</div>
+            </div>
+          )}
+
+          {invoice.created_by_name && (
+            <div className="inv-issuer">
+              <div className="inv-issuer-label">Vystavil/a</div>
+              <div className="inv-issuer-name">{invoice.created_by_name}</div>
+              {invoice.created_by_signature && (
+                <img src={invoice.created_by_signature} alt="Podpis" className="inv-signature-img" />
+              )}
             </div>
           )}
 
