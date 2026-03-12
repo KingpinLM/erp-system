@@ -18,13 +18,19 @@ async function request(path, options = {}) {
       ...options.headers,
     },
   });
-  if (res.status === 401) {
-    localStorage.removeItem('erp_token');
-    localStorage.removeItem('erp_user');
-    localStorage.removeItem('erp_tenant');
-    localStorage.removeItem('erp_tenant_slug');
-    window.location.href = '/login';
-    throw new Error('Unauthorized');
+  if (res.status === 401 || res.status === 403) {
+    // Check if it's a tenant context error (stale token from pre-multi-tenant)
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 401 || data.error === 'Chybí tenant kontext') {
+      localStorage.removeItem('erp_token');
+      localStorage.removeItem('erp_user');
+      localStorage.removeItem('erp_tenant');
+      localStorage.removeItem('erp_tenant_slug');
+      window.location.href = '/login';
+      throw new Error('Unauthorized');
+    }
+    if (!res.ok) throw new Error(data.error || 'Nedostatečná oprávnění');
+    return data;
   }
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Chyba serveru');
