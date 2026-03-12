@@ -5,29 +5,26 @@ function getToken() {
 }
 
 async function request(path, options = {}) {
+  const isAuthEndpoint = path.startsWith('/auth/') || path.startsWith('/superadmin/login');
   const token = getToken();
   const res = await fetch(`${API}${path}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(!isAuthEndpoint && token ? { Authorization: `Bearer ${token}` } : {}),
       ...options.headers,
     },
   });
-  if (res.status === 401 || res.status === 403) {
-    const data = await res.json().catch(() => ({}));
-    if (res.status === 401) {
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    if (res.status === 401 && !isAuthEndpoint) {
       localStorage.removeItem('erp_token');
       localStorage.removeItem('erp_user');
       localStorage.removeItem('erp_tenant');
       window.location.href = '/login';
-      throw new Error('Unauthorized');
     }
-    if (!res.ok) throw new Error(data.error || 'Nedostatečná oprávnění');
-    return data;
+    throw new Error(data.error || 'Chyba serveru');
   }
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Chyba serveru');
   return data;
 }
 
