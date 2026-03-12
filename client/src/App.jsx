@@ -23,6 +23,17 @@ import './styles.css';
 export const AuthContext = createContext(null);
 export const useAuth = () => useContext(AuthContext);
 
+// Clear stale sessions from old auth flow
+(function clearStaleStorage() {
+  const slug = localStorage.getItem('erp_tenant_slug');
+  if (slug) {
+    localStorage.removeItem('erp_token');
+    localStorage.removeItem('erp_user');
+    localStorage.removeItem('erp_tenant');
+    localStorage.removeItem('erp_tenant_slug');
+  }
+})();
+
 function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
     const saved = localStorage.getItem('erp_user');
