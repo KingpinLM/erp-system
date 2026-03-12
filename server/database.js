@@ -216,15 +216,16 @@ try {
   });
 } catch (e) { /* ok */ }
 
-// Ensure default tenant exists and migrate orphan data
+// Migrate orphan data (only for upgrades from pre-multi-tenant DB)
 try {
-  const hasTenant = db.prepare("SELECT id FROM tenants WHERE slug = 'rfi'").get();
-  if (!hasTenant) {
-    db.prepare("INSERT INTO tenants (name, slug) VALUES ('Výchozí firma', 'rfi')").run();
-  }
-  const defaultTenant = db.prepare("SELECT id FROM tenants WHERE slug = 'rfi'").get();
-  if (defaultTenant) {
-    const tid = defaultTenant.id;
+  const orphanUsers = db.prepare("SELECT COUNT(*) as cnt FROM users WHERE tenant_id IS NULL").get().cnt;
+  if (orphanUsers > 0) {
+    let tenant = db.prepare("SELECT id FROM tenants WHERE slug = 'rfi'").get();
+    if (!tenant) {
+      db.prepare("INSERT INTO tenants (name, slug) VALUES ('Výchozí firma', 'rfi')").run();
+      tenant = db.prepare("SELECT id FROM tenants WHERE slug = 'rfi'").get();
+    }
+    const tid = tenant.id;
     // Migrate orphan rows to default tenant
     db.prepare("UPDATE users SET tenant_id = ? WHERE tenant_id IS NULL").run(tid);
     db.prepare("UPDATE clients SET tenant_id = ? WHERE tenant_id IS NULL").run(tid);
