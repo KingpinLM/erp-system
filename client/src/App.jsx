@@ -13,6 +13,7 @@ import Currencies from './pages/Currencies';
 import Company from './pages/Company';
 import Profile from './pages/Profile';
 import UserDetail from './pages/UserDetail';
+import ClientDetail from './pages/ClientDetail';
 import './styles.css';
 
 export const AuthContext = createContext(null);
@@ -146,6 +147,7 @@ export default function App() {
                   <Route path="/invoices/:id/edit" element={<InvoiceForm />} />
                   <Route path="/evidence" element={<Evidence />} />
                   <Route path="/clients" element={<Clients />} />
+                  <Route path="/clients/:id" element={<ClientDetail />} />
                   <Route path="/currencies" element={<Currencies />} />
                   <Route path="/company" element={<Company />} />
                   <Route path="/users" element={<Users />} />

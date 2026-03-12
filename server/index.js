@@ -1,10 +1,18 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 const https = require('https');
+const multer = require('multer');
+const pdfParse = require('pdf-parse');
+const AdmZip = require('adm-zip');
 const db = require('./database');
 const bcrypt = require('bcryptjs');
 const { generateToken, authenticate, authorize } = require('./auth');
+
+const uploadDir = path.join(__dirname, '..', 'uploads');
+if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+const upload = multer({ dest: uploadDir, limits: { fileSize: 20 * 1024 * 1024 } });
 
 // ─── CNB EXCHANGE RATES ─────────────────────────────────────
 function fetchCnbRates() {
@@ -159,19 +167,38 @@ app.put('/api/clients/:id', authenticate, authorize('admin', 'accountant', 'mana
   res.json({ ok: true });
 });
 
+app.get('/api/clients/:id', authenticate, (req, res) => {
+  const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(req.params.id);
+  if (!client) return res.status(404).json({ error: 'Klient nenalezen' });
+  res.json(client);
+});
+
+app.get('/api/clients/:id/invoices', authenticate, (req, res) => {
+  res.json(db.prepare('SELECT * FROM invoices WHERE client_id = ? ORDER BY created_at DESC').all(req.params.id));
+});
+
 app.delete('/api/clients/:id', authenticate, authorize('admin'), (req, res) => {
   db.prepare('DELETE FROM clients WHERE id = ?').run(req.params.id);
   res.json({ ok: true });
 });
 
 // ─── INVOICES ────────────────────────────────────────────────
-app.get('/api/invoices/next-number', authenticate, (req, res) => {
-  const comp = db.prepare('SELECT invoice_prefix, invoice_counter FROM company WHERE id = 1').get();
+function generateInvoiceNumber(comp) {
   const prefix = comp?.invoice_prefix || 'FV';
   const counter = comp?.invoice_counter || 1;
-  const year = new Date().getFullYear();
-  const number = `${prefix}-${year}-${String(counter).padStart(3, '0')}`;
-  res.json({ number });
+  const sep = comp?.invoice_separator || '-';
+  const padding = comp?.invoice_padding || 3;
+  const yearFmt = comp?.invoice_year_format || 'full';
+  const format = comp?.invoice_format || '{prefix}{sep}{year}{sep}{num}';
+  const fullYear = new Date().getFullYear();
+  const year = yearFmt === 'short' ? String(fullYear).slice(2) : String(fullYear);
+  const num = String(counter).padStart(padding, '0');
+  return format.replace(/\{prefix\}/g, prefix).replace(/\{sep\}/g, sep).replace(/\{year\}/g, year).replace(/\{num\}/g, num);
+}
+
+app.get('/api/invoices/next-number', authenticate, (req, res) => {
+  const comp = db.prepare('SELECT * FROM company WHERE id = 1').get();
+  res.json({ number: generateInvoiceNumber(comp) });
 });
 
 app.get('/api/invoices', authenticate, (req, res) => {
@@ -208,12 +235,9 @@ app.post('/api/invoices', authenticate, authorize('admin', 'accountant'), (req, 
   // Auto-generate invoice number if not provided
   let finalNumber = invoice_number;
   if (!finalNumber) {
-    const comp = db.prepare('SELECT invoice_prefix, invoice_counter FROM company WHERE id = 1').get();
-    const prefix = comp?.invoice_prefix || 'FV';
-    const counter = comp?.invoice_counter || 1;
-    const year = new Date().getFullYear();
-    finalNumber = `${prefix}-${year}-${String(counter).padStart(3, '0')}`;
-    db.prepare('UPDATE company SET invoice_counter = ? WHERE id = 1').run(counter + 1);
+    const comp = db.prepare('SELECT * FROM company WHERE id = 1').get();
+    finalNumber = generateInvoiceNumber(comp);
+    db.prepare('UPDATE company SET invoice_counter = ? WHERE id = 1').run((comp?.invoice_counter || 1) + 1);
   }
 
   // Calculate totals from per-item tax rates
@@ -316,9 +340,10 @@ app.get('/api/evidence', authenticate, (req, res) => {
 });
 
 app.post('/api/evidence', authenticate, authorize('admin', 'accountant', 'manager'), (req, res) => {
-  const { type, title, description, amount, currency, date, category, invoice_id } = req.body;
-  const result = db.prepare('INSERT INTO evidence (type, title, description, amount, currency, date, category, invoice_id, created_by) VALUES (?,?,?,?,?,?,?,?,?)')
-    .run(type, title, description || null, amount || null, currency || 'CZK', date, category || null, invoice_id || null, req.user.id);
+  const { type, title, description, amount, currency, date, category, invoice_id, file_path, original_filename } = req.body;
+  const result = db.prepare('INSERT INTO evidence (type, title, description, amount, currency, date, category, invoice_id, created_by, file_path, original_filename) VALUES (?,?,?,?,?,?,?,?,?,?,?)')
+    .run(type, title, description || null, amount || null, currency || 'CZK', date, category || null, invoice_id || null, req.user.id, file_path || null, original_filename || null);
+  if (category) learnCategory(title, description, category);
   res.json({ id: result.lastInsertRowid });
 });
 
@@ -326,6 +351,7 @@ app.put('/api/evidence/:id', authenticate, authorize('admin', 'accountant'), (re
   const { type, title, description, amount, currency, date, category, invoice_id } = req.body;
   db.prepare('UPDATE evidence SET type=?, title=?, description=?, amount=?, currency=?, date=?, category=?, invoice_id=? WHERE id=?')
     .run(type, title, description, amount, currency, date, category, invoice_id || null, req.params.id);
+  if (category) learnCategory(title, description, category);
   res.json({ ok: true });
 });
 
@@ -384,8 +410,8 @@ app.get('/api/company', authenticate, (req, res) => {
 });
 
 app.put('/api/company', authenticate, authorize('admin'), (req, res) => {
-  const { name, ico, dic, email, phone, address, city, zip, country, bank_account, iban, swift, invoice_prefix, invoice_counter, default_due_days, vat_payer } = req.body;
-  db.prepare('INSERT OR REPLACE INTO company (id,name,ico,dic,email,phone,address,city,zip,country,bank_account,iban,swift,invoice_prefix,invoice_counter,default_due_days,vat_payer) VALUES (1,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run(name,ico||null,dic||null,email||null,phone||null,address||null,city||null,zip||null,country||'CZ',bank_account||null,iban||null,swift||null,invoice_prefix||'FV',invoice_counter||1,default_due_days||14,vat_payer?1:0);
+  const { name, ico, dic, email, phone, address, city, zip, country, bank_account, iban, swift, invoice_prefix, invoice_counter, default_due_days, vat_payer, invoice_format, invoice_separator, invoice_padding, invoice_year_format } = req.body;
+  db.prepare('INSERT OR REPLACE INTO company (id,name,ico,dic,email,phone,address,city,zip,country,bank_account,iban,swift,invoice_prefix,invoice_counter,default_due_days,vat_payer,invoice_format,invoice_separator,invoice_padding,invoice_year_format) VALUES (1,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run(name,ico||null,dic||null,email||null,phone||null,address||null,city||null,zip||null,country||'CZ',bank_account||null,iban||null,swift||null,invoice_prefix||'FV',invoice_counter||1,default_due_days||14,vat_payer?1:0,invoice_format||'{prefix}{sep}{year}{sep}{num}',invoice_separator||'-',invoice_padding||3,invoice_year_format||'full');
   res.json({ ok: true });
 });
 
@@ -404,6 +430,123 @@ app.post('/api/currencies/refresh', authenticate, authorize('admin'), async (req
 app.get('/api/audit-log', authenticate, authorize('admin'), (req, res) => {
   res.json(db.prepare('SELECT a.*, u.full_name as user_name FROM audit_log a LEFT JOIN users u ON a.user_id = u.id ORDER BY a.created_at DESC LIMIT 100').all());
 });
+
+// ─── PDF/ZIP UPLOAD & EXPENSE EXTRACTION ────────────────────
+function extractExpenseFromText(text) {
+  const result = { title: '', amount: null, date: null, category: null };
+  // Try to extract amount (Czech format: 1 234,56 or 1234.56)
+  const amountMatch = text.match(/(?:celkem|total|k úhradě|částka|suma|amount)[:\s]*([0-9\s]+[.,]\d{2})/i)
+    || text.match(/([0-9\s]{1,10}[.,]\d{2})\s*(?:Kč|CZK|EUR|USD)/i)
+    || text.match(/(?:Kč|CZK|EUR|USD)\s*([0-9\s]{1,10}[.,]\d{2})/i);
+  if (amountMatch) {
+    result.amount = parseFloat(amountMatch[1].replace(/\s/g, '').replace(',', '.'));
+  }
+  // Try to extract date (DD.MM.YYYY or YYYY-MM-DD)
+  const dateMatch = text.match(/(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4})/) || text.match(/(\d{4})-(\d{2})-(\d{2})/);
+  if (dateMatch) {
+    if (dateMatch[3] && dateMatch[3].length === 4) {
+      result.date = `${dateMatch[3]}-${dateMatch[2].padStart(2, '0')}-${dateMatch[1].padStart(2, '0')}`;
+    } else if (dateMatch[1] && dateMatch[1].length === 4) {
+      result.date = `${dateMatch[1]}-${dateMatch[2]}-${dateMatch[3]}`;
+    }
+  }
+  // Title from first meaningful line
+  const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 3 && l.length < 100);
+  result.title = lines[0] || 'Importovaný doklad';
+  return result;
+}
+
+function suggestCategory(text) {
+  // First check learned rules
+  const rules = db.prepare('SELECT keyword, category, weight FROM category_rules ORDER BY weight DESC').all();
+  const lowerText = text.toLowerCase();
+  for (const rule of rules) {
+    if (lowerText.includes(rule.keyword.toLowerCase())) {
+      return rule.category;
+    }
+  }
+  return null;
+}
+
+function learnCategory(title, description, category) {
+  if (!category) return;
+  // Extract keywords from title
+  const words = (title + ' ' + (description || '')).toLowerCase().split(/\s+/).filter(w => w.length > 3);
+  words.forEach(word => {
+    const existing = db.prepare('SELECT id, weight FROM category_rules WHERE keyword = ? AND category = ?').get(word, category);
+    if (existing) {
+      db.prepare('UPDATE category_rules SET weight = weight + 1 WHERE id = ?').run(existing.id);
+    } else {
+      db.prepare('INSERT INTO category_rules (keyword, category) VALUES (?, ?)').run(word, category);
+    }
+  });
+}
+
+app.post('/api/evidence/upload', authenticate, authorize('admin', 'accountant', 'manager'), upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'Žádný soubor' });
+    const results = [];
+
+    const processFile = async (filePath, originalName) => {
+      if (originalName.toLowerCase().endsWith('.pdf')) {
+        const buffer = fs.readFileSync(filePath);
+        const data = await pdfParse(buffer);
+        const extracted = extractExpenseFromText(data.text);
+        const category = suggestCategory(data.text);
+        results.push({
+          title: extracted.title,
+          amount: extracted.amount,
+          date: extracted.date || new Date().toISOString().slice(0, 10),
+          category: category,
+          text_preview: data.text.slice(0, 500),
+          original_filename: originalName,
+          file_path: filePath
+        });
+      }
+    };
+
+    if (req.file.originalname.toLowerCase().endsWith('.zip')) {
+      const zip = new AdmZip(req.file.path);
+      const entries = zip.getEntries();
+      for (const entry of entries) {
+        if (entry.entryName.toLowerCase().endsWith('.pdf') && !entry.isDirectory) {
+          const tempPath = path.join(uploadDir, `${Date.now()}_${entry.entryName.replace(/[/\\]/g, '_')}`);
+          fs.writeFileSync(tempPath, entry.getData());
+          await processFile(tempPath, entry.entryName);
+        }
+      }
+      fs.unlinkSync(req.file.path); // remove zip
+    } else {
+      await processFile(req.file.path, req.file.originalname);
+    }
+
+    res.json(results);
+  } catch (e) {
+    console.error('Upload error:', e);
+    res.status(500).json({ error: 'Chyba při zpracování souboru: ' + e.message });
+  }
+});
+
+// ─── CATEGORY RULES ─────────────────────────────────────────
+app.get('/api/categories', authenticate, (req, res) => {
+  // Get distinct categories from evidence + rules
+  const fromEvidence = db.prepare("SELECT DISTINCT category FROM evidence WHERE category IS NOT NULL AND category != '' ORDER BY category").all().map(r => r.category);
+  const fromRules = db.prepare("SELECT DISTINCT category FROM category_rules ORDER BY category").all().map(r => r.category);
+  const all = [...new Set([...fromEvidence, ...fromRules])].sort();
+  res.json(all);
+});
+
+app.get('/api/category-rules', authenticate, authorize('admin'), (req, res) => {
+  res.json(db.prepare('SELECT * FROM category_rules ORDER BY category, weight DESC').all());
+});
+
+app.delete('/api/category-rules/:id', authenticate, authorize('admin'), (req, res) => {
+  db.prepare('DELETE FROM category_rules WHERE id = ?').run(req.params.id);
+  res.json({ ok: true });
+});
+
+// Override: when user sets/changes category on evidence, learn from it
+const origEvidencePost = '/api/evidence';
 
 // SPA fallback
 app.get('*', (req, res) => {

@@ -1,8 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api';
 
+const formatTemplates = [
+  { value: '{prefix}{sep}{year}{sep}{num}', label: 'Prefix-Rok-Číslo', example: 'FV-2026-001' },
+  { value: '{prefix}{sep}{num}{sep}{year}', label: 'Prefix-Číslo-Rok', example: 'FV-001-2026' },
+  { value: '{year}{sep}{num}', label: 'Rok-Číslo (bez prefixu)', example: '2026-001' },
+  { value: '{prefix}{year}{num}', label: 'PrefixRokČíslo (bez oddělovače)', example: 'FV2026001' },
+  { value: '{prefix}{sep}{num}', label: 'Prefix-Číslo (bez roku)', example: 'FV-001' },
+];
+
+const separatorOptions = [
+  { value: '-', label: 'Pomlčka (-)' },
+  { value: '/', label: 'Lomítko (/)' },
+  { value: '', label: 'Bez oddělovače' },
+];
+
 export default function Company() {
-  const [form, setForm] = useState({ name: 'Rainbow Family Investment', ico: '', dic: '', email: '', phone: '', address: '', city: '', zip: '', country: 'CZ', bank_account: '', iban: '', swift: '', invoice_prefix: 'FV', invoice_counter: 1, default_due_days: 14, vat_payer: 0 });
+  const [form, setForm] = useState({
+    name: 'Rainbow Family Investment', ico: '', dic: '', email: '', phone: '',
+    address: '', city: '', zip: '', country: 'CZ', bank_account: '', iban: '', swift: '',
+    invoice_prefix: 'FV', invoice_counter: 1, default_due_days: 14, vat_payer: 0,
+    invoice_format: '{prefix}{sep}{year}{sep}{num}', invoice_separator: '-',
+    invoice_padding: 3, invoice_year_format: 'full'
+  });
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(false);
 
@@ -17,6 +37,18 @@ export default function Company() {
     await api.updateCompany(form);
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
+  };
+
+  // Generate preview of invoice number
+  const previewNumber = () => {
+    const prefix = form.invoice_prefix || 'FV';
+    const sep = form.invoice_separator || '-';
+    const padding = form.invoice_padding || 3;
+    const fullYear = new Date().getFullYear();
+    const year = form.invoice_year_format === 'short' ? String(fullYear).slice(2) : String(fullYear);
+    const num = String(form.invoice_counter || 1).padStart(padding, '0');
+    const format = form.invoice_format || '{prefix}{sep}{year}{sep}{num}';
+    return format.replace(/\{prefix\}/g, prefix).replace(/\{sep\}/g, sep).replace(/\{year\}/g, year).replace(/\{num\}/g, num);
   };
 
   if (loading) return <div className="loading">Načítání...</div>;
@@ -86,13 +118,44 @@ export default function Company() {
         </div>
         <div className="card">
           <div className="card-title" style={{ marginBottom: '1rem' }}>Číselná řada faktur</div>
-          <p style={{ fontSize: '0.85rem', color: 'var(--gray-500)', marginBottom: '1rem' }}>
-            Faktury se automaticky číslují ve formátu: <strong>{form.invoice_prefix || 'FV'}-{new Date().getFullYear()}-{String(form.invoice_counter || 1).padStart(3, '0')}</strong>
-          </p>
+          <div style={{ background: 'var(--gray-50)', border: '2px solid var(--primary)', borderRadius: 'var(--radius)', padding: '1rem', marginBottom: '1.5rem', textAlign: 'center' }}>
+            <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--gray-500)', marginBottom: 4 }}>Náhled další faktury</div>
+            <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--primary)', fontFamily: 'monospace' }}>{previewNumber()}</div>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Formát číslování</label>
+            <select className="form-select" value={form.invoice_format || '{prefix}{sep}{year}{sep}{num}'} onChange={e => setForm(f => ({ ...f, invoice_format: e.target.value }))}>
+              {formatTemplates.map(t => <option key={t.value} value={t.value}>{t.label} ({t.example})</option>)}
+            </select>
+          </div>
           <div className="form-row">
             <div className="form-group">
               <label className="form-label">Prefix</label>
               <input className="form-input" value={form.invoice_prefix || ''} onChange={e => setForm(f => ({ ...f, invoice_prefix: e.target.value }))} placeholder="FV" />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Oddělovač</label>
+              <select className="form-select" value={form.invoice_separator ?? '-'} onChange={e => setForm(f => ({ ...f, invoice_separator: e.target.value }))}>
+                {separatorOptions.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Formát roku</label>
+              <select className="form-select" value={form.invoice_year_format || 'full'} onChange={e => setForm(f => ({ ...f, invoice_year_format: e.target.value }))}>
+                <option value="full">Celý rok (2026)</option>
+                <option value="short">Krátký (26)</option>
+              </select>
+            </div>
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">Počet číslic</label>
+              <select className="form-select" value={form.invoice_padding || 3} onChange={e => setForm(f => ({ ...f, invoice_padding: parseInt(e.target.value) }))}>
+                <option value={2}>2 (01, 02...)</option>
+                <option value={3}>3 (001, 002...)</option>
+                <option value={4}>4 (0001, 0002...)</option>
+                <option value={5}>5 (00001, 00002...)</option>
+              </select>
             </div>
             <div className="form-group">
               <label className="form-label">Další číslo</label>

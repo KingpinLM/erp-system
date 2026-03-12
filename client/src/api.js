@@ -34,6 +34,8 @@ export const api = {
   getClients: () => request('/clients'),
   createClient: (data) => request('/clients', { method: 'POST', body: JSON.stringify(data) }),
   updateClient: (id, data) => request(`/clients/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  getClient: (id) => request(`/clients/${id}`),
+  getClientInvoices: (id) => request(`/clients/${id}/invoices`),
   deleteClient: (id) => request(`/clients/${id}`, { method: 'DELETE' }),
   getNextInvoiceNumber: () => request('/invoices/next-number'),
   getInvoices: (params = {}) => {
@@ -63,4 +65,20 @@ export const api = {
   getUserSignature: (id) => request(`/users/${id}/signature`),
   updateUserSignature: (id, signature) => request(`/users/${id}/signature`, { method: 'PUT', body: JSON.stringify({ signature }) }),
   refreshCurrencies: () => request('/currencies/refresh', { method: 'POST' }),
+  uploadEvidence: async (file) => {
+    const token = getToken();
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await fetch(`${API}/evidence/upload`, {
+      method: 'POST',
+      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: formData,
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Chyba serveru');
+    return data;
+  },
+  getCategories: () => request('/categories'),
+  getCategoryRules: () => request('/category-rules'),
+  deleteCategoryRule: (id) => request(`/category-rules/${id}`, { method: 'DELETE' }),
 };

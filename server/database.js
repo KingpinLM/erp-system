@@ -131,6 +131,21 @@ try { db.exec('ALTER TABLE invoice_items ADD COLUMN total_with_tax REAL DEFAULT 
 // Company: default due days
 try { db.exec('ALTER TABLE company ADD COLUMN default_due_days INTEGER DEFAULT 14'); } catch (e) { /* already exists */ }
 try { db.exec('ALTER TABLE company ADD COLUMN vat_payer INTEGER DEFAULT 0'); } catch (e) { /* already exists */ }
+// Invoice numbering format options
+try { db.exec("ALTER TABLE company ADD COLUMN invoice_format TEXT DEFAULT '{prefix}{sep}{year}{sep}{num}'"); } catch (e) { /* already exists */ }
+try { db.exec("ALTER TABLE company ADD COLUMN invoice_separator TEXT DEFAULT '-'"); } catch (e) { /* already exists */ }
+try { db.exec('ALTER TABLE company ADD COLUMN invoice_padding INTEGER DEFAULT 3'); } catch (e) { /* already exists */ }
+try { db.exec("ALTER TABLE company ADD COLUMN invoice_year_format TEXT DEFAULT 'full'"); } catch (e) { /* already exists */ }
+// Evidence: category_rules for auto-learning
+try { db.exec("ALTER TABLE evidence ADD COLUMN file_path TEXT"); } catch (e) { /* already exists */ }
+try { db.exec("ALTER TABLE evidence ADD COLUMN original_filename TEXT"); } catch (e) { /* already exists */ }
+try { db.exec(`CREATE TABLE IF NOT EXISTS category_rules (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  keyword TEXT NOT NULL,
+  category TEXT NOT NULL,
+  weight INTEGER DEFAULT 1,
+  created_at TEXT DEFAULT (datetime('now'))
+)`); } catch (e) { /* already exists */ }
 // Migrate full_name → first_name + last_name
 try {
   const users = db.prepare("SELECT id, full_name, first_name FROM users WHERE first_name IS NULL AND full_name IS NOT NULL").all();

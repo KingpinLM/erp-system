@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '../api';
 import { useAuth } from '../App';
 
@@ -43,7 +44,7 @@ export default function Clients() {
               <tbody>
                 {clients.map(c => (
                   <tr key={c.id}>
-                    <td><strong>{c.name}</strong></td>
+                    <td><Link to={`/clients/${c.id}`} style={{ color: 'var(--primary)', fontWeight: 600, textDecoration: 'none' }}>{c.name}</Link></td>
                     <td>{c.ico || '—'}</td>
                     <td>{c.dic || '—'}</td>
                     <td>{c.email || '—'}</td>

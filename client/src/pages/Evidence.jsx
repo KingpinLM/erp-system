@@ -1,35 +1,44 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../api';
 import { useAuth } from '../App';
 
-const typeLabels = { income: 'Příjem', expense: 'Výdaj', asset: 'Majetek', document: 'Dokument' };
 const fmt = (n, cur = 'CZK') => n != null ? new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: cur, maximumFractionDigits: 2 }).format(n) : '—';
 const fmtDate = (d) => { if (!d) return '—'; const p = d.slice(0,10).split('-'); return p.length === 3 ? `${p[2]}.${p[1]}.${p[0]}` : d; };
 
 export default function Evidence() {
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState({ type: '', category: '' });
+  const [tab, setTab] = useState('expense');
+  const [categoryFilter, setCategoryFilter] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
-  const [form, setForm] = useState({ type: 'income', title: '', description: '', amount: '', currency: 'CZK', date: new Date().toISOString().slice(0, 10), category: '' });
+  const [form, setForm] = useState({ type: 'expense', title: '', description: '', amount: '', currency: 'CZK', date: new Date().toISOString().slice(0, 10), category: '' });
+  const [uploading, setUploading] = useState(false);
+  const [uploadResults, setUploadResults] = useState(null);
+  const [dragOver, setDragOver] = useState(false);
+  const [categories, setCategories] = useState([]);
+  const [showCategoryTab, setShowCategoryTab] = useState(false);
+  const [categoryRules, setCategoryRules] = useState([]);
+  const fileRef = useRef();
   const { can } = useAuth();
 
   const load = () => {
     setLoading(true);
-    const params = {};
-    if (filter.type) params.type = filter.type;
-    if (filter.category) params.category = filter.category;
+    const params = { type: tab };
+    if (categoryFilter) params.category = categoryFilter;
     api.getEvidence(params).then(setRecords).finally(() => setLoading(false));
+    api.getCategories().then(setCategories).catch(() => {});
   };
 
-  useEffect(load, [filter]);
+  useEffect(load, [tab, categoryFilter]);
 
-  const categories = [...new Set(records.map(r => r.category).filter(Boolean))];
+  const loadCategoryRules = () => {
+    api.getCategoryRules().then(setCategoryRules).catch(() => {});
+  };
 
   const openNew = () => {
     setEditing(null);
-    setForm({ type: 'income', title: '', description: '', amount: '', currency: 'CZK', date: new Date().toISOString().slice(0, 10), category: '' });
+    setForm({ type: tab, title: '', description: '', amount: '', currency: 'CZK', date: new Date().toISOString().slice(0, 10), category: '' });
     setShowModal(true);
   };
 
@@ -57,84 +66,234 @@ export default function Evidence() {
     load();
   };
 
-  const totalIncome = records.filter(r => r.type === 'income').reduce((s, r) => s + (r.amount || 0), 0);
-  const totalExpense = records.filter(r => r.type === 'expense').reduce((s, r) => s + (r.amount || 0), 0);
+  const handleUpload = async (files) => {
+    if (!files || files.length === 0) return;
+    setUploading(true);
+    setUploadResults(null);
+    try {
+      const allResults = [];
+      for (const file of files) {
+        const results = await api.uploadEvidence(file);
+        allResults.push(...results);
+      }
+      setUploadResults(allResults);
+    } catch (e) {
+      alert('Chyba: ' + e.message);
+    }
+    setUploading(false);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setDragOver(false);
+    handleUpload(e.dataTransfer.files);
+  };
+
+  const saveUploadedExpense = async (item) => {
+    await api.createEvidence({
+      type: 'expense',
+      title: item.title,
+      description: '',
+      amount: item.amount,
+      currency: 'CZK',
+      date: item.date,
+      category: item.category || '',
+      file_path: item.file_path,
+      original_filename: item.original_filename
+    });
+    setUploadResults(prev => prev.filter(r => r !== item));
+    load();
+  };
+
+  const deleteRule = async (id) => {
+    await api.deleteCategoryRule(id);
+    loadCategoryRules();
+  };
+
+  const total = records.reduce((s, r) => s + (r.amount || 0), 0);
 
   return (
     <div>
       <div className="page-header">
         <h1 className="page-title">Evidence</h1>
         {can('admin', 'accountant', 'manager') && (
-          <button className="btn btn-primary" onClick={openNew}>+ Nový záznam</button>
-        )}
-      </div>
-
-      <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
-        <div className="kpi-card"><div className="kpi-label">Příjmy</div><div className="kpi-value success">{fmt(totalIncome)}</div></div>
-        <div className="kpi-card"><div className="kpi-label">Výdaje</div><div className="kpi-value danger">{fmt(totalExpense)}</div></div>
-        <div className="kpi-card"><div className="kpi-label">Bilance</div><div className="kpi-value primary">{fmt(totalIncome - totalExpense)}</div></div>
-      </div>
-
-      <div className="filters">
-        <select className="form-select" value={filter.type} onChange={e => setFilter(f => ({ ...f, type: e.target.value }))}>
-          <option value="">Všechny typy</option>
-          {Object.entries(typeLabels).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-        </select>
-        <select className="form-select" value={filter.category} onChange={e => setFilter(f => ({ ...f, category: e.target.value }))}>
-          <option value="">Všechny kategorie</option>
-          {categories.map(c => <option key={c} value={c}>{c}</option>)}
-        </select>
-      </div>
-
-      <div className="card">
-        {loading ? <div className="loading">Načítání...</div> : records.length === 0 ? <div className="empty-state">Žádné záznamy</div> : (
-          <div className="table-responsive">
-            <table>
-              <thead><tr><th>Typ</th><th>Název</th><th>Kategorie</th><th>Datum</th><th className="text-right">Částka</th><th>Měna</th><th>Vytvořil</th><th>Akce</th></tr></thead>
-              <tbody>
-                {records.map(r => (
-                  <tr key={r.id}>
-                    <td><span className={`badge badge-${r.type}`}>{typeLabels[r.type]}</span></td>
-                    <td><strong>{r.title}</strong>{r.description && <div className="text-muted" style={{ fontSize: '0.8rem' }}>{r.description}</div>}</td>
-                    <td>{r.category || '—'}</td>
-                    <td>{fmtDate(r.date)}</td>
-                    <td className="text-right" style={{ fontWeight: 600, color: r.type === 'income' ? 'var(--success)' : r.type === 'expense' ? 'var(--danger)' : 'inherit' }}>{fmt(r.amount, r.currency)}</td>
-                    <td>{r.currency}</td>
-                    <td>{r.created_by_name}</td>
-                    <td>
-                      <div className="btn-group">
-                        {can('admin', 'accountant') && <button className="btn btn-outline btn-sm" onClick={() => openEdit(r)}>Upravit</button>}
-                        {can('admin') && <button className="btn btn-danger btn-sm" onClick={() => handleDelete(r.id)}>Smazat</button>}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="btn-group">
+            <button className="btn btn-primary" onClick={openNew}>+ Nový záznam</button>
           </div>
         )}
       </div>
+
+      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+        <button className={`btn ${tab === 'expense' ? 'btn-primary' : 'btn-outline'}`} onClick={() => { setTab('expense'); setShowCategoryTab(false); }}>Výdaje</button>
+        <button className={`btn ${tab === 'income' ? 'btn-primary' : 'btn-outline'}`} onClick={() => { setTab('income'); setShowCategoryTab(false); }}>Příjmy</button>
+        {tab === 'expense' && (
+          <button className={`btn ${showCategoryTab ? 'btn-primary' : 'btn-outline'}`} onClick={() => { setShowCategoryTab(!showCategoryTab); if (!showCategoryTab) loadCategoryRules(); }} style={{ marginLeft: 'auto' }}>Kategorie</button>
+        )}
+      </div>
+
+      {showCategoryTab ? (
+        <div className="card">
+          <div className="card-title" style={{ marginBottom: '1rem' }}>Naučené kategorie</div>
+          <p style={{ fontSize: '0.85rem', color: 'var(--gray-500)', marginBottom: '1rem' }}>
+            Systém se učí kategorizovat výdaje podle klíčových slov z názvů. Čím vyšší váha, tím silnější pravidlo.
+          </p>
+          {categoryRules.length === 0 ? (
+            <div className="empty-state">Zatím žádná pravidla. Přiřazujte kategorie k výdajům a systém se bude učit.</div>
+          ) : (
+            <div className="table-responsive">
+              <table>
+                <thead><tr><th>Klíčové slovo</th><th>Kategorie</th><th className="text-right">Váha</th><th>Akce</th></tr></thead>
+                <tbody>
+                  {categoryRules.map(r => (
+                    <tr key={r.id}>
+                      <td><code style={{ background: 'var(--gray-50)', padding: '2px 6px', borderRadius: 4 }}>{r.keyword}</code></td>
+                      <td><span className="badge">{r.category}</span></td>
+                      <td className="text-right">{r.weight}</td>
+                      <td>{can('admin') && <button className="btn btn-danger btn-sm" onClick={() => deleteRule(r.id)}>Smazat</button>}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      ) : (
+        <>
+          {tab === 'expense' && can('admin', 'accountant', 'manager') && (
+            <div
+              className="card"
+              onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={handleDrop}
+              style={{
+                border: dragOver ? '2px dashed var(--primary)' : '2px dashed var(--gray-300)',
+                background: dragOver ? 'rgba(67,97,238,0.05)' : 'transparent',
+                textAlign: 'center', padding: '2rem', cursor: 'pointer', transition: 'all 0.2s'
+              }}
+              onClick={() => fileRef.current?.click()}
+            >
+              <input ref={fileRef} type="file" accept=".pdf,.zip" multiple style={{ display: 'none' }}
+                onChange={(e) => handleUpload(e.target.files)} />
+              {uploading ? (
+                <div className="loading">Zpracovávám soubory...</div>
+              ) : (
+                <>
+                  <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>📄</div>
+                  <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>Přetáhněte PDF nebo ZIP soubory sem</div>
+                  <div style={{ fontSize: '0.85rem', color: 'var(--gray-500)' }}>nebo klikněte pro výběr souborů</div>
+                </>
+              )}
+            </div>
+          )}
+
+          {uploadResults && uploadResults.length > 0 && (
+            <div className="card" style={{ marginTop: '1rem' }}>
+              <div className="card-title" style={{ marginBottom: '1rem' }}>Extrahované výdaje ({uploadResults.length})</div>
+              {uploadResults.map((item, idx) => (
+                <div key={idx} style={{ border: '1px solid var(--gray-200)', borderRadius: 'var(--radius)', padding: '1rem', marginBottom: '0.75rem' }}>
+                  <div className="form-row">
+                    <div className="form-group" style={{ flex: 2 }}>
+                      <label className="form-label">Název</label>
+                      <input className="form-input" value={item.title} onChange={e => {
+                        const updated = [...uploadResults];
+                        updated[idx] = { ...updated[idx], title: e.target.value };
+                        setUploadResults(updated);
+                      }} />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Částka</label>
+                      <input className="form-input" type="number" step="0.01" value={item.amount || ''} onChange={e => {
+                        const updated = [...uploadResults];
+                        updated[idx] = { ...updated[idx], amount: parseFloat(e.target.value) || null };
+                        setUploadResults(updated);
+                      }} />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Datum</label>
+                      <input className="form-input" type="date" value={item.date} onChange={e => {
+                        const updated = [...uploadResults];
+                        updated[idx] = { ...updated[idx], date: e.target.value };
+                        setUploadResults(updated);
+                      }} />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Kategorie</label>
+                      <input className="form-input" value={item.category || ''} onChange={e => {
+                        const updated = [...uploadResults];
+                        updated[idx] = { ...updated[idx], category: e.target.value };
+                        setUploadResults(updated);
+                      }} list="cat-list" />
+                    </div>
+                  </div>
+                  {item.original_filename && <div style={{ fontSize: '0.75rem', color: 'var(--gray-500)', marginBottom: '0.5rem' }}>Soubor: {item.original_filename}</div>}
+                  <div className="btn-group">
+                    <button className="btn btn-success btn-sm" onClick={() => saveUploadedExpense(item)}>Uložit výdaj</button>
+                    <button className="btn btn-outline btn-sm" onClick={() => setUploadResults(prev => prev.filter((_, i) => i !== idx))}>Zrušit</button>
+                  </div>
+                </div>
+              ))}
+              <datalist id="cat-list">
+                {categories.map(c => <option key={c} value={c} />)}
+              </datalist>
+            </div>
+          )}
+
+          <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)', marginTop: '1rem' }}>
+            <div className="kpi-card">
+              <div className="kpi-label">Celkem {tab === 'expense' ? 'výdajů' : 'příjmů'}</div>
+              <div className={`kpi-value ${tab === 'expense' ? 'danger' : 'success'}`}>{fmt(total)}</div>
+            </div>
+            <div className="kpi-card">
+              <div className="kpi-label">Počet záznamů</div>
+              <div className="kpi-value">{records.length}</div>
+            </div>
+          </div>
+
+          <div className="filters" style={{ marginTop: '1rem' }}>
+            <select className="form-select" value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)}>
+              <option value="">Všechny kategorie</option>
+              {categories.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+
+          <div className="card">
+            {loading ? <div className="loading">Načítání...</div> : records.length === 0 ? <div className="empty-state">Žádné záznamy</div> : (
+              <div className="table-responsive">
+                <table>
+                  <thead><tr><th>Název</th><th>Kategorie</th><th>Datum</th><th className="text-right">Částka</th><th>Měna</th><th>Vytvořil</th><th>Akce</th></tr></thead>
+                  <tbody>
+                    {records.map(r => (
+                      <tr key={r.id}>
+                        <td><strong>{r.title}</strong>{r.description && <div className="text-muted" style={{ fontSize: '0.8rem' }}>{r.description}</div>}</td>
+                        <td>{r.category ? <span className="badge">{r.category}</span> : '—'}</td>
+                        <td>{fmtDate(r.date)}</td>
+                        <td className="text-right" style={{ fontWeight: 600, color: tab === 'income' ? 'var(--success)' : 'var(--danger)' }}>{fmt(r.amount, r.currency)}</td>
+                        <td>{r.currency}</td>
+                        <td>{r.created_by_name}</td>
+                        <td>
+                          <div className="btn-group">
+                            {can('admin', 'accountant') && <button className="btn btn-outline btn-sm" onClick={() => openEdit(r)}>Upravit</button>}
+                            {can('admin') && <button className="btn btn-danger btn-sm" onClick={() => handleDelete(r.id)}>Smazat</button>}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </>
+      )}
 
       {showModal && (
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h3 className="modal-title">{editing ? 'Upravit záznam' : 'Nový záznam'}</h3>
+              <h3 className="modal-title">{editing ? 'Upravit záznam' : `Nový ${tab === 'expense' ? 'výdaj' : 'příjem'}`}</h3>
               <button className="modal-close" onClick={() => setShowModal(false)}>&times;</button>
             </div>
             <form onSubmit={handleSubmit}>
-              <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label">Typ *</label>
-                  <select className="form-select" value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))}>
-                    {Object.entries(typeLabels).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Kategorie</label>
-                  <input className="form-input" value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} placeholder="např. Služby" />
-                </div>
-              </div>
               <div className="form-group">
                 <label className="form-label">Název *</label>
                 <input className="form-input" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} required />
@@ -158,6 +317,13 @@ export default function Evidence() {
                   <label className="form-label">Datum *</label>
                   <input className="form-input" type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} required />
                 </div>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Kategorie</label>
+                <input className="form-input" value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} placeholder="např. Služby, Materiál, Nájemné..." list="modal-cat-list" />
+                <datalist id="modal-cat-list">
+                  {categories.map(c => <option key={c} value={c} />)}
+                </datalist>
               </div>
               <div className="btn-group" style={{ marginTop: '0.5rem' }}>
                 <button type="submit" className="btn btn-primary">{editing ? 'Uložit' : 'Vytvořit'}</button>
