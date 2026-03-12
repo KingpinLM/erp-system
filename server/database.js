@@ -220,7 +220,7 @@ try {
 try {
   const hasTenant = db.prepare("SELECT id FROM tenants WHERE slug = 'rfi'").get();
   if (!hasTenant) {
-    db.prepare("INSERT INTO tenants (name, slug) VALUES ('Výchozí firma', 'default')").run();
+    db.prepare("INSERT INTO tenants (name, slug) VALUES ('Výchozí firma', 'rfi')").run();
   }
   const defaultTenant = db.prepare("SELECT id FROM tenants WHERE slug = 'rfi'").get();
   if (defaultTenant) {
