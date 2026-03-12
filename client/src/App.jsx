@@ -22,6 +22,27 @@ import './styles.css';
 export const AuthContext = createContext(null);
 export const useAuth = () => useContext(AuthContext);
 
+function clearStaleSession() {
+  // Clear old pre-multi-tenant sessions that lack tenant info
+  const savedUser = localStorage.getItem('erp_user');
+  const savedTenant = localStorage.getItem('erp_tenant');
+  const savedToken = localStorage.getItem('erp_token');
+  if (savedToken && savedUser && !savedTenant) {
+    try {
+      const user = JSON.parse(savedUser);
+      if (user.role !== 'superadmin') {
+        localStorage.removeItem('erp_token');
+        localStorage.removeItem('erp_user');
+        localStorage.removeItem('erp_tenant');
+        localStorage.removeItem('erp_tenant_slug');
+        return true;
+      }
+    } catch { /* ignore */ }
+  }
+  return false;
+}
+clearStaleSession();
+
 function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
     const saved = localStorage.getItem('erp_user');
