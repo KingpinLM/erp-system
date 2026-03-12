@@ -54,9 +54,14 @@ async function updateRates() {
 updateRates();
 setInterval(updateRates, 6 * 60 * 60 * 1000);
 
+const getLoginPage = require('./login-page');
+
+const cookieParser = require('cookie-parser');
+
 const app = express();
 app.disable('etag');
 app.use(cors());
+app.use(cookieParser());
 app.use((req, res, next) => {
   console.log(`[REQ] ${req.method} ${req.url}`);
   res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
@@ -66,8 +71,15 @@ app.use((req, res, next) => {
   next();
 });
 app.use(express.json({ limit: '5mb' }));
+
+// Server-side login page (NO React, NO JS bundles, pure HTML form)
+app.get('/login', (req, res) => {
+  res.type('html').send(getLoginPage(req.query.error));
+});
+
 app.use(express.static(path.join(__dirname, '..', 'client', 'dist'), {
   etag: false,
+  index: false, // Don't auto-serve index.html
   setHeaders: (res, filePath) => {
     if (filePath.endsWith('.html')) {
       res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
@@ -168,13 +180,10 @@ app.post('/api/auth/form-login', express.urlencoded({ extended: false }), (req, 
     return res.redirect('/login?error=1');
   }
   const token = generateToken(user);
-  const { password: _, ...safeUser } = user;
-  const tenant = user.tenant_id ? db.prepare('SELECT id, name, slug FROM tenants WHERE id = ? AND active = 1').get(user.tenant_id) : null;
-  // Set data via cookie, then redirect - the SPA will read cookies on load
-  res.cookie('erp_token', token, { httpOnly: false, maxAge: 8*60*60*1000, sameSite: 'lax' });
-  res.cookie('erp_user', JSON.stringify(safeUser), { httpOnly: false, maxAge: 8*60*60*1000, sameSite: 'lax' });
-  if (tenant) res.cookie('erp_tenant', JSON.stringify(tenant), { httpOnly: false, maxAge: 8*60*60*1000, sameSite: 'lax' });
-  res.redirect('/?loggedin=1');
+  // Set session cookie and redirect - SPA fallback will embed auth into HTML
+  res.cookie('erp_session', token, { httpOnly: true, maxAge: 8*60*60*1000, sameSite: 'lax', path: '/' });
+  console.log('[FORM-LOGIN] SUCCESS, setting session cookie, redirecting to /');
+  res.redirect('/');
 });
 
 // ─── AUTH (login without tenant slug — globally unique usernames) ──
@@ -889,8 +898,28 @@ app.get('/api/auth/get-login', (req, res) => {
   res.json({ token, user: safeUser, tenant });
 });
 
-// SPA fallback
+// SPA fallback - embed auth from session cookie into HTML
 app.get('*', (req, res) => {
+  // Check for session cookie (set by form-login)
+  const sessionToken = req.cookies?.erp_session;
+  if (sessionToken) {
+    try {
+      const { verify } = require('./auth');
+      // not using verify, just jwt.verify
+      const jwt = require('jsonwebtoken');
+      const { SECRET } = require('./auth');
+      const decoded = jwt.verify(sessionToken, SECRET);
+      const user = db.prepare('SELECT id, username, email, full_name, first_name, last_name, role, active, signature, created_at, tenant_id FROM users WHERE id = ? AND active = 1').get(decoded.id);
+      const tenant = user?.tenant_id ? db.prepare('SELECT id, name, slug FROM tenants WHERE id = ? AND active = 1').get(user.tenant_id) : null;
+      if (user) {
+        // Read the HTML template and inject auth data
+        const html = require('fs').readFileSync(path.join(__dirname, '..', 'client', 'dist', 'index.html'), 'utf8');
+        const authScript = `<script>window.__AUTH__=${JSON.stringify({token: sessionToken, user, tenant}).replace(/</g,'\\u003c')};</script>`;
+        return res.type('html').send(html.replace('</head>', authScript + '</head>'));
+      }
+    } catch(e) { console.log('[SPA] Invalid session:', e.message); }
+  }
+  // No valid session - serve plain SPA (will redirect to /login via React)
   res.sendFile(path.join(__dirname, '..', 'client', 'dist', 'index.html'));
 });
 

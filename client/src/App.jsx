@@ -23,42 +23,19 @@ import './styles.css';
 export const AuthContext = createContext(null);
 export const useAuth = () => useContext(AuthContext);
 
-function getCookie(name) {
-  const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
-  return match ? decodeURIComponent(match[2]) : null;
-}
-
 function AuthProvider({ children }) {
   const [user] = useState(() => {
-    // Try cookie first (from form-login), then localStorage
-    try {
-      const cookieUser = getCookie('erp_user');
-      if (cookieUser) {
-        const parsed = JSON.parse(cookieUser);
-        localStorage.setItem('erp_user', JSON.stringify(parsed));
-        return parsed;
-      }
-      return JSON.parse(localStorage.getItem('erp_user'));
-    } catch { return null; }
+    // Read from server-injected window.__AUTH__ (set by SPA fallback)
+    if (window.__AUTH__?.user) return window.__AUTH__.user;
+    try { return JSON.parse(localStorage.getItem('erp_user')); } catch { return null; }
   });
   const [token] = useState(() => {
-    const cookieToken = getCookie('erp_token');
-    if (cookieToken) {
-      localStorage.setItem('erp_token', cookieToken);
-      return cookieToken;
-    }
+    if (window.__AUTH__?.token) return window.__AUTH__.token;
     return localStorage.getItem('erp_token');
   });
   const [tenant] = useState(() => {
-    try {
-      const cookieTenant = getCookie('erp_tenant');
-      if (cookieTenant) {
-        const parsed = JSON.parse(cookieTenant);
-        localStorage.setItem('erp_tenant', JSON.stringify(parsed));
-        return parsed;
-      }
-      return JSON.parse(localStorage.getItem('erp_tenant'));
-    } catch { return null; }
+    if (window.__AUTH__?.tenant) return window.__AUTH__.tenant;
+    try { return JSON.parse(localStorage.getItem('erp_tenant')); } catch { return null; }
   });
 
   const logout = () => {
