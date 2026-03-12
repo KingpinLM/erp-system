@@ -12,6 +12,7 @@ import Users from './pages/Users';
 import Currencies from './pages/Currencies';
 import Company from './pages/Company';
 import Profile from './pages/Profile';
+import UserDetail from './pages/UserDetail';
 import './styles.css';
 
 export const AuthContext = createContext(null);
@@ -78,16 +79,16 @@ function Sidebar({ open, onClose }) {
       {open && <div className="sidebar-overlay" onClick={onClose} />}
       <aside className={`sidebar ${open ? 'open' : ''}`}>
         <div className="sidebar-header">
-          <h2>RFI ERP</h2>
+          <Link to="/" onClick={onClose} style={{ textDecoration: 'none' }}><h2>RFI ERP</h2></Link>
           <button className="sidebar-close" onClick={onClose}>&times;</button>
         </div>
-        <div className="sidebar-user">
+        <Link to="/profile" onClick={onClose} className="sidebar-user" style={{ textDecoration: 'none', color: 'inherit' }}>
           <div className="avatar">{user?.full_name?.charAt(0)}</div>
           <div>
             <div className="sidebar-user-name">{user?.full_name}</div>
             <div className="sidebar-user-role">{roleLabels[user?.role] || user?.role}</div>
           </div>
-        </div>
+        </Link>
         <nav className="sidebar-nav">
           {links.map(l => (
             <Link
@@ -120,7 +121,7 @@ function Layout({ children }) {
       <div className="main-area">
         <header className="topbar">
           <button className="menu-btn" onClick={() => setSidebarOpen(true)}>☰</button>
-          <h1 className="topbar-title">RFI ERP</h1>
+          <Link to="/" style={{ textDecoration: 'none' }}><h1 className="topbar-title">RFI ERP</h1></Link>
         </header>
         <main className="content">{children}</main>
       </div>
@@ -148,6 +149,7 @@ export default function App() {
                   <Route path="/currencies" element={<Currencies />} />
                   <Route path="/company" element={<Company />} />
                   <Route path="/users" element={<Users />} />
+                  <Route path="/users/:id" element={<UserDetail />} />
                   <Route path="/profile" element={<Profile />} />
                 </Routes>
               </Layout>

@@ -53,6 +53,7 @@ export const api = {
   updateEvidence: (id, data) => request(`/evidence/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteEvidence: (id) => request(`/evidence/${id}`, { method: 'DELETE' }),
   getUsers: () => request('/users'),
+  getUser: (id) => request(`/users/${id}`),
   createUser: (data) => request('/users', { method: 'POST', body: JSON.stringify(data) }),
   updateUser: (id, data) => request(`/users/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   getAuditLog: () => request('/audit-log'),

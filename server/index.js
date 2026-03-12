@@ -25,7 +25,7 @@ app.post('/api/auth/login', (req, res) => {
 });
 
 app.get('/api/auth/me', authenticate, (req, res) => {
-  const user = db.prepare('SELECT id, username, email, full_name, role, active, signature, created_at FROM users WHERE id = ?').get(req.user.id);
+  const user = db.prepare('SELECT id, username, email, full_name, first_name, last_name, role, active, signature, created_at FROM users WHERE id = ?').get(req.user.id);
   res.json(user);
 });
 
@@ -285,14 +285,24 @@ app.delete('/api/evidence/:id', authenticate, authorize('admin'), (req, res) => 
 
 // ─── USERS ───────────────────────────────────────────────────
 app.get('/api/users', authenticate, authorize('admin'), (req, res) => {
-  res.json(db.prepare('SELECT id, username, email, full_name, role, active, created_at, updated_at FROM users ORDER BY id').all());
+  res.json(db.prepare('SELECT id, username, email, full_name, first_name, last_name, role, active, created_at, updated_at FROM users ORDER BY id').all());
+});
+
+app.get('/api/users/:id', authenticate, authorize('admin'), (req, res) => {
+  const user = db.prepare('SELECT id, username, email, full_name, first_name, last_name, role, active, signature, created_at, updated_at FROM users WHERE id = ?').get(req.params.id);
+  if (!user) return res.status(404).json({ error: 'Uživatel nenalezen' });
+  // Get user stats
+  const invoiceCount = db.prepare("SELECT COUNT(*) as cnt FROM invoices WHERE created_by = ?").get(req.params.id).cnt;
+  const lastLogin = user.updated_at;
+  res.json({ ...user, invoice_count: invoiceCount });
 });
 
 app.post('/api/users', authenticate, authorize('admin'), (req, res) => {
-  const { username, email, password, full_name, role } = req.body;
+  const { username, email, password, first_name, last_name, role } = req.body;
+  const full_name = `${first_name || ''} ${last_name || ''}`.trim();
   const hash = bcrypt.hashSync(password, 10);
   try {
-    const result = db.prepare('INSERT INTO users (username, email, password, full_name, role) VALUES (?,?,?,?,?)').run(username, email, hash, full_name, role || 'viewer');
+    const result = db.prepare('INSERT INTO users (username, email, password, full_name, first_name, last_name, role) VALUES (?,?,?,?,?,?,?)').run(username, email, hash, full_name, first_name || '', last_name || '', role || 'viewer');
     res.json({ id: result.lastInsertRowid });
   } catch (e) {
     res.status(400).json({ error: 'Uživatel s tímto jménem nebo emailem již existuje' });
@@ -300,12 +310,13 @@ app.post('/api/users', authenticate, authorize('admin'), (req, res) => {
 });
 
 app.put('/api/users/:id', authenticate, authorize('admin'), (req, res) => {
-  const { email, full_name, role, active, password } = req.body;
+  const { email, first_name, last_name, role, active, password } = req.body;
+  const full_name = `${first_name || ''} ${last_name || ''}`.trim();
   if (password) {
     const hash = bcrypt.hashSync(password, 10);
-    db.prepare("UPDATE users SET email=?, full_name=?, role=?, active=?, password=?, updated_at=datetime('now') WHERE id=?").run(email, full_name, role, active, hash, req.params.id);
+    db.prepare("UPDATE users SET email=?, full_name=?, first_name=?, last_name=?, role=?, active=?, password=?, updated_at=datetime('now') WHERE id=?").run(email, full_name, first_name||'', last_name||'', role, active, hash, req.params.id);
   } else {
-    db.prepare("UPDATE users SET email=?, full_name=?, role=?, active=?, updated_at=datetime('now') WHERE id=?").run(email, full_name, role, active, req.params.id);
+    db.prepare("UPDATE users SET email=?, full_name=?, first_name=?, last_name=?, role=?, active=?, updated_at=datetime('now') WHERE id=?").run(email, full_name, first_name||'', last_name||'', role, active, req.params.id);
   }
   res.json({ ok: true });
 });

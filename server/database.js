@@ -119,6 +119,19 @@ db.exec(`
 
 // Migrations - add columns to existing tables
 try { db.exec('ALTER TABLE users ADD COLUMN signature TEXT'); } catch (e) { /* already exists */ }
+try { db.exec('ALTER TABLE users ADD COLUMN first_name TEXT'); } catch (e) { /* already exists */ }
+try { db.exec('ALTER TABLE users ADD COLUMN last_name TEXT'); } catch (e) { /* already exists */ }
+// Migrate full_name → first_name + last_name
+try {
+  const users = db.prepare("SELECT id, full_name, first_name FROM users WHERE first_name IS NULL AND full_name IS NOT NULL").all();
+  const upd = db.prepare("UPDATE users SET first_name = ?, last_name = ? WHERE id = ?");
+  users.forEach(u => {
+    const parts = u.full_name.trim().split(/\s+/);
+    const first = parts[0] || '';
+    const last = parts.slice(1).join(' ') || '';
+    upd.run(first, last, u.id);
+  });
+} catch (e) { /* ok */ }
 try { db.exec('ALTER TABLE company ADD COLUMN invoice_prefix TEXT DEFAULT \'FV\''); } catch (e) { /* already exists */ }
 try { db.exec('ALTER TABLE company ADD COLUMN invoice_counter INTEGER DEFAULT 1'); } catch (e) { /* already exists */ }
 // Set counter based on existing invoices
