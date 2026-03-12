@@ -16,6 +16,7 @@ import Company from './pages/Company';
 import Profile from './pages/Profile';
 import UserDetail from './pages/UserDetail';
 import ClientDetail from './pages/ClientDetail';
+import SuperAdmin from './pages/SuperAdmin';
 import './styles.css';
 
 export const AuthContext = createContext(null);
@@ -27,26 +28,48 @@ function AuthProvider({ children }) {
     return saved ? JSON.parse(saved) : null;
   });
   const [token, setToken] = useState(() => localStorage.getItem('erp_token'));
+  const [tenant, setTenant] = useState(() => {
+    const saved = localStorage.getItem('erp_tenant');
+    return saved ? JSON.parse(saved) : null;
+  });
 
-  const login = async (username, password) => {
-    const data = await api.login(username, password);
+  const login = async (username, password, tenant_slug) => {
+    const data = await api.login(username, password, tenant_slug);
     localStorage.setItem('erp_token', data.token);
     localStorage.setItem('erp_user', JSON.stringify(data.user));
+    localStorage.setItem('erp_tenant', JSON.stringify(data.tenant));
+    localStorage.setItem('erp_tenant_slug', data.tenant.slug);
     setToken(data.token);
     setUser(data.user);
+    setTenant(data.tenant);
+  };
+
+  const superadminLogin = async (username, password) => {
+    const data = await api.superadminLogin(username, password);
+    localStorage.setItem('erp_token', data.token);
+    localStorage.setItem('erp_user', JSON.stringify(data.user));
+    localStorage.removeItem('erp_tenant');
+    localStorage.removeItem('erp_tenant_slug');
+    setToken(data.token);
+    setUser(data.user);
+    setTenant(null);
   };
 
   const logout = () => {
     localStorage.removeItem('erp_token');
     localStorage.removeItem('erp_user');
+    localStorage.removeItem('erp_tenant');
+    localStorage.removeItem('erp_tenant_slug');
     setToken(null);
     setUser(null);
+    setTenant(null);
   };
 
   const can = (...roles) => user && roles.includes(user.role);
+  const isSuperadmin = user?.role === 'superadmin';
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, can }}>
+    <AuthContext.Provider value={{ user, token, tenant, login, superadminLogin, logout, can, isSuperadmin }}>
       {children}
     </AuthContext.Provider>
   );
@@ -58,8 +81,22 @@ function ProtectedRoute({ children }) {
   return children;
 }
 
+function SuperadminRoute({ children }) {
+  const { token, isSuperadmin } = useAuth();
+  if (!token) return <Navigate to="/login" replace />;
+  if (!isSuperadmin) return <Navigate to="/" replace />;
+  return children;
+}
+
+function TenantRoute({ children }) {
+  const { token, isSuperadmin } = useAuth();
+  if (!token) return <Navigate to="/login" replace />;
+  if (isSuperadmin) return <Navigate to="/superadmin" replace />;
+  return children;
+}
+
 function Sidebar({ open, onClose }) {
-  const { user, logout, can } = useAuth();
+  const { user, tenant, logout, can } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -82,7 +119,10 @@ function Sidebar({ open, onClose }) {
       {open && <div className="sidebar-overlay" onClick={onClose} />}
       <aside className={`sidebar ${open ? 'open' : ''}`}>
         <div className="sidebar-header">
-          <Link to="/" onClick={onClose} style={{ textDecoration: 'none' }}><h2>RFI ERP</h2></Link>
+          <Link to="/" onClick={onClose} style={{ textDecoration: 'none' }}>
+            <h2>RFI ERP</h2>
+            {tenant && <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 400, marginTop: -4 }}>{tenant.name}</div>}
+          </Link>
           <button className="sidebar-close" onClick={onClose}>&times;</button>
         </div>
         <Link to="/profile" onClick={onClose} className="sidebar-user" style={{ textDecoration: 'none', color: 'inherit' }}>
@@ -118,6 +158,7 @@ function Sidebar({ open, onClose }) {
 
 function Layout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { tenant } = useAuth();
   return (
     <div className="layout">
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
@@ -125,6 +166,7 @@ function Layout({ children }) {
         <header className="topbar">
           <button className="menu-btn" onClick={() => setSidebarOpen(true)}>☰</button>
           <Link to="/" style={{ textDecoration: 'none' }}><h1 className="topbar-title">RFI ERP</h1></Link>
+          {tenant && <span style={{ fontSize: 12, color: '#94a3b8', marginLeft: 8 }}>{tenant.name}</span>}
         </header>
         <main className="content">{children}</main>
       </div>
@@ -140,8 +182,11 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/superadmin" element={
+            <SuperadminRoute><SuperAdmin /></SuperadminRoute>
+          } />
           <Route path="*" element={
-            <ProtectedRoute>
+            <TenantRoute>
               <Layout>
                 <Routes>
                   <Route path="/" element={<Dashboard />} />
@@ -159,7 +204,7 @@ export default function App() {
                   <Route path="/profile" element={<Profile />} />
                 </Routes>
               </Layout>
-            </ProtectedRoute>
+            </TenantRoute>
           } />
         </Routes>
       </AuthProvider>

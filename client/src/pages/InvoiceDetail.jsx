@@ -13,6 +13,90 @@ const fmtDate = (d) => {
   return `${parts[2]}.${parts[1]}.${parts[0]}`;
 };
 
+const CSS = `
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1e293b; padding: 0; font-size: 13px; line-height: 1.5; }
+.inv { max-width: 780px; margin: 0 auto; padding: 48px 48px 32px; }
+
+/* ── Accent bar ── */
+.inv-accent { height: 4px; background: linear-gradient(90deg, #4361ee 0%, #7c3aed 100%); border-radius: 2px; }
+
+/* ── Header ── */
+.inv-head { display: flex; justify-content: space-between; align-items: flex-start; margin: 28px 0 32px; }
+.inv-head-left h1 { font-size: 13px; font-weight: 800; color: #4361ee; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 2px; }
+.inv-head-left .inv-num { font-size: 28px; font-weight: 800; color: #0f172a; letter-spacing: -0.5px; line-height: 1.1; }
+.inv-head-right { text-align: right; }
+.inv-head-right .inv-company { font-size: 18px; font-weight: 700; color: #0f172a; margin-bottom: 4px; }
+.inv-head-right .inv-company-info { font-size: 11.5px; color: #64748b; line-height: 1.6; }
+.inv-badge { display: inline-block; padding: 3px 10px; border-radius: 4px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 6px; }
+.inv-badge-draft { background: #f1f5f9; color: #475569; }
+.inv-badge-sent { background: #eff6ff; color: #2563eb; }
+.inv-badge-paid { background: #f0fdf4; color: #16a34a; }
+.inv-badge-overdue { background: #fef2f2; color: #dc2626; }
+.inv-badge-cancelled { background: #fffbeb; color: #d97706; }
+
+/* ── Parties ── */
+.inv-parties { display: grid; grid-template-columns: 1fr 1fr; gap: 0; margin-bottom: 24px; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; }
+.inv-party { padding: 18px 20px; }
+.inv-party:first-child { border-right: 1px solid #e2e8f0; }
+.inv-party-tag { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #94a3b8; margin-bottom: 8px; }
+.inv-party-name { font-size: 14px; font-weight: 700; color: #0f172a; margin-bottom: 6px; }
+.inv-party-detail { font-size: 11.5px; color: #475569; line-height: 1.7; }
+.inv-party-detail strong { color: #334155; font-weight: 600; }
+
+/* ── Payment box ── */
+.inv-pay { display: grid; grid-template-columns: 1fr auto; gap: 0; margin-bottom: 24px; border: 1.5px solid #4361ee; border-radius: 8px; overflow: hidden; }
+.inv-pay-details { padding: 16px 20px; }
+.inv-pay-title { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; color: #4361ee; margin-bottom: 10px; }
+.inv-pay-table { width: 100%; }
+.inv-pay-table td { padding: 3px 0; vertical-align: top; }
+.inv-pay-table td:first-child { color: #64748b; font-size: 11.5px; width: 120px; white-space: nowrap; padding-right: 12px; }
+.inv-pay-table td:last-child { font-weight: 600; color: #0f172a; font-size: 12.5px; }
+.inv-pay-table .inv-pay-total td:last-child { font-size: 16px; font-weight: 800; color: #4361ee; }
+.inv-pay-table .inv-pay-vs td:last-child { font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace; letter-spacing: 1.5px; font-size: 13px; }
+.inv-pay-qr { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 12px 16px; background: #f8fafc; border-left: 1px solid #e2e8f0; min-width: 100px; }
+.inv-pay-qr img { width: 88px; height: 88px; }
+.inv-pay-qr span { font-size: 8px; color: #94a3b8; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 600; }
+
+/* ── Dates strip ── */
+.inv-dates { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0; margin-bottom: 24px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0; overflow: hidden; }
+.inv-date { padding: 12px 16px; border-right: 1px solid #e2e8f0; }
+.inv-date:last-child { border-right: none; }
+.inv-date-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #94a3b8; margin-bottom: 3px; }
+.inv-date-val { font-size: 13px; font-weight: 600; color: #0f172a; }
+
+/* ── Items table ── */
+.inv-items { width: 100%; border-collapse: collapse; margin-bottom: 0; }
+.inv-items thead { background: #f8fafc; }
+.inv-items thead th { padding: 10px 14px; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #94a3b8; text-align: left; border-bottom: 2px solid #e2e8f0; border-top: 1px solid #e2e8f0; }
+.inv-items thead th.r { text-align: right; }
+.inv-items tbody td { padding: 11px 14px; font-size: 12.5px; color: #334155; border-bottom: 1px solid #f1f5f9; }
+.inv-items tbody td.r { text-align: right; font-variant-numeric: tabular-nums; }
+.inv-items tbody tr:last-child td { border-bottom: 2px solid #e2e8f0; }
+
+/* ── Totals ── */
+.inv-sum { display: flex; justify-content: flex-end; padding: 16px 0 24px; }
+.inv-sum-box { width: 260px; }
+.inv-sum-row { display: flex; justify-content: space-between; padding: 5px 0; font-size: 12px; color: #64748b; }
+.inv-sum-row span:last-child { font-variant-numeric: tabular-nums; font-weight: 500; }
+.inv-sum-total { display: flex; justify-content: space-between; padding: 10px 0 4px; font-size: 18px; font-weight: 800; color: #0f172a; border-top: 2px solid #0f172a; margin-top: 6px; }
+.inv-sum-czk { display: flex; justify-content: space-between; padding: 2px 0; font-size: 11px; color: #94a3b8; }
+
+/* ── Note ── */
+.inv-note { padding: 14px 18px; background: #f8fafc; border-radius: 8px; margin-bottom: 20px; border: 1px solid #e2e8f0; }
+.inv-note-tag { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #94a3b8; margin-bottom: 4px; }
+.inv-note-text { font-size: 12px; color: #475569; line-height: 1.5; }
+
+/* ── Issuer + Footer ── */
+.inv-bottom { display: flex; justify-content: space-between; align-items: flex-end; padding-top: 20px; border-top: 1px solid #e2e8f0; margin-top: 8px; }
+.inv-issuer-tag { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #94a3b8; margin-bottom: 3px; }
+.inv-issuer-name { font-size: 13px; font-weight: 600; color: #0f172a; }
+.inv-sig { max-width: 140px; max-height: 60px; margin-top: 6px; }
+.inv-foot { font-size: 10px; color: #94a3b8; text-align: right; }
+.inv-accent-bottom { height: 3px; background: linear-gradient(90deg, #4361ee 0%, #7c3aed 100%); border-radius: 1.5px; margin-top: 20px; }
+@media print { body { padding: 0; } .inv { padding: 24px; } }
+`;
+
 export default function InvoiceDetail() {
   const { id } = useParams();
   const [invoice, setInvoice] = useState(null);
@@ -26,7 +110,6 @@ export default function InvoiceDetail() {
     Promise.all([api.getInvoice(id), api.getCompany()])
       .then(([inv, comp]) => {
         setInvoice(inv); setCompany(comp);
-        // Load QR code
         api.getInvoiceQR(id).then(setQrData).catch(() => {});
       })
       .finally(() => setLoading(false));
@@ -41,76 +124,17 @@ export default function InvoiceDetail() {
   const downloadPDF = () => {
     const content = invoiceRef.current;
     const win = window.open('', '_blank');
-    win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${invoice.invoice_number}</title>
-    <style>
-      * { margin: 0; padding: 0; box-sizing: border-box; }
-      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1a1a2e; padding: 0; }
-      .invoice-pdf { max-width: 800px; margin: 0 auto; padding: 40px; }
-      .inv-gradient-bar { height: 6px; background: linear-gradient(90deg, #ff6b6b, #ffa500, #ffd93d, #6bcb77, #4d96ff, #9b59b6); border-radius: 3px; margin-bottom: 32px; }
-      .inv-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px; }
-      .inv-company-name { font-size: 24px; font-weight: 800; color: #1a1a2e; margin-bottom: 4px; }
-      .inv-company-details { font-size: 12px; color: #64748b; line-height: 1.6; }
-      .inv-title { font-size: 36px; font-weight: 800; color: #1a1a2e; text-align: right; letter-spacing: -1px; }
-      .inv-number { font-size: 14px; color: #64748b; text-align: right; margin-top: 4px; }
-      .inv-status { display: inline-block; padding: 4px 14px; border-radius: 20px; font-size: 12px; font-weight: 700; text-transform: uppercase; margin-top: 8px; }
-      .inv-status-draft { background: #e2e8f0; color: #475569; }
-      .inv-status-sent { background: #dbeafe; color: #1d4ed8; }
-      .inv-status-paid { background: #d1fae5; color: #059669; }
-      .inv-status-overdue { background: #fee2e2; color: #dc2626; }
-      .inv-status-cancelled { background: #fef3c7; color: #d97706; }
-      .inv-parties { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-bottom: 32px; }
-      .inv-party-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: #9ca3af; font-weight: 700; margin-bottom: 8px; }
-      .inv-party-name { font-size: 16px; font-weight: 700; color: #1a1a2e; margin-bottom: 4px; }
-      .inv-party-info { font-size: 12px; color: #64748b; line-height: 1.6; }
-      .inv-meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 16px; margin-bottom: 32px; padding: 20px; background: #f8f9fa; border-radius: 10px; }
-      .inv-meta-item label { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: #9ca3af; font-weight: 700; margin-bottom: 4px; }
-      .inv-meta-item span { font-size: 14px; font-weight: 600; color: #1a1a2e; }
-      .inv-table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
-      .inv-table thead th { text-align: left; padding: 12px 16px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: #9ca3af; font-weight: 700; border-bottom: 2px solid #e2e8f0; }
-      .inv-table thead th.right { text-align: right; }
-      .inv-table tbody td { padding: 14px 16px; font-size: 13px; color: #334155; border-bottom: 1px solid #f1f5f9; }
-      .inv-table tbody td.right { text-align: right; font-variant-numeric: tabular-nums; }
-      .inv-table tbody tr:last-child td { border-bottom: 2px solid #e2e8f0; }
-      .inv-totals { display: flex; justify-content: flex-end; margin-bottom: 32px; }
-      .inv-totals-box { width: 280px; }
-      .inv-totals-row { display: flex; justify-content: space-between; padding: 8px 0; font-size: 13px; color: #64748b; }
-      .inv-totals-row span:last-child { font-variant-numeric: tabular-nums; }
-      .inv-totals-total { display: flex; justify-content: space-between; padding: 14px 0; font-size: 20px; font-weight: 800; color: #1a1a2e; border-top: 3px solid #1a1a2e; margin-top: 4px; }
-      .inv-totals-czk { display: flex; justify-content: space-between; padding: 4px 0; font-size: 12px; color: #9ca3af; }
-      .inv-note { padding: 16px 20px; background: #f8f9fa; border-radius: 10px; margin-bottom: 24px; }
-      .inv-note-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: #9ca3af; font-weight: 700; margin-bottom: 6px; }
-      .inv-note-text { font-size: 13px; color: #64748b; line-height: 1.5; }
-      .inv-footer { text-align: center; padding-top: 24px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #9ca3af; }
-      .inv-issuer { margin-bottom: 24px; text-align: right; }
-      .inv-issuer-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: #9ca3af; font-weight: 700; margin-bottom: 4px; }
-      .inv-issuer-name { font-size: 14px; font-weight: 600; color: #1a1a2e; margin-bottom: 8px; }
-      .inv-signature-img { max-width: 180px; max-height: 80px; }
-      .inv-gradient-bar-bottom { height: 4px; background: linear-gradient(90deg, #ff6b6b, #ffa500, #ffd93d, #6bcb77, #4d96ff, #9b59b6); border-radius: 2px; margin-top: 24px; }
-      .inv-bank { padding: 20px; background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 10px; margin-bottom: 24px; }
-      .inv-bank-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #0284c7; font-weight: 700; margin-bottom: 12px; }
-      .inv-bank-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 13px; }
-      .inv-bank-label { color: #64748b; }
-      .inv-bank-value { font-weight: 600; color: #1a1a2e; }
-      .inv-payment-section { display: flex; gap: 24px; align-items: flex-start; margin-bottom: 24px; }
-      .inv-qr { text-align: center; }
-      .inv-qr img { width: 150px; height: 150px; }
-      .inv-qr-label { font-size: 10px; color: #9ca3af; margin-top: 4px; }
-      @media print { body { padding: 0; } .invoice-pdf { padding: 20px; } }
-    </style>
-    </head><body>${content.innerHTML}
-    <script>window.onload=function(){window.print();}<\/script>
-    </body></html>`);
+    win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${invoice.invoice_number}</title><style>${CSS}</style></head><body>${content.innerHTML}<script>window.onload=function(){window.print();}<\/script></body></html>`);
     win.document.close();
   };
 
   if (loading) return <div className="loading">Načítání...</div>;
   if (!invoice) return <div className="empty-state">Faktura nenalezena</div>;
 
-  const companyName = company?.name || 'Rainbow Family Investment';
-  const isVatPayer = !!company?.vat_payer;
-  const fullBankAccount = company?.bank_account ? (company.bank_code ? `${company.bank_account}/${company.bank_code}` : company.bank_account) : null;
+  const co = company || {};
+  const isVatPayer = !!co.vat_payer;
+  const bankFull = co.bank_account ? (co.bank_code ? `${co.bank_account}/${co.bank_code}` : co.bank_account) : null;
 
-  // Group tax by rate for summary
   const taxByRate = {};
   (invoice.items || []).forEach(item => {
     const rate = item.tax_rate ?? 21;
@@ -121,6 +145,8 @@ export default function InvoiceDetail() {
     taxByRate[rate].tax += tax;
   });
 
+  const hasBankDetails = bankFull || co.iban;
+
   return (
     <div>
       <div className="page-header">
@@ -129,7 +155,7 @@ export default function InvoiceDetail() {
           <h1 className="page-title">{invoice.invoice_number}</h1>
         </div>
         <div className="btn-group">
-          <button className="btn btn-primary" onClick={downloadPDF}>⬇ Stáhnout PDF</button>
+          <button className="btn btn-primary" onClick={downloadPDF}>Stáhnout PDF</button>
           {can('admin', 'accountant') && (
             <Link to={`/invoices/${id}/edit`} className="btn btn-outline">Upravit</Link>
           )}
@@ -146,138 +172,119 @@ export default function InvoiceDetail() {
       </div>
 
       <div ref={invoiceRef}>
-        <div className="invoice-pdf">
-          <div className="inv-gradient-bar"></div>
+        <div className="inv">
+          {/* Accent bar */}
+          <div className="inv-accent"></div>
 
-          <div className="inv-header">
-            <div>
-              <div className="inv-company-name">{companyName}</div>
-              <div className="inv-company-details">
-                {company?.ico && <>IČO: {company.ico}<br/></>}
-                {company?.dic && <>DIČ: {company.dic}<br/></>}
-                {company?.address && <>{company.address}<br/></>}
-                {company?.city && <>{company.city} {company?.zip}<br/></>}
-                {company?.email && <>{company.email}<br/></>}
-                {company?.phone && <>{company.phone}</>}
-              </div>
+          {/* Header: Invoice number left, Company right */}
+          <div className="inv-head">
+            <div className="inv-head-left">
+              <h1>Faktura</h1>
+              <div className="inv-num">{invoice.invoice_number}</div>
+              <span className={`inv-badge inv-badge-${invoice.status}`}>{statusLabels[invoice.status]}</span>
             </div>
-            <div>
-              <div className="inv-title">FAKTURA</div>
-              <div className="inv-number">{invoice.invoice_number}</div>
-              <div style={{ textAlign: 'right' }}>
-                <span className={`inv-status inv-status-${invoice.status}`}>
-                  {statusLabels[invoice.status]}
-                </span>
+            <div className="inv-head-right">
+              <div className="inv-company">{co.name || 'Rainbow Family Investment'}</div>
+              <div className="inv-company-info">
+                {co.ico && <>IČO: {co.ico}<br/></>}
+                {co.dic && <>DIČ: {co.dic}<br/></>}
+                {co.address && <>{co.address}<br/></>}
+                {co.city && <>{co.city} {co.zip}</>}
               </div>
             </div>
           </div>
 
+          {/* Two-column: Dodavatel | Odběratel */}
           <div className="inv-parties">
-            <div>
-              <div className="inv-party-label">Dodavatel</div>
-              <div className="inv-party-name">{companyName}</div>
-              <div className="inv-party-info">
-                {company?.ico && <>IČO: {company.ico}<br/></>}
-                {company?.dic && <>DIČ: {company.dic}<br/></>}
-                {company?.address && <>{company.address}<br/></>}
-                {company?.city && <>{company.city} {company?.zip}</>}
-                {company?.email && <><br/>{company.email}</>}
-                {company?.phone && <><br/>{company.phone}</>}
+            <div className="inv-party">
+              <div className="inv-party-tag">Dodavatel</div>
+              <div className="inv-party-name">{co.name || '—'}</div>
+              <div className="inv-party-detail">
+                {co.ico && <><strong>IČ:</strong> {co.ico}<br/></>}
+                {co.dic && <><strong>DIČ:</strong> {co.dic}<br/></>}
+                {co.address && <>{co.address}<br/></>}
+                {co.city && <>{co.city} {co.zip}<br/></>}
+                {co.email && <>{co.email}<br/></>}
+                {co.phone && <>{co.phone}</>}
               </div>
             </div>
-            <div>
-              <div className="inv-party-label">Odběratel</div>
+            <div className="inv-party">
+              <div className="inv-party-tag">Odběratel</div>
               <div className="inv-party-name">{invoice.client_name || '—'}</div>
-              <div className="inv-party-info">
-                {invoice.client_ico && <>IČO: {invoice.client_ico}<br/></>}
-                {invoice.client_dic && <>DIČ: {invoice.client_dic}<br/></>}
+              <div className="inv-party-detail">
+                {invoice.client_ico && <><strong>IČ:</strong> {invoice.client_ico}<br/></>}
+                {invoice.client_dic && <><strong>DIČ:</strong> {invoice.client_dic}<br/></>}
                 {invoice.client_address && <>{invoice.client_address}<br/></>}
-                {invoice.client_city && <>{invoice.client_city} {invoice.client_zip}</>}
-                {invoice.client_email && <><br/>{invoice.client_email}</>}
+                {invoice.client_city && <>{invoice.client_city} {invoice.client_zip}<br/></>}
+                {invoice.client_email && <>{invoice.client_email}</>}
               </div>
             </div>
           </div>
 
-          {/* Bank details + QR code section */}
-          <div className="inv-payment-section">
-            <div className="inv-bank" style={{ flex: 1 }}>
-              <div className="inv-bank-title">Platební údaje</div>
-              <div className="inv-bank-grid">
-                {fullBankAccount && <>
-                  <div className="inv-bank-label">Číslo účtu:</div>
-                  <div className="inv-bank-value">{fullBankAccount}</div>
-                </>}
-                {company?.iban && <>
-                  <div className="inv-bank-label">IBAN:</div>
-                  <div className="inv-bank-value">{company.iban}</div>
-                </>}
-                {company?.swift && <>
-                  <div className="inv-bank-label">SWIFT/BIC:</div>
-                  <div className="inv-bank-value">{company.swift}</div>
-                </>}
-                {invoice.variable_symbol && <>
-                  <div className="inv-bank-label">Variabilní symbol:</div>
-                  <div className="inv-bank-value" style={{ fontSize: '1.1em', letterSpacing: 1 }}>{invoice.variable_symbol}</div>
-                </>}
-                <div className="inv-bank-label">Částka k úhradě:</div>
-                <div className="inv-bank-value" style={{ fontSize: '1.1em' }}>{fmt(invoice.total, invoice.currency)}</div>
-                <div className="inv-bank-label">Splatnost:</div>
-                <div className="inv-bank-value">{fmtDate(invoice.due_date)}</div>
+          {/* Payment box with QR */}
+          {hasBankDetails && (
+            <div className="inv-pay">
+              <div className="inv-pay-details">
+                <div className="inv-pay-title">Platební údaje</div>
+                <table className="inv-pay-table">
+                  <tbody>
+                    {bankFull && <tr><td>Číslo účtu</td><td>{bankFull}</td></tr>}
+                    {co.iban && <tr><td>IBAN</td><td>{co.iban}</td></tr>}
+                    {co.swift && <tr><td>SWIFT</td><td>{co.swift}</td></tr>}
+                    {invoice.variable_symbol && <tr className="inv-pay-vs"><td>Variabilní symbol</td><td>{invoice.variable_symbol}</td></tr>}
+                    <tr><td>Způsob úhrady</td><td>{paymentLabels[invoice.payment_method] || 'Bankovní převod'}</td></tr>
+                    <tr className="inv-pay-total"><td>K úhradě</td><td>{fmt(invoice.total, invoice.currency)}</td></tr>
+                  </tbody>
+                </table>
               </div>
+              {qrData?.qr && (
+                <div className="inv-pay-qr">
+                  <img src={qrData.qr} alt="QR Platba" />
+                  <span>QR Platba</span>
+                </div>
+              )}
             </div>
-            {qrData?.qr && (
-              <div className="inv-qr">
-                <img src={qrData.qr} alt="QR Platba" />
-                <div className="inv-qr-label">QR Platba</div>
-              </div>
-            )}
-          </div>
+          )}
 
-          <div className="inv-meta">
-            <div className="inv-meta-item">
-              <label>Datum vystavení</label>
-              <span>{fmtDate(invoice.issue_date)}</span>
+          {/* Dates strip */}
+          <div className="inv-dates">
+            <div className="inv-date">
+              <div className="inv-date-label">Datum vystavení</div>
+              <div className="inv-date-val">{fmtDate(invoice.issue_date)}</div>
             </div>
             {isVatPayer && (
-              <div className="inv-meta-item">
-                <label>DÚZP</label>
-                <span>{fmtDate(invoice.supply_date || invoice.issue_date)}</span>
+              <div className="inv-date">
+                <div className="inv-date-label">DÚZP</div>
+                <div className="inv-date-val">{fmtDate(invoice.supply_date || invoice.issue_date)}</div>
               </div>
             )}
-            <div className="inv-meta-item">
-              <label>Datum splatnosti</label>
-              <span>{fmtDate(invoice.due_date)}</span>
+            <div className="inv-date">
+              <div className="inv-date-label">Datum splatnosti</div>
+              <div className="inv-date-val">{fmtDate(invoice.due_date)}</div>
             </div>
-            <div className="inv-meta-item">
-              <label>Způsob úhrady</label>
-              <span>{paymentLabels[invoice.payment_method] || 'Bankovní převod'}</span>
-            </div>
-            {invoice.variable_symbol && (
-              <div className="inv-meta-item">
-                <label>Variabilní symbol</label>
-                <span style={{ fontFamily: 'monospace', letterSpacing: 1 }}>{invoice.variable_symbol}</span>
+            {invoice.paid_date && (
+              <div className="inv-date">
+                <div className="inv-date-label">Datum úhrady</div>
+                <div className="inv-date-val">{fmtDate(invoice.paid_date)}</div>
               </div>
             )}
-            <div className="inv-meta-item">
-              <label>Měna</label>
-              <span>{invoice.currency}</span>
-            </div>
-            <div className="inv-meta-item">
-              <label>{invoice.paid_date ? 'Zaplaceno' : 'Stav'}</label>
-              <span>{invoice.paid_date ? fmtDate(invoice.paid_date) : statusLabels[invoice.status]}</span>
+            <div className="inv-date">
+              <div className="inv-date-label">Měna</div>
+              <div className="inv-date-val">{invoice.currency}</div>
             </div>
           </div>
 
-          <table className="inv-table">
+          {/* Items table */}
+          <table className="inv-items">
             <thead>
               <tr>
-                <th>Popis</th>
-                <th className="right">Množství</th>
-                <th>Jednotka</th>
-                <th className="right">Cena/ks</th>
-                {isVatPayer && <th className="right">DPH</th>}
-                <th className="right">Celkem{isVatPayer ? ' bez DPH' : ''}</th>
-                {isVatPayer && <th className="right">Celkem s DPH</th>}
+                <th style={{ width: '40%' }}>Popis</th>
+                <th className="r">Množství</th>
+                <th>Jedn.</th>
+                <th className="r">Cena/ks</th>
+                {isVatPayer && <th className="r">DPH</th>}
+                <th className="r">Celkem{isVatPayer ? ' bez DPH' : ''}</th>
+                {isVatPayer && <th className="r">S DPH</th>}
               </tr>
             </thead>
             <tbody>
@@ -287,58 +294,65 @@ export default function InvoiceDetail() {
                 return (
                   <tr key={i}>
                     <td>{item.description}</td>
-                    <td className="right">{item.quantity}</td>
+                    <td className="r">{item.quantity}</td>
                     <td>{item.unit}</td>
-                    <td className="right">{fmt(item.unit_price, invoice.currency)}</td>
-                    {isVatPayer && <td className="right">{item.tax_rate ?? 21}%</td>}
-                    <td className="right">{fmt(lineBase, invoice.currency)}</td>
-                    {isVatPayer && <td className="right">{fmt(lineBase + lineTax, invoice.currency)}</td>}
+                    <td className="r">{fmt(item.unit_price, invoice.currency)}</td>
+                    {isVatPayer && <td className="r">{item.tax_rate ?? 21}%</td>}
+                    <td className="r">{fmt(lineBase, invoice.currency)}</td>
+                    {isVatPayer && <td className="r">{fmt(lineBase + lineTax, invoice.currency)}</td>}
                   </tr>
                 );
               })}
             </tbody>
           </table>
 
-          <div className="inv-totals">
-            <div className="inv-totals-box">
-              {isVatPayer && <div className="inv-totals-row"><span>Základ</span><span>{fmt(invoice.subtotal, invoice.currency)}</span></div>}
+          {/* Totals */}
+          <div className="inv-sum">
+            <div className="inv-sum-box">
+              {isVatPayer && <div className="inv-sum-row"><span>Základ</span><span>{fmt(invoice.subtotal, invoice.currency)}</span></div>}
               {isVatPayer && Object.entries(taxByRate).map(([rate, vals]) => (
-                <div className="inv-totals-row" key={rate}><span>DPH {rate}%</span><span>{fmt(vals.tax, invoice.currency)}</span></div>
+                <div className="inv-sum-row" key={rate}><span>DPH {rate}%</span><span>{fmt(vals.tax, invoice.currency)}</span></div>
               ))}
-              <div className="inv-totals-total"><span>Celkem</span><span>{fmt(invoice.total, invoice.currency)}</span></div>
+              <div className="inv-sum-total"><span>Celkem</span><span>{fmt(invoice.total, invoice.currency)}</span></div>
               {invoice.currency !== 'CZK' && (
-                <div className="inv-totals-czk"><span>Celkem v CZK</span><span>{fmt(invoice.total_czk, 'CZK')}</span></div>
+                <div className="inv-sum-czk"><span>V CZK</span><span>{fmt(invoice.total_czk, 'CZK')}</span></div>
               )}
             </div>
           </div>
 
+          {/* Note */}
           {invoice.note && (
             <div className="inv-note">
-              <div className="inv-note-label">Poznámka</div>
+              <div className="inv-note-tag">Poznámka</div>
               <div className="inv-note-text">{invoice.note}</div>
             </div>
           )}
 
-          {invoice.created_by_name && (
-            <div className="inv-issuer">
-              <div className="inv-issuer-label">Vystavil/a</div>
-              <div className="inv-issuer-name">{invoice.created_by_name}</div>
-              {invoice.created_by_signature && (
-                <img src={invoice.created_by_signature} alt="Podpis" className="inv-signature-img" />
+          {!isVatPayer && (
+            <div className="inv-note">
+              <div className="inv-note-text">Dodavatel není plátcem DPH.</div>
+            </div>
+          )}
+
+          {/* Footer: Issuer + Company info */}
+          <div className="inv-bottom">
+            <div>
+              {invoice.created_by_name && (
+                <>
+                  <div className="inv-issuer-tag">Vystavil/a</div>
+                  <div className="inv-issuer-name">{invoice.created_by_name}</div>
+                  {invoice.created_by_signature && (
+                    <img src={invoice.created_by_signature} alt="Podpis" className="inv-sig" />
+                  )}
+                </>
               )}
             </div>
-          )}
-
-          {!isVatPayer && (
-            <div className="inv-note" style={{ marginBottom: 24 }}>
-              <div className="inv-note-text">Dodavatel není plátce DPH.</div>
+            <div className="inv-foot">
+              {co.name}{co.ico && ` · IČ ${co.ico}`}{co.dic && ` · DIČ ${co.dic}`}
             </div>
-          )}
-
-          <div className="inv-footer">
-            {companyName} {company?.ico && `· IČO: ${company.ico}`} {company?.dic && `· DIČ: ${company.dic}`}
           </div>
-          <div className="inv-gradient-bar-bottom"></div>
+
+          <div className="inv-accent-bottom"></div>
         </div>
       </div>
     </div>
