@@ -115,4 +115,7 @@ db.exec(`
   );
 `);
 
+// Migrations - add columns to existing tables
+try { db.exec('ALTER TABLE users ADD COLUMN signature TEXT'); } catch (e) { /* already exists */ }
+
 module.exports = db;
