@@ -445,22 +445,21 @@ export default function Company() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.75rem' }}>
             {invoiceLayouts.map(layout => {
               const selected = (form.invoice_layout || 'klasicky') === layout.key;
-              const hovered = hoveredLayout === layout.key;
               return (
                 <div key={layout.key}
                   onClick={() => setForm(f => ({ ...f, invoice_layout: layout.key }))}
                   onMouseEnter={(e) => { setHoveredLayout(layout.key); hoverRef.current = e.currentTarget; }}
                   onMouseLeave={() => setHoveredLayout(null)}
                   style={{
-                    border: selected ? `2px solid ${layout.accent}` : hovered ? `2px solid ${layout.accent}80` : '2px solid var(--gray-200)',
+                    border: selected ? `2px solid ${layout.accent}` : '2px solid var(--gray-200)',
                     borderRadius: 'var(--radius-lg)', padding: 0, cursor: 'pointer',
                     transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)', overflow: 'hidden',
-                    boxShadow: selected ? `0 4px 16px ${layout.accent}20` : hovered ? `0 4px 12px ${layout.accent}15` : 'none',
-                    transform: selected ? 'translateY(-2px)' : hovered ? 'translateY(-3px) scale(1.02)' : 'none',
+                    boxShadow: selected ? `0 4px 16px ${layout.accent}20` : 'none',
+                    transform: selected ? 'translateY(-2px)' : 'none',
                   }}
                 >
-                  {/* Mini realistic preview thumbnail */}
-                  <div style={{ background: selected ? `${layout.accent}06` : hovered ? `${layout.accent}04` : '#fff', borderBottom: `1px solid ${selected ? layout.accent + '30' : 'var(--gray-200)'}`, transition: 'background 0.2s', padding: 6, overflow: 'hidden' }}>
+                  {/* Mini realistic preview thumbnail — fixed height for grid alignment */}
+                  <div style={{ height: 180, background: selected ? `${layout.accent}06` : '#fff', borderBottom: `1px solid ${selected ? layout.accent + '30' : 'var(--gray-200)'}`, padding: 6, overflow: 'hidden' }}>
                     <div style={{ transform: 'scale(0.52)', transformOrigin: 'top left', width: '192%', pointerEvents: 'none' }}>
                       <InvoicePreview layout={layout} companyName={form.name} />
                     </div>
