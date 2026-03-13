@@ -19,12 +19,9 @@ import UserDetail from './pages/UserDetail';
 import ClientDetail from './pages/ClientDetail';
 import SuperAdmin from './pages/SuperAdmin';
 import RecurringInvoices from './pages/RecurringInvoices';
-import AgingReport from './pages/AgingReport';
 import Accounting from './pages/Accounting';
 import VatReport from './pages/VatReport';
 import Bank from './pages/Bank';
-import CashRegister from './pages/CashRegister';
-import Products from './pages/Products';
 import Orders from './pages/Orders';
 import './styles.css';
 
@@ -127,15 +124,12 @@ function Sidebar({ open, onClose }) {
     { to: '/invoices', label: 'Faktury', icon: 'invoice' },
     { to: '/orders', label: 'Objednávky', icon: 'orders' },
     { to: '/clients', label: 'Klienti', icon: 'clients' },
-    { to: '/products', label: 'Ceník', icon: 'products' },
     { to: '/evidence', label: 'Evidence', icon: 'evidence' },
     { to: '/bank', label: 'Banka', icon: 'bank' },
-    { to: '/cash', label: 'Pokladna', icon: 'cash' },
     { to: '/accounting', label: 'Účetnictví', icon: 'accounting' },
     { to: '/vat', label: 'DPH', icon: 'vat' },
     { to: '/currencies', label: 'Měny', icon: 'currencies' },
     { to: '/recurring', label: 'Opakované', icon: 'recurring' },
-    { to: '/aging', label: 'Pohledávky', icon: 'aging' },
   ];
   if (can('admin')) {
     links.push({ to: '/company', label: 'Společnost', icon: 'company' });
@@ -306,14 +300,11 @@ export default function App() {
                   <Route path="/clients" element={<Clients />} />
                   <Route path="/clients/:id" element={<ClientDetail />} />
                   <Route path="/orders" element={<Orders />} />
-                  <Route path="/products" element={<Products />} />
                   <Route path="/bank" element={<Bank />} />
-                  <Route path="/cash" element={<CashRegister />} />
                   <Route path="/accounting" element={<Accounting />} />
                   <Route path="/vat" element={<VatReport />} />
                   <Route path="/currencies" element={<Currencies />} />
                   <Route path="/recurring" element={<RecurringInvoices />} />
-                  <Route path="/aging" element={<AgingReport />} />
                   <Route path="/company" element={<Company />} />
                   <Route path="/users" element={<Users />} />
                   <Route path="/users/:id" element={<UserDetail />} />
