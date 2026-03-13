@@ -584,6 +584,9 @@ app.post('/api/invoices', ...tenanted, authorize('admin', 'accountant'), (req, r
   let finalNumber = invoice_number;
   let finalVS = variable_symbol;
   const comp = db.prepare('SELECT * FROM company WHERE tenant_id = ?').get(req.tenant_id);
+  if (!comp || (!comp.bank_account && !comp.iban)) {
+    return res.status(400).json({ error: 'Nelze vystavit fakturu bez bankovního spojení. Vyplňte údaje v nastavení firmy.' });
+  }
   if (!finalNumber) {
     finalNumber = generateInvoiceNumber(comp);
     db.prepare('UPDATE company SET invoice_counter = ? WHERE tenant_id = ?').run((comp?.invoice_counter || 1) + 1, req.tenant_id);

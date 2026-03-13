@@ -22,6 +22,7 @@ export default function InvoiceForm() {
   const [currencies, setCurrencies] = useState([]);
   const [defaultDueDays, setDefaultDueDays] = useState(14);
   const [vatPayer, setVatPayer] = useState(false);
+  const [hasBankDetails, setHasBankDetails] = useState(true);
   const [form, setForm] = useState({
     invoice_number: '', variable_symbol: '', client_id: '', issue_date: new Date().toISOString().slice(0, 10),
     due_date: '', supply_date: '', status: 'draft', currency: 'CZK',
@@ -44,6 +45,7 @@ export default function InvoiceForm() {
       const isVatPayer = !!comp?.vat_payer;
       setDefaultDueDays(dueDays);
       setVatPayer(isVatPayer);
+      setHasBankDetails(!!(comp?.bank_account || comp?.iban));
 
       if (isEdit) {
         setForm({
@@ -132,6 +134,12 @@ export default function InvoiceForm() {
       </div>
 
       {error && <div className="login-error" style={{ marginBottom: '1rem' }}>{error}</div>}
+
+      {!hasBankDetails && (
+        <div style={{ background: '#fef2f2', color: '#991b1b', padding: '0.75rem 1rem', borderRadius: 'var(--radius)', marginBottom: '1rem', fontSize: '0.85rem', border: '1px solid #fecaca' }}>
+          Nelze vystavit fakturu bez bankovního spojení. <a href="/settings" style={{ color: '#991b1b', fontWeight: 600 }}>Vyplňte údaje v nastavení firmy →</a>
+        </div>
+      )}
 
       {!vatPayer && (
         <div style={{ background: '#fef3c7', color: '#92400e', padding: '0.75rem 1rem', borderRadius: 'var(--radius)', marginBottom: '1rem', fontSize: '0.85rem' }}>
@@ -268,7 +276,7 @@ export default function InvoiceForm() {
         </div>
 
         <div className="btn-group">
-          <button type="submit" className="btn btn-primary">{isEdit ? 'Uložit změny' : 'Vytvořit fakturu'}</button>
+          <button type="submit" className="btn btn-primary" disabled={!hasBankDetails}>{isEdit ? 'Uložit změny' : 'Vytvořit fakturu'}</button>
           <button type="button" className="btn btn-outline" onClick={() => navigate('/invoices')}>Zrušit</button>
         </div>
       </form>
