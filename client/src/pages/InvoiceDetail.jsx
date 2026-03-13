@@ -6,6 +6,95 @@ import { useAuth } from '../App';
 const statusLabels = { draft: 'Koncept', sent: 'Odesláno', paid: 'Zaplaceno', overdue: 'Po splatnosti', cancelled: 'Zrušeno' };
 const paymentLabels = { bank_transfer: 'Bankovní převod', cash: 'Hotově', card: 'Kartou', other: 'Jiný' };
 const fmt = (n, cur = 'CZK') => new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: cur, maximumFractionDigits: 2 }).format(n);
+
+const layoutStyles = {
+  klasicky: '', // default styles, no overrides needed
+  minimalisticky: `
+.inv-accent { display: none; }
+.inv-accent-bottom { display: none; }
+.inv-head-left h1 { color: #1e293b; font-size: 11px; letter-spacing: 0.15em; }
+.inv-head-left .inv-num { font-size: 24px; font-weight: 400; letter-spacing: 0.02em; color: #1e293b; }
+.inv-pay { border-color: #cbd5e1; border-width: 1px; border-radius: 4px; }
+.inv-pay-title { color: #475569; }
+.inv-pay-table .inv-pay-total td:last-child { color: #1e293b; }
+.inv-parties { border-radius: 0; border-left: none; border-right: none; }
+.inv-party:first-child { border-right: none; padding-right: 40px; }
+.inv-dates { background: transparent; border: none; border-top: 1px solid var(--gray-200); border-bottom: 1px solid var(--gray-200); border-radius: 0; }
+.inv-items thead { background: transparent; }
+.inv-items thead th { border-top: none; border-bottom: 1px solid #1e293b; color: #1e293b; font-weight: 600; }
+.inv-sum-total { border-top-color: #1e293b; }
+.inv .inv-note { background: transparent; border: 1px solid var(--gray-200); border-radius: 4px; }
+.inv-bottom { border-top: 1px solid #1e293b; }
+.inv-badge-sent { background: #f1f5f9; color: #475569; }
+`,
+  korporatni: `
+.inv-accent { height: 0; }
+.inv-accent-bottom { display: none; }
+.inv-head { background: #0f172a; margin: 0 -48px; padding: 24px 48px 20px; margin-bottom: 28px; }
+.inv-head-left h1 { color: #e2e8f0; }
+.inv-head-left .inv-num { color: #ffffff; }
+.inv-head-right .inv-company { color: #ffffff; }
+.inv-head-right .inv-company-info { color: #94a3b8; }
+.inv-head-right img { filter: brightness(0) invert(1); }
+.inv-badge-draft { background: rgba(255,255,255,0.15); color: #e2e8f0; }
+.inv-badge-sent { background: rgba(99,102,241,0.3); color: #c7d2fe; }
+.inv-badge-paid { background: rgba(16,185,129,0.3); color: #a7f3d0; }
+.inv-badge-overdue { background: rgba(239,68,68,0.3); color: #fecaca; }
+.inv-pay { border-color: #0f172a; }
+.inv-pay-title { color: #0f172a; }
+.inv-pay-table .inv-pay-total td:last-child { color: #0f172a; }
+.inv-parties { border-color: #1e293b; border-radius: 4px; }
+.inv-party:first-child { border-right-color: #1e293b; }
+.inv-items thead { background: #0f172a; }
+.inv-items thead th { color: #e2e8f0; border-bottom-color: #0f172a; border-top-color: #0f172a; }
+.inv-sum-total { border-top-color: #0f172a; }
+`,
+  elegantni: `
+.inv-accent { height: 2px; background: linear-gradient(90deg, #c4b5fd 0%, #8b5cf6 50%, #c4b5fd 100%); }
+.inv-accent-bottom { height: 2px; background: linear-gradient(90deg, #c4b5fd 0%, #8b5cf6 50%, #c4b5fd 100%); opacity: 0.6; }
+.inv-head-left h1 { color: #7c3aed; font-weight: 600; letter-spacing: 0.12em; }
+.inv-head-left .inv-num { font-weight: 300; font-size: 32px; color: #1e1b4b; }
+.inv-pay { border-color: #a78bfa; border-width: 1px; border-radius: 16px; }
+.inv-pay-title { color: #7c3aed; }
+.inv-pay-table .inv-pay-total td:last-child { color: #7c3aed; }
+.inv-parties { border-radius: 16px; border-color: #e9d5ff; }
+.inv-party:first-child { border-right-color: #e9d5ff; }
+.inv-party-tag { color: #7c3aed; }
+.inv-dates { border-radius: 16px; border-color: #e9d5ff; background: #faf5ff; }
+.inv-date { border-right-color: #e9d5ff; }
+.inv-date-label { color: #7c3aed; }
+.inv-items thead { background: #faf5ff; }
+.inv-items thead th { color: #7c3aed; border-bottom-color: #e9d5ff; border-top-color: #e9d5ff; }
+.inv-items tbody td { border-bottom-color: #f3e8ff; }
+.inv-items tbody tr:last-child td { border-bottom-color: #e9d5ff; }
+.inv-sum-total { border-top-color: #7c3aed; color: #1e1b4b; }
+.inv .inv-note { background: #faf5ff; border-color: #e9d5ff; border-radius: 16px; }
+.inv-bottom { border-top-color: #e9d5ff; }
+.inv-badge-sent { background: #ede9fe; color: #6d28d9; }
+`,
+  kompaktni: `
+.inv-accent { height: 3px; background: #059669; border-radius: 0; }
+.inv-accent-bottom { height: 2px; background: #059669; border-radius: 0; opacity: 0.4; }
+.inv { padding: 32px 36px 24px; font-size: 12px; }
+.inv-head { margin: 16px 0 20px; }
+.inv-head-left h1 { color: #059669; font-size: 10px; }
+.inv-head-left .inv-num { font-size: 22px; }
+.inv-head-right .inv-company { font-size: 15px; }
+.inv-pay { border-color: #059669; border-radius: 6px; }
+.inv-pay-title { color: #059669; }
+.inv-pay-table .inv-pay-total td:last-child { color: #059669; }
+.inv-parties { margin-bottom: 16px; border-radius: 6px; }
+.inv-party { padding: 12px 14px; }
+.inv-dates { margin-bottom: 16px; border-radius: 6px; }
+.inv-date { padding: 8px 12px; }
+.inv-items tbody td { padding: 7px 10px; font-size: 11.5px; }
+.inv-items thead th { padding: 7px 10px; }
+.inv-sum { padding: 10px 0 16px; }
+.inv .inv-note { padding: 10px 14px; border-radius: 6px; }
+.inv-bottom { padding-top: 14px; }
+.inv-badge-sent { background: #ecfdf5; color: #059669; }
+`,
+};
 const fmtDate = (d) => {
   if (!d) return '—';
   const parts = d.slice(0, 10).split('-');
@@ -97,6 +186,14 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Robo
 @media print { body { padding: 0; } .inv { padding: 24px; } }
 `;
 
+const layoutPrintCSS = {
+  klasicky: '',
+  minimalisticky: `.inv-accent,.inv-accent-bottom{display:none}.inv-head-left h1{color:#1e293b}.inv-head-left .inv-num{font-size:24px;font-weight:400}.inv-pay{border-color:#cbd5e1}.inv-pay-title{color:#475569}.inv-pay-table .inv-pay-total td:last-child{color:#1e293b}.inv-items thead th{border-top:none;border-bottom:1px solid #1e293b;color:#1e293b}`,
+  korporatni: `.inv-accent,.inv-accent-bottom{display:none}.inv-head{background:#0f172a;margin:0 -48px;padding:24px 48px 20px;margin-bottom:28px}.inv-head-left h1{color:#e2e8f0}.inv-head-left .inv-num{color:#fff}.inv-head-right .inv-company{color:#fff}.inv-head-right .inv-company-info{color:#94a3b8}.inv-items thead{background:#0f172a}.inv-items thead th{color:#e2e8f0}`,
+  elegantni: `.inv-accent{height:2px;background:linear-gradient(90deg,#c4b5fd,#8b5cf6,#c4b5fd)}.inv-head-left h1{color:#7c3aed}.inv-head-left .inv-num{font-weight:300;font-size:32px}.inv-pay{border-color:#a78bfa}.inv-pay-title{color:#7c3aed}.inv-items thead{background:#faf5ff}.inv-items thead th{color:#7c3aed}`,
+  kompaktni: `.inv-accent{height:3px;background:#059669;border-radius:0}.inv{padding:32px 36px 24px}.inv-head-left h1{color:#059669}.inv-pay{border-color:#059669}.inv-pay-title{color:#059669}`,
+};
+
 export default function InvoiceDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -137,7 +234,8 @@ export default function InvoiceDetail() {
       // Fallback to print
       const content = invoiceRef.current;
       const win = window.open('', '_blank');
-      win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${invoice.invoice_number}</title><style>${CSS}</style></head><body>${content.innerHTML}<script>window.onload=function(){window.print();}<\/script></body></html>`);
+      const pLayout = layoutPrintCSS[co?.invoice_layout] || '';
+      win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${invoice.invoice_number}</title><style>${CSS}${pLayout}</style></head><body>${content.innerHTML}<script>window.onload=function(){window.print();}<\/script></body></html>`);
       win.document.close();
     }
   };
@@ -267,6 +365,7 @@ export default function InvoiceDetail() {
 .inv-sig { max-width: 140px; max-height: 60px; margin-top: 6px; }
 .inv-foot { font-size: 10px; color: var(--gray-400); text-align: right; }
 .inv-accent-bottom { height: 3px; background: linear-gradient(90deg, #6366f1 0%, #8b5cf6 100%); border-radius: 1.5px; margin-top: 20px; opacity: 0.5; }
+${layoutStyles[co?.invoice_layout] || ''}
       ` }} />
       <div ref={invoiceRef}>
         <div className="inv">
