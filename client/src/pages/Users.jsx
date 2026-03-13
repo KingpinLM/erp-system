@@ -245,6 +245,7 @@ function SystemRoleCard({ roleKey, label, defaultPerms, currentPerms, userCount,
   const [perms, setPerms] = useState(currentPerms);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => { setPerms(currentPerms); setDirty(false); }, [currentPerms]);
 
@@ -267,33 +268,43 @@ function SystemRoleCard({ roleKey, label, defaultPerms, currentPerms, userCount,
 
   return (
     <div className="card" style={{ borderLeft: `4px solid var(--primary)`, padding: '1.25rem' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', cursor: 'pointer' }} onClick={() => setExpanded(!expanded)}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--gray-400)" strokeWidth="2" style={{ transition: 'transform 0.15s', transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)', flexShrink: 0 }}>
+          <path d="M9 18l6-6-6-6"/>
+        </svg>
         <span className={`badge badge-${roleKey}`} style={{ fontSize: '0.8rem' }}>{label}</span>
         <span style={{ fontSize: '0.78rem', color: 'var(--gray-400)' }}>{userCount} uživatelů</span>
         <span style={{ fontSize: '0.75rem', color: 'var(--gray-400)', fontStyle: 'italic' }}>Systémová role</span>
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.35rem' }}>
-          <button type="button" className="btn btn-outline btn-sm" style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem' }}
-            onClick={() => { setPerms(allPerms.map(p => p.key)); setDirty(true); }}>Vše</button>
-          <button type="button" className="btn btn-outline btn-sm" style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem' }}
-            onClick={reset}>Výchozí</button>
-          <button type="button" className="btn btn-outline btn-sm" style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem' }}
-            onClick={() => { setPerms([]); setDirty(true); }}>Nic</button>
-        </div>
+        <span style={{ fontSize: '0.75rem', color: 'var(--gray-400)', marginLeft: 'auto' }}>{perms.length}/{allPerms.length} oprávnění</span>
+        {dirty && <span style={{ fontSize: '0.72rem', color: 'var(--warning)', fontWeight: 600 }}>Neuloženo</span>}
       </div>
 
-      <PermissionGrid perms={perms} onToggle={toggle} allPerms={allPerms} permGroups={permGroups} saving={saving} />
+      {expanded && (
+        <>
+          <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'flex-end', gap: '0.35rem', marginBottom: '0.5rem' }}>
+            <button type="button" className="btn btn-outline btn-sm" style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem' }}
+              onClick={() => { setPerms(allPerms.map(p => p.key)); setDirty(true); }}>Vše</button>
+            <button type="button" className="btn btn-outline btn-sm" style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem' }}
+              onClick={reset}>Výchozí</button>
+            <button type="button" className="btn btn-outline btn-sm" style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem' }}
+              onClick={() => { setPerms([]); setDirty(true); }}>Nic</button>
+          </div>
 
-      <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-        <button className="btn btn-primary btn-sm" onClick={save} disabled={!dirty || saving}>
-          {saving ? 'Ukládám...' : 'Uložit oprávnění'}
-        </button>
-        {dirty && <span style={{ fontSize: '0.78rem', color: 'var(--warning)', fontWeight: 500 }}>Neuložené změny</span>}
-      </div>
+          <PermissionGrid perms={perms} onToggle={toggle} allPerms={allPerms} permGroups={permGroups} saving={saving} />
+
+          <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <button className="btn btn-primary btn-sm" onClick={save} disabled={!dirty || saving}>
+              {saving ? 'Ukládám...' : 'Uložit oprávnění'}
+            </button>
+            {dirty && <span style={{ fontSize: '0.78rem', color: 'var(--warning)', fontWeight: 500 }}>Neuložené změny</span>}
+          </div>
+        </>
+      )}
     </div>
   );
 }
 
-/* ═══ Custom role card — inline rename + permission checkboxes + save button ═══ */
+/* ═══ Custom role card — collapsed by default, expands to show editing ═══ */
 function RoleCard({ role, loadRoles, allPermissions, permissionGroups }) {
   const [name, setName] = useState(role.name);
   const [desc, setDesc] = useState(role.description || '');
@@ -301,6 +312,7 @@ function RoleCard({ role, loadRoles, allPermissions, permissionGroups }) {
   const [perms, setPerms] = useState(role.permissions || []);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     setName(role.name);
@@ -338,52 +350,68 @@ function RoleCard({ role, loadRoles, allPermissions, permissionGroups }) {
 
   return (
     <div className="card" style={{ borderLeft: '4px solid var(--primary-light)', padding: '1.25rem' }}>
-      {/* Row 1: Name + Description + Base role + Delete */}
-      <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-end', marginBottom: '1rem', flexWrap: 'wrap' }}>
-        <div style={{ flex: '1 1 140px' }}>
-          <label className="form-label">Název role</label>
-          <input className="form-input" value={name} onChange={e => { setName(e.target.value); setDirty(true); }}
-            style={{ fontWeight: 600 }} />
-        </div>
-        <div style={{ flex: '2 1 200px' }}>
-          <label className="form-label">Popis</label>
-          <input className="form-input" value={desc} onChange={e => { setDesc(e.target.value); setDirty(true); }}
-            placeholder="Volitelný popis role" />
-        </div>
-        <div style={{ flex: '0 1 140px' }}>
-          <label className="form-label">Základ</label>
-          <select className="form-select" value={baseRole} onChange={e => { setBaseRole(e.target.value); setDirty(true); }}>
-            <option value="admin">Administrátor</option>
-            <option value="accountant">Účetní</option>
-            <option value="manager">Manažer</option>
-            <option value="viewer">Náhled</option>
-          </select>
-        </div>
-        <button className="btn btn-danger btn-sm" onClick={del} title="Smazat roli" style={{ flexShrink: 0 }}>
-          Smazat
-        </button>
+      {/* Collapsed header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', cursor: 'pointer' }} onClick={() => setExpanded(!expanded)}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--gray-400)" strokeWidth="2" style={{ transition: 'transform 0.15s', transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)', flexShrink: 0 }}>
+          <path d="M9 18l6-6-6-6"/>
+        </svg>
+        <span style={{ fontWeight: 700, color: 'var(--gray-800)', fontSize: '0.95rem' }}>{role.name}</span>
+        {role.description && <span style={{ fontSize: '0.78rem', color: 'var(--gray-400)' }}>{role.description}</span>}
+        <span className={`badge badge-${role.base_role}`} style={{ fontSize: '0.65rem' }}>{roleLabels[role.base_role]}</span>
+        <span style={{ fontSize: '0.75rem', color: 'var(--gray-400)', marginLeft: 'auto' }}>{(role.permissions || []).length}/{allPermissions.length} oprávnění</span>
+        {dirty && <span style={{ fontSize: '0.72rem', color: 'var(--warning)', fontWeight: 600 }}>Neuloženo</span>}
       </div>
 
-      {/* Row 2: Permission checkboxes */}
-      <div style={{ marginBottom: '0.75rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.35rem', marginBottom: '0.5rem' }}>
-          <button type="button" className="btn btn-outline btn-sm" style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem' }}
-            onClick={() => { setPerms(allPermissions.map(p => p.key)); setDirty(true); }}>Vše</button>
-          <button type="button" className="btn btn-outline btn-sm" style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem' }}
-            onClick={() => { setPerms(roleDefaults[baseRole] || []); setDirty(true); }}>Výchozí</button>
-          <button type="button" className="btn btn-outline btn-sm" style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem' }}
-            onClick={() => { setPerms([]); setDirty(true); }}>Nic</button>
-        </div>
-        <PermissionGrid perms={perms} onToggle={togglePerm} allPerms={allPermissions} permGroups={permissionGroups} saving={saving} />
-      </div>
+      {expanded && (
+        <>
+          {/* Row 1: Name + Description + Base role + Delete */}
+          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-end', marginTop: '1rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+            <div style={{ flex: '1 1 140px' }}>
+              <label className="form-label">Název role</label>
+              <input className="form-input" value={name} onChange={e => { setName(e.target.value); setDirty(true); }}
+                style={{ fontWeight: 600 }} />
+            </div>
+            <div style={{ flex: '2 1 200px' }}>
+              <label className="form-label">Popis</label>
+              <input className="form-input" value={desc} onChange={e => { setDesc(e.target.value); setDirty(true); }}
+                placeholder="Volitelný popis role" />
+            </div>
+            <div style={{ flex: '0 1 140px' }}>
+              <label className="form-label">Základ</label>
+              <select className="form-select" value={baseRole} onChange={e => { setBaseRole(e.target.value); setDirty(true); }}>
+                <option value="admin">Administrátor</option>
+                <option value="accountant">Účetní</option>
+                <option value="manager">Manažer</option>
+                <option value="viewer">Náhled</option>
+              </select>
+            </div>
+            <button className="btn btn-danger btn-sm" onClick={del} title="Smazat roli" style={{ flexShrink: 0 }}>
+              Smazat
+            </button>
+          </div>
 
-      {/* Save button */}
-      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-        <button className="btn btn-primary btn-sm" onClick={save} disabled={!dirty || saving}>
-          {saving ? 'Ukládám...' : 'Uložit'}
-        </button>
-        {dirty && <span style={{ fontSize: '0.78rem', color: 'var(--warning)', fontWeight: 500 }}>Neuložené změny</span>}
-      </div>
+          {/* Permission checkboxes */}
+          <div style={{ marginBottom: '0.75rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.35rem', marginBottom: '0.5rem' }}>
+              <button type="button" className="btn btn-outline btn-sm" style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem' }}
+                onClick={() => { setPerms(allPermissions.map(p => p.key)); setDirty(true); }}>Vše</button>
+              <button type="button" className="btn btn-outline btn-sm" style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem' }}
+                onClick={() => { setPerms(roleDefaults[baseRole] || []); setDirty(true); }}>Výchozí</button>
+              <button type="button" className="btn btn-outline btn-sm" style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem' }}
+                onClick={() => { setPerms([]); setDirty(true); }}>Nic</button>
+            </div>
+            <PermissionGrid perms={perms} onToggle={togglePerm} allPerms={allPermissions} permGroups={permissionGroups} saving={saving} />
+          </div>
+
+          {/* Save button */}
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <button className="btn btn-primary btn-sm" onClick={save} disabled={!dirty || saving}>
+              {saving ? 'Ukládám...' : 'Uložit'}
+            </button>
+            {dirty && <span style={{ fontSize: '0.78rem', color: 'var(--warning)', fontWeight: 500 }}>Neuložené změny</span>}
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -774,19 +802,16 @@ export default function Users() {
             Upravujte oprávnění systémových i vlastních rolí. Administrátor má vždy všechna oprávnění.
           </p>
 
-          {/* Admin — read-only, always all permissions */}
-          <div className="card" style={{ borderLeft: '4px solid var(--gray-300)', padding: '1.25rem', marginBottom: '0.75rem', opacity: 0.7 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
+          {/* Admin — read-only, collapsed same as others */}
+          <div className="card" style={{ borderLeft: '4px solid var(--gray-300)', padding: '1.25rem', marginBottom: '0.75rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--gray-300)" strokeWidth="2" style={{ flexShrink: 0 }}>
+                <path d="M5 12h14"/>
+              </svg>
               <span className="badge badge-admin" style={{ fontSize: '0.8rem' }}>Administrátor</span>
               <span style={{ fontSize: '0.78rem', color: 'var(--gray-400)' }}>{users.filter(u => u.role === 'admin').length} uživatelů</span>
-              <span style={{ fontSize: '0.75rem', color: 'var(--gray-400)', fontStyle: 'italic' }}>Vždy plná oprávnění — nelze omezit</span>
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem' }}>
-              {allPermissions.map(p => (
-                <span key={p.key} style={{ fontSize: '0.65rem', padding: '0.15rem 0.4rem', borderRadius: 4, background: 'var(--success-light)', color: 'var(--success-dark)', fontWeight: 600 }}>
-                  {p.label}
-                </span>
-              ))}
+              <span style={{ fontSize: '0.75rem', color: 'var(--gray-400)', fontStyle: 'italic' }}>Plná oprávnění — nelze omezit</span>
+              <span style={{ fontSize: '0.75rem', color: 'var(--gray-400)', marginLeft: 'auto' }}>{allPermissions.length}/{allPermissions.length} oprávnění</span>
             </div>
           </div>
 
