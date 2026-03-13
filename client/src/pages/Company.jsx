@@ -1,6 +1,44 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api';
 
+const invoiceLayouts = [
+  {
+    key: 'klasicky',
+    name: 'Klasický',
+    desc: 'Standardní moderní layout s gradientovým pruhem a přehledným rozložením.',
+    accent: '#6366f1',
+    preview: { headerAlign: 'left-right', accentType: 'gradient-bar', partyStyle: 'grid-border', totalsStyle: 'right-aligned' }
+  },
+  {
+    key: 'minimalisticky',
+    name: 'Minimalistický',
+    desc: 'Čistý design s maximem bílého prostoru. Žádné barvy, pouze typografie.',
+    accent: '#1e293b',
+    preview: { headerAlign: 'left-only', accentType: 'none', partyStyle: 'simple', totalsStyle: 'right-aligned' }
+  },
+  {
+    key: 'korporatni',
+    name: 'Korporátní',
+    desc: 'Profesionální firemní styl s tmavou hlavičkou a výrazným logem.',
+    accent: '#0f172a',
+    preview: { headerAlign: 'dark-header', accentType: 'full-header', partyStyle: 'boxed', totalsStyle: 'highlighted' }
+  },
+  {
+    key: 'elegantni',
+    name: 'Elegantní',
+    desc: 'Jemné barvy, zaoblené rohy a rafinovaná typografie pro prémiový dojem.',
+    accent: '#8b5cf6',
+    preview: { headerAlign: 'center', accentType: 'subtle-line', partyStyle: 'card', totalsStyle: 'card' }
+  },
+  {
+    key: 'kompaktni',
+    name: 'Kompaktní',
+    desc: 'Úsporné rozložení pro maximum informací na jedné stránce.',
+    accent: '#059669',
+    preview: { headerAlign: 'inline', accentType: 'left-border', partyStyle: 'inline', totalsStyle: 'compact' }
+  },
+];
+
 const formatTemplates = [
   { value: '{prefix}{sep}{year}{sep}{num}', label: 'Prefix-Rok-Číslo', example: 'FV-2026-001' },
   { value: '{prefix}{sep}{num}{sep}{year}', label: 'Prefix-Číslo-Rok', example: 'FV-001-2026' },
@@ -230,6 +268,110 @@ export default function Company() {
               <label className="form-label">Další číslo</label>
               <input className="form-input" type="number" min="1" value={form.invoice_counter || 1} onChange={e => setForm(f => ({ ...f, invoice_counter: parseInt(e.target.value) || 1 }))} />
             </div>
+          </div>
+        </div>
+        <div className="card">
+          <div className="card-title" style={{ marginBottom: '0.5rem' }}>Vzhled faktury</div>
+          <p style={{ fontSize: '0.8rem', color: 'var(--gray-500)', marginBottom: '1.25rem' }}>Zvolte layout, který se použije při zobrazení a tisku faktur.</p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.75rem' }}>
+            {invoiceLayouts.map(layout => {
+              const selected = (form.invoice_layout || 'klasicky') === layout.key;
+              return (
+                <div key={layout.key}
+                  onClick={() => setForm(f => ({ ...f, invoice_layout: layout.key }))}
+                  style={{
+                    border: selected ? `2px solid ${layout.accent}` : '2px solid var(--gray-200)',
+                    borderRadius: 'var(--radius-lg)', padding: 0, cursor: 'pointer',
+                    transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)', overflow: 'hidden',
+                    boxShadow: selected ? `0 4px 16px ${layout.accent}20` : 'none',
+                    transform: selected ? 'translateY(-2px)' : 'none',
+                  }}
+                >
+                  {/* Mini preview */}
+                  <div style={{ padding: '12px 14px 10px', background: selected ? `${layout.accent}08` : 'var(--gray-50)', borderBottom: `1px solid ${selected ? layout.accent + '30' : 'var(--gray-200)'}` }}>
+                    {layout.preview.accentType === 'gradient-bar' && (
+                      <div style={{ height: 3, background: `linear-gradient(90deg, ${layout.accent}, #8b5cf6)`, borderRadius: 2, marginBottom: 8 }} />
+                    )}
+                    {layout.preview.accentType === 'full-header' && (
+                      <div style={{ height: 20, background: layout.accent, borderRadius: 4, marginBottom: 8, display: 'flex', alignItems: 'center', padding: '0 6px' }}>
+                        <div style={{ width: 24, height: 6, background: 'rgba(255,255,255,0.7)', borderRadius: 2 }} />
+                        <div style={{ marginLeft: 'auto', width: 16, height: 6, background: 'rgba(255,255,255,0.4)', borderRadius: 2 }} />
+                      </div>
+                    )}
+                    {layout.preview.accentType === 'subtle-line' && (
+                      <div style={{ height: 1.5, background: layout.accent, opacity: 0.3, marginBottom: 8 }} />
+                    )}
+                    {layout.preview.accentType === 'left-border' && (
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <div style={{ width: 3, background: layout.accent, borderRadius: 2, alignSelf: 'stretch' }} />
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                            <div style={{ width: 32, height: 5, background: 'var(--gray-300)', borderRadius: 2 }} />
+                            <div style={{ width: 20, height: 5, background: 'var(--gray-200)', borderRadius: 2 }} />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    {layout.preview.accentType !== 'left-border' && (
+                      <div style={{ display: 'flex', justifyContent: layout.preview.headerAlign === 'center' ? 'center' : 'space-between', marginBottom: 6 }}>
+                        <div style={{ width: 32, height: 5, background: 'var(--gray-300)', borderRadius: 2 }} />
+                        {layout.preview.headerAlign !== 'center' && layout.preview.headerAlign !== 'left-only' && (
+                          <div style={{ width: 20, height: 5, background: 'var(--gray-200)', borderRadius: 2 }} />
+                        )}
+                      </div>
+                    )}
+                    {/* Mini party boxes */}
+                    <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
+                      <div style={{
+                        flex: 1, height: 16, borderRadius: 3,
+                        background: layout.preview.partyStyle === 'boxed' ? 'var(--gray-200)' : 'transparent',
+                        border: layout.preview.partyStyle === 'card' ? '1px solid var(--gray-200)' : layout.preview.partyStyle === 'grid-border' ? '1px solid var(--gray-200)' : 'none',
+                      }}>
+                        <div style={{ width: '60%', height: 3, background: 'var(--gray-300)', borderRadius: 1, margin: '4px 4px' }} />
+                        <div style={{ width: '40%', height: 2, background: 'var(--gray-200)', borderRadius: 1, margin: '2px 4px' }} />
+                      </div>
+                      <div style={{
+                        flex: 1, height: 16, borderRadius: 3,
+                        background: layout.preview.partyStyle === 'boxed' ? 'var(--gray-200)' : 'transparent',
+                        border: layout.preview.partyStyle === 'card' ? '1px solid var(--gray-200)' : layout.preview.partyStyle === 'grid-border' ? '1px solid var(--gray-200)' : 'none',
+                      }}>
+                        <div style={{ width: '50%', height: 3, background: 'var(--gray-300)', borderRadius: 1, margin: '4px 4px' }} />
+                        <div style={{ width: '35%', height: 2, background: 'var(--gray-200)', borderRadius: 1, margin: '2px 4px' }} />
+                      </div>
+                    </div>
+                    {/* Mini table */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <div style={{ height: 3, background: 'var(--gray-200)', borderRadius: 1 }} />
+                      <div style={{ height: 2, background: 'var(--gray-100)', borderRadius: 1, width: '90%' }} />
+                      <div style={{ height: 2, background: 'var(--gray-100)', borderRadius: 1, width: '75%' }} />
+                    </div>
+                    {/* Mini total */}
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 6 }}>
+                      <div style={{
+                        width: layout.preview.totalsStyle === 'compact' ? '35%' : layout.preview.totalsStyle === 'card' ? '45%' : '40%',
+                        height: layout.preview.totalsStyle === 'highlighted' ? 8 : 5,
+                        background: layout.preview.totalsStyle === 'highlighted' ? layout.accent : 'var(--gray-300)',
+                        borderRadius: 2,
+                        opacity: layout.preview.totalsStyle === 'highlighted' ? 0.7 : 1
+                      }} />
+                    </div>
+                  </div>
+                  {/* Label */}
+                  <div style={{ padding: '10px 14px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: 2 }}>
+                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: layout.accent, flexShrink: 0 }} />
+                      <span style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--gray-900)' }}>{layout.name}</span>
+                      {selected && (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill={layout.accent} style={{ marginLeft: 'auto' }}>
+                          <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                        </svg>
+                      )}
+                    </div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--gray-500)', lineHeight: 1.4 }}>{layout.desc}</div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
         <button type="submit" className="btn btn-primary">Uložit nastavení</button>
