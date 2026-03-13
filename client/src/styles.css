@@ -88,7 +88,7 @@
   height: 3px; background: var(--rainbow); opacity: 0.4;
 }
 .menu-btn { display: none; background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--gray-700); }
-.topbar-title { font-size: 1.1rem; font-weight: 700; color: var(--gray-700); }
+.topbar-title { font-size: 1.1rem; font-weight: 700; color: #10b981; }
 
 .content { padding: 1.5rem; max-width: 1400px; }
 
