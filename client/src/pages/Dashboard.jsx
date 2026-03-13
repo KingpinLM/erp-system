@@ -9,14 +9,14 @@ const fmtNum = (n) => new Intl.NumberFormat('cs-CZ').format(n);
 const fmtDate = (d) => { if (!d) return '—'; const p = d.slice(0,10).split('-'); return p.length === 3 ? `${p[2]}.${p[1]}.${p[0]}` : d; };
 const MONTHS = ['Led','Úno','Bře','Dub','Kvě','Čvn','Čvc','Srp','Zář','Říj','Lis','Pro'];
 
-// Rillion-inspired muted color palette
+// Rillion-inspired teal color palette
 const CHART_COLORS = {
-  income: '#2563eb',
-  expense: '#dc2626',
+  income: '#0d9488',
+  expense: '#e11d48',
   profit: '#059669',
   neutral: '#64748b',
-  accent: '#7c3aed',
-  muted: ['#2563eb', '#0891b2', '#059669', '#d97706', '#dc2626', '#7c3aed', '#64748b', '#0d9488', '#ea580c', '#be185d'],
+  accent: '#0891b2',
+  muted: ['#0d9488', '#0891b2', '#059669', '#d97706', '#e11d48', '#7c3aed', '#64748b', '#0f766e', '#ea580c', '#be185d'],
 };
 
 // SVG Icons - clean, professional
@@ -158,7 +158,7 @@ export default function Dashboard() {
   const { kpis, revenueByMonth, expensesByCategory, invoicesByStatus, recentInvoices, topClients, topSuppliers, currencyBreakdown, monthlyIssued, monthlyExpenses, pendingItems, chartYear } = data;
 
   const statusLabels = { draft: 'Koncept', sent: 'Odesláno', paid: 'Zaplaceno', overdue: 'Po splatnosti', cancelled: 'Zrušeno' };
-  const statusColors = { draft: '#94a3b8', sent: '#2563eb', paid: '#059669', overdue: '#dc2626', cancelled: '#d97706' };
+  const statusColors = { draft: '#94a3b8', sent: '#0891b2', paid: '#0d9488', overdue: '#e11d48', cancelled: '#d97706' };
   const pieData = (invoicesByStatus || []).map(s => ({ name: statusLabels[s.status] || s.status, value: s.count, color: statusColors[s.status] || '#999' }));
 
   const monthlyData = MONTHS.map((name, i) => {
@@ -304,32 +304,32 @@ export default function Dashboard() {
       {/* === OVERVIEW === */}
       {tab === 'overview' && (
         <div className="dash-content dash-fade-in">
-          {/* KPI Cards - Rillion sober style with SVG icons */}
+          {/* KPI Cards - Rillion sober teal style */}
           <div className="dash-kpi-grid">
             <div className="dash-kpi">
-              <div className="dash-kpi-icon-wrap" style={{ color: '#059669', background: 'rgba(5, 150, 105, 0.08)' }}>
+              <div className="dash-kpi-icon-wrap" style={{ color: '#0d9488', background: 'rgba(13, 148, 136, 0.08)' }}>
                 {Icons.revenue}
               </div>
               <div className="dash-kpi-body">
                 <span className="dash-kpi-label">Celkové příjmy</span>
                 <span className="dash-kpi-value">{fmt(kpis.totalRevenue)}</span>
               </div>
-              <div className="dash-kpi-accent" style={{ background: '#059669' }} />
+              <div className="dash-kpi-accent" style={{ background: '#0d9488' }} />
             </div>
 
             <div className="dash-kpi">
-              <div className="dash-kpi-icon-wrap" style={{ color: '#dc2626', background: 'rgba(220, 38, 38, 0.08)' }}>
+              <div className="dash-kpi-icon-wrap" style={{ color: '#e11d48', background: 'rgba(225, 29, 72, 0.08)' }}>
                 {Icons.expense}
               </div>
               <div className="dash-kpi-body">
                 <span className="dash-kpi-label">Celkové výdaje</span>
                 <span className="dash-kpi-value">{fmt(kpis.totalExpenses)}</span>
               </div>
-              <div className="dash-kpi-accent" style={{ background: '#dc2626' }} />
+              <div className="dash-kpi-accent" style={{ background: '#e11d48' }} />
             </div>
 
             <div className="dash-kpi">
-              <div className="dash-kpi-icon-wrap" style={{ color: '#2563eb', background: 'rgba(37, 99, 235, 0.08)' }}>
+              <div className="dash-kpi-icon-wrap" style={{ color: '#0891b2', background: 'rgba(8, 145, 178, 0.08)' }}>
                 {Icons.profit}
               </div>
               <div className="dash-kpi-body">
@@ -339,18 +339,18 @@ export default function Dashboard() {
                   {kpis.profit >= 0 ? Icons.arrowUp : Icons.arrowDown} {profitMargin}% marže
                 </span>
               </div>
-              <div className="dash-kpi-accent" style={{ background: '#2563eb' }} />
+              <div className="dash-kpi-accent" style={{ background: '#0891b2' }} />
             </div>
 
             <div className="dash-kpi">
-              <div className="dash-kpi-icon-wrap" style={{ color: '#7c3aed', background: 'rgba(124, 58, 237, 0.08)' }}>
+              <div className="dash-kpi-icon-wrap" style={{ color: '#0f766e', background: 'rgba(15, 118, 110, 0.08)' }}>
                 {Icons.clients}
               </div>
               <div className="dash-kpi-body">
                 <span className="dash-kpi-label">Klienti</span>
                 <span className="dash-kpi-value">{kpis.totalClients}</span>
               </div>
-              <div className="dash-kpi-accent" style={{ background: '#7c3aed' }} />
+              <div className="dash-kpi-accent" style={{ background: '#0f766e' }} />
             </div>
           </div>
 
@@ -363,12 +363,12 @@ export default function Dashboard() {
             <div className="dash-perf-sep" />
             <div className="dash-perf-item">
               <div className="dash-perf-label">Míra zaplacení</div>
-              <div className="dash-perf-value" style={{ color: '#059669' }}>{paidRate}%</div>
+              <div className="dash-perf-value" style={{ color: '#0d9488' }}>{paidRate}%</div>
             </div>
             <div className="dash-perf-sep" />
             <div className="dash-perf-item">
               <div className="dash-perf-label">Po splatnosti</div>
-              <div className="dash-perf-value" style={{ color: overdueRate > 0 ? '#dc2626' : '#059669' }}>{overdueRate}%</div>
+              <div className="dash-perf-value" style={{ color: overdueRate > 0 ? '#e11d48' : '#0d9488' }}>{overdueRate}%</div>
             </div>
             <div className="dash-perf-sep" />
             <div className="dash-perf-item">
@@ -507,34 +507,34 @@ export default function Dashboard() {
           {/* Cash flow KPIs */}
           <div className="dash-kpi-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
             <div className="dash-kpi">
-              <div className="dash-kpi-icon-wrap" style={{ color: '#059669', background: 'rgba(5, 150, 105, 0.08)' }}>
+              <div className="dash-kpi-icon-wrap" style={{ color: '#0d9488', background: 'rgba(13, 148, 136, 0.08)' }}>
                 {Icons.cashflow}
               </div>
               <div className="dash-kpi-body">
                 <span className="dash-kpi-label">Čistý cash flow</span>
-                <span className="dash-kpi-value" style={{ color: kpis.profit >= 0 ? '#059669' : '#dc2626' }}>{fmt(kpis.profit)}</span>
+                <span className="dash-kpi-value" style={{ color: kpis.profit >= 0 ? '#0d9488' : '#e11d48' }}>{fmt(kpis.profit)}</span>
               </div>
-              <div className="dash-kpi-accent" style={{ background: kpis.profit >= 0 ? '#059669' : '#dc2626' }} />
+              <div className="dash-kpi-accent" style={{ background: kpis.profit >= 0 ? '#0d9488' : '#e11d48' }} />
             </div>
             <div className="dash-kpi">
-              <div className="dash-kpi-icon-wrap" style={{ color: '#2563eb', background: 'rgba(37, 99, 235, 0.08)' }}>
+              <div className="dash-kpi-icon-wrap" style={{ color: '#0891b2', background: 'rgba(8, 145, 178, 0.08)' }}>
                 {Icons.revenue}
               </div>
               <div className="dash-kpi-body">
                 <span className="dash-kpi-label">Příjmy celkem</span>
                 <span className="dash-kpi-value">{fmt(kpis.totalRevenue)}</span>
               </div>
-              <div className="dash-kpi-accent" style={{ background: '#2563eb' }} />
+              <div className="dash-kpi-accent" style={{ background: '#0891b2' }} />
             </div>
             <div className="dash-kpi">
-              <div className="dash-kpi-icon-wrap" style={{ color: '#dc2626', background: 'rgba(220, 38, 38, 0.08)' }}>
+              <div className="dash-kpi-icon-wrap" style={{ color: '#e11d48', background: 'rgba(225, 29, 72, 0.08)' }}>
                 {Icons.expense}
               </div>
               <div className="dash-kpi-body">
                 <span className="dash-kpi-label">Výdaje celkem</span>
                 <span className="dash-kpi-value">{fmt(kpis.totalExpenses)}</span>
               </div>
-              <div className="dash-kpi-accent" style={{ background: '#dc2626' }} />
+              <div className="dash-kpi-accent" style={{ background: '#e11d48' }} />
             </div>
           </div>
 
@@ -550,15 +550,15 @@ export default function Dashboard() {
               <AreaChart data={cashFlowData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="gradCashflow" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#059669" stopOpacity={0.2} />
-                    <stop offset="100%" stopColor="#059669" stopOpacity={0.02} />
+                    <stop offset="0%" stopColor="#0d9488" stopOpacity={0.2} />
+                    <stop offset="100%" stopColor="#0d9488" stopOpacity={0.02} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
                 <XAxis dataKey="name" fontSize={11} tick={{ fill: '#94a3b8' }} axisLine={false} tickLine={false} />
                 <YAxis fontSize={11} tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} tick={{ fill: '#94a3b8' }} axisLine={false} tickLine={false} />
                 <Tooltip content={<CustomTooltip />} />
-                <Area type="monotone" dataKey="cashflow" name="Cash flow" stroke="#059669" fill="url(#gradCashflow)" strokeWidth={2.5} dot={{ r: 3, fill: '#059669', strokeWidth: 0 }} />
+                <Area type="monotone" dataKey="cashflow" name="Cash flow" stroke="#0d9488" fill="url(#gradCashflow)" strokeWidth={2.5} dot={{ r: 3, fill: '#0d9488', strokeWidth: 0 }} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -594,7 +594,7 @@ export default function Dashboard() {
         <div className="dash-content dash-fade-in">
           {(pendingItems || []).length === 0 && !kpis.pendingUsers ? (
             <div className="dash-empty-hero">
-              <span className="dash-empty-icon" style={{ color: '#059669' }}>{Icons.check}</span>
+              <span className="dash-empty-icon" style={{ color: '#0d9488' }}>{Icons.check}</span>
               <span className="dash-empty-title">Vše vyřízeno</span>
               <span className="dash-empty-desc">Nemáte žádné nevyřízené položky.</span>
             </div>

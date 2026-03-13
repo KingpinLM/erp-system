@@ -118,20 +118,39 @@ function Sidebar({ open, onClose }) {
   const { user, tenant, logout, can } = useAuth();
   const location = useLocation();
 
-  const links = [
-    { to: '/', label: 'Dashboard', icon: 'dashboard' },
-    { to: '/invoices', label: 'Faktury', icon: 'invoice' },
-    { to: '/clients', label: 'Klienti', icon: 'clients' },
-    { to: '/evidence', label: 'Evidence', icon: 'evidence' },
-    { to: '/bank', label: 'Banka', icon: 'bank' },
-    { to: '/accounting', label: 'Účetnictví', icon: 'accounting' },
-    { to: '/vat', label: 'DPH', icon: 'vat' },
-    { to: '/currencies', label: 'Měny', icon: 'currencies' },
-    { to: '/recurring', label: 'Opakované', icon: 'recurring' },
+  const sections = [
+    {
+      items: [
+        { to: '/', label: 'Dashboard', icon: 'dashboard' },
+      ]
+    },
+    {
+      title: 'Finance',
+      items: [
+        { to: '/invoices', label: 'Faktury', icon: 'invoice' },
+        { to: '/clients', label: 'Klienti', icon: 'clients' },
+        { to: '/evidence', label: 'Evidence', icon: 'evidence' },
+        { to: '/recurring', label: 'Opakované', icon: 'recurring' },
+      ]
+    },
+    {
+      title: 'Účetnictví',
+      items: [
+        { to: '/bank', label: 'Banka', icon: 'bank' },
+        { to: '/accounting', label: 'Účetnictví', icon: 'accounting' },
+        { to: '/vat', label: 'DPH', icon: 'vat' },
+        { to: '/currencies', label: 'Měny', icon: 'currencies' },
+      ]
+    },
   ];
   if (can('admin')) {
-    links.push({ to: '/company', label: 'Společnost', icon: 'company' });
-    links.push({ to: '/users', label: 'Uživatelé', icon: 'users' });
+    sections.push({
+      title: 'Správa',
+      items: [
+        { to: '/company', label: 'Společnost', icon: 'company' },
+        { to: '/users', label: 'Uživatelé', icon: 'users' },
+      ]
+    });
   }
 
   const roleLabels = { admin: 'Administrátor', accountant: 'Účetní', manager: 'Manažer', viewer: 'Náhled' };
@@ -155,16 +174,21 @@ function Sidebar({ open, onClose }) {
           </div>
         </Link>
         <nav className="sidebar-nav">
-          {links.map(l => (
-            <Link
-              key={l.to}
-              to={l.to}
-              className={`sidebar-link ${location.pathname === l.to ? 'active' : ''}`}
-              onClick={onClose}
-            >
-              <span className="sidebar-icon"><NavIcon name={l.icon} size={18} /></span>
-              {l.label}
-            </Link>
+          {sections.map((sec, si) => (
+            <div key={si} className="sidebar-section">
+              {sec.title && <div className="sidebar-section-title">{sec.title}</div>}
+              {sec.items.map(l => (
+                <Link
+                  key={l.to}
+                  to={l.to}
+                  className={`sidebar-link ${location.pathname === l.to ? 'active' : ''}`}
+                  onClick={onClose}
+                >
+                  <span className="sidebar-icon"><NavIcon name={l.icon} size={17} /></span>
+                  {l.label}
+                </Link>
+              ))}
+            </div>
           ))}
         </nav>
         <Link to="/profile" className="sidebar-link sidebar-profile-link" onClick={onClose} style={{ marginTop: 'auto' }}>
