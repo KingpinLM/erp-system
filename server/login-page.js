@@ -25,7 +25,7 @@ module.exports = function getLoginPage(error) {
         radial-gradient(circle at 50% 80%, rgba(124,58,237,0.3) 0%, transparent 40%),
         radial-gradient(circle at 30% 70%, rgba(45,212,191,0.3) 0%, transparent 35%),
         radial-gradient(circle at 70% 60%, rgba(6,182,212,0.25) 0%, transparent 35%);
-      animation: bgDrift 20s ease-in-out infinite alternate;
+      animation: bgDrift 40s ease-in-out infinite alternate;
       will-change: transform;
     }
     .bg-animated::after {
@@ -34,7 +34,7 @@ module.exports = function getLoginPage(error) {
         radial-gradient(circle at 60% 40%, rgba(13,148,136,0.3) 0%, transparent 35%),
         radial-gradient(circle at 30% 60%, rgba(124,58,237,0.25) 0%, transparent 40%),
         radial-gradient(circle at 80% 70%, rgba(45,212,191,0.3) 0%, transparent 35%);
-      animation: bgDrift2 25s ease-in-out infinite alternate;
+      animation: bgDrift2 50s ease-in-out infinite alternate;
       will-change: transform;
     }
     @keyframes bgDrift {
