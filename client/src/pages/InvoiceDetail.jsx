@@ -206,6 +206,68 @@ export default function InvoiceDetail() {
         </div>
       </div>
 
+      <style dangerouslySetInnerHTML={{ __html: `
+.inv { max-width: 780px; margin: 0 auto; padding: 48px 48px 32px; background: white; border-radius: 16px; border: 1px solid var(--gray-200); box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+.inv-accent { height: 4px; background: linear-gradient(90deg, #6366f1 0%, #8b5cf6 100%); border-radius: 2px; }
+.inv-head { display: flex; justify-content: space-between; align-items: flex-start; margin: 28px 0 32px; }
+.inv-head-left h1 { font-size: 13px; font-weight: 800; color: #6366f1; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 2px; }
+.inv-head-left .inv-num { font-size: 28px; font-weight: 800; color: var(--gray-900); letter-spacing: -0.5px; line-height: 1.1; }
+.inv-head-right { text-align: right; }
+.inv-head-right .inv-company { font-size: 18px; font-weight: 700; color: var(--gray-900); margin-bottom: 4px; }
+.inv-head-right .inv-company-info { font-size: 11.5px; color: var(--gray-500); line-height: 1.6; }
+.inv-badge { display: inline-block; padding: 3px 10px; border-radius: 6px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 6px; }
+.inv-badge-draft { background: var(--gray-100); color: var(--gray-600); }
+.inv-badge-sent { background: #eef2ff; color: #4f46e5; }
+.inv-badge-paid { background: #ecfdf5; color: #059669; }
+.inv-badge-overdue { background: #fef2f2; color: #dc2626; }
+.inv-badge-cancelled { background: #fffbeb; color: #d97706; }
+.inv-parties { display: grid; grid-template-columns: 1fr 1fr; gap: 0; margin-bottom: 24px; border: 1px solid var(--gray-200); border-radius: 12px; overflow: hidden; }
+.inv-party { padding: 18px 20px; }
+.inv-party:first-child { border-right: 1px solid var(--gray-200); }
+.inv-party-tag { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--gray-400); margin-bottom: 8px; }
+.inv-party-name { font-size: 14px; font-weight: 700; color: var(--gray-900); margin-bottom: 6px; }
+.inv-party-detail { font-size: 11.5px; color: var(--gray-600); line-height: 1.7; }
+.inv-party-detail strong { color: var(--gray-700); font-weight: 600; }
+.inv-pay { display: grid; grid-template-columns: 1fr auto; gap: 0; margin-bottom: 24px; border: 1.5px solid #6366f1; border-radius: 12px; overflow: hidden; }
+.inv-pay-details { padding: 16px 20px; }
+.inv-pay-title { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; color: #6366f1; margin-bottom: 10px; }
+.inv-pay-table { width: 100%; }
+.inv-pay-table td { padding: 3px 0; vertical-align: top; }
+.inv-pay-table td:first-child { color: var(--gray-500); font-size: 11.5px; width: 120px; white-space: nowrap; padding-right: 12px; }
+.inv-pay-table td:last-child { font-weight: 600; color: var(--gray-900); font-size: 12.5px; }
+.inv-pay-table .inv-pay-total td:last-child { font-size: 16px; font-weight: 800; color: #6366f1; }
+.inv-pay-table .inv-pay-vs td:last-child { font-family: 'SF Mono', 'Fira Code', monospace; letter-spacing: 1.5px; font-size: 13px; }
+.inv-pay-qr { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 12px 16px; background: var(--gray-50); border-left: 1px solid var(--gray-200); min-width: 100px; }
+.inv-pay-qr img { width: 88px; height: 88px; }
+.inv-pay-qr span { font-size: 8px; color: var(--gray-400); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 600; }
+.inv-dates { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0; margin-bottom: 24px; background: var(--gray-50); border-radius: 12px; border: 1px solid var(--gray-200); overflow: hidden; }
+.inv-date { padding: 12px 16px; border-right: 1px solid var(--gray-200); }
+.inv-date:last-child { border-right: none; }
+.inv-date-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--gray-400); margin-bottom: 3px; }
+.inv-date-val { font-size: 13px; font-weight: 600; color: var(--gray-900); }
+.inv-items { width: 100%; border-collapse: collapse; margin-bottom: 0; }
+.inv-items thead { background: var(--gray-50); }
+.inv-items thead th { padding: 10px 14px; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--gray-400); text-align: left; border-bottom: 2px solid var(--gray-200); border-top: 1px solid var(--gray-200); }
+.inv-items thead th.r { text-align: right; }
+.inv-items tbody td { padding: 11px 14px; font-size: 12.5px; color: var(--gray-700); border-bottom: 1px solid var(--gray-100); }
+.inv-items tbody td.r { text-align: right; font-variant-numeric: tabular-nums; }
+.inv-items tbody tr:last-child td { border-bottom: 2px solid var(--gray-200); }
+.inv-sum { display: flex; justify-content: flex-end; padding: 16px 0 24px; }
+.inv-sum-box { width: 260px; }
+.inv-sum-row { display: flex; justify-content: space-between; padding: 5px 0; font-size: 12px; color: var(--gray-500); }
+.inv-sum-row span:last-child { font-variant-numeric: tabular-nums; font-weight: 500; }
+.inv-sum-total { display: flex; justify-content: space-between; padding: 10px 0 4px; font-size: 18px; font-weight: 800; color: var(--gray-900); border-top: 2px solid var(--gray-900); margin-top: 6px; letter-spacing: -0.02em; }
+.inv-sum-czk { display: flex; justify-content: space-between; padding: 2px 0; font-size: 11px; color: var(--gray-400); }
+.inv .inv-note { padding: 14px 18px; background: var(--gray-50); border-radius: 10px; margin-bottom: 20px; border: 1px solid var(--gray-200); }
+.inv .inv-note-tag { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--gray-400); margin-bottom: 4px; }
+.inv .inv-note-text { font-size: 12px; color: var(--gray-600); line-height: 1.5; }
+.inv-bottom { display: flex; justify-content: space-between; align-items: flex-end; padding-top: 20px; border-top: 1px solid var(--gray-200); margin-top: 8px; }
+.inv-issuer-tag { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--gray-400); margin-bottom: 3px; }
+.inv-issuer-name { font-size: 13px; font-weight: 600; color: var(--gray-900); }
+.inv-sig { max-width: 140px; max-height: 60px; margin-top: 6px; }
+.inv-foot { font-size: 10px; color: var(--gray-400); text-align: right; }
+.inv-accent-bottom { height: 3px; background: linear-gradient(90deg, #6366f1 0%, #8b5cf6 100%); border-radius: 1.5px; margin-top: 20px; opacity: 0.5; }
+      ` }} />
       <div ref={invoiceRef}>
         <div className="inv">
           {/* Accent bar */}
