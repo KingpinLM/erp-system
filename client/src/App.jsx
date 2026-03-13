@@ -25,16 +25,24 @@ export const useAuth = () => useContext(AuthContext);
 
 function AuthProvider({ children }) {
   const [user] = useState(() => {
-    // Read from server-injected window.__AUTH__ (set by SPA fallback)
-    if (window.__AUTH__?.user) return window.__AUTH__.user;
+    if (window.__AUTH__?.user) {
+      localStorage.setItem('erp_user', JSON.stringify(window.__AUTH__.user));
+      return window.__AUTH__.user;
+    }
     try { return JSON.parse(localStorage.getItem('erp_user')); } catch { return null; }
   });
   const [token] = useState(() => {
-    if (window.__AUTH__?.token) return window.__AUTH__.token;
+    if (window.__AUTH__?.token) {
+      localStorage.setItem('erp_token', window.__AUTH__.token);
+      return window.__AUTH__.token;
+    }
     return localStorage.getItem('erp_token');
   });
   const [tenant] = useState(() => {
-    if (window.__AUTH__?.tenant) return window.__AUTH__.tenant;
+    if (window.__AUTH__?.tenant) {
+      localStorage.setItem('erp_tenant', JSON.stringify(window.__AUTH__.tenant));
+      return window.__AUTH__.tenant;
+    }
     try { return JSON.parse(localStorage.getItem('erp_tenant')); } catch { return null; }
   });
 
