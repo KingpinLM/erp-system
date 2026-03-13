@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import { useAuth } from '../App';
 
@@ -99,10 +99,14 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Robo
 
 export default function InvoiceDetail() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [invoice, setInvoice] = useState(null);
   const [company, setCompany] = useState(null);
   const [qrData, setQrData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [payments, setPayments] = useState([]);
+  const [showPayment, setShowPayment] = useState(false);
+  const [payForm, setPayForm] = useState({ amount: '', date: new Date().toISOString().slice(0, 10), note: '' });
   const { can } = useAuth();
   const invoiceRef = useRef();
 
@@ -111,6 +115,7 @@ export default function InvoiceDetail() {
       .then(([inv, comp]) => {
         setInvoice(inv); setCompany(comp);
         api.getInvoiceQR(id).then(setQrData).catch(() => {});
+        api.getInvoicePayments(id).then(setPayments).catch(() => {});
       })
       .finally(() => setLoading(false));
   }, [id]);
@@ -154,13 +159,26 @@ export default function InvoiceDetail() {
           <Link to="/invoices" className="btn btn-outline btn-sm" style={{ marginBottom: '0.5rem' }}>← Zpět na seznam</Link>
           <h1 className="page-title">{invoice.invoice_number}</h1>
         </div>
-        <div className="btn-group">
-          <button className="btn btn-primary" onClick={downloadPDF}>Stáhnout PDF</button>
+        <div className="btn-group" style={{ flexWrap: 'wrap' }}>
+          <button className="btn btn-primary" onClick={downloadPDF}>PDF</button>
+          <a href={`/api/invoices/${id}/isdoc`} className="btn btn-outline" download>ISDOC</a>
           {can('admin', 'accountant') && (
             <Link to={`/invoices/${id}/edit`} className="btn btn-outline">Upravit</Link>
           )}
+          {can('admin', 'accountant') && (
+            <button className="btn btn-outline" onClick={async () => { const r = await api.duplicateInvoice(id); navigate(`/invoices/${r.id}`); }}>Duplikovat</button>
+          )}
+          {can('admin', 'accountant') && invoice.status !== 'cancelled' && invoice.invoice_type !== 'credit_note' && (
+            <button className="btn btn-outline" onClick={async () => { const r = await api.createCreditNote(id); navigate(`/invoices/${r.id}`); }}>Dobropis</button>
+          )}
+          {can('admin', 'accountant') && invoice.invoice_type === 'proforma' && invoice.status !== 'paid' && (
+            <button className="btn btn-success" onClick={async () => { const r = await api.convertProforma(id); navigate(`/invoices/${r.id}`); }}>Převést na fakturu</button>
+          )}
           {can('admin', 'accountant', 'manager') && invoice.status === 'draft' && (
             <button className="btn btn-success" onClick={() => changeStatus('sent')}>Odeslat</button>
+          )}
+          {can('admin', 'accountant', 'manager') && ['sent', 'overdue'].includes(invoice.status) && (
+            <button className="btn btn-outline" onClick={() => setShowPayment(true)}>Zaznamenat platbu</button>
           )}
           {can('admin', 'accountant', 'manager') && invoice.status === 'sent' && (
             <button className="btn btn-success" onClick={() => changeStatus('paid')}>Zaplaceno</button>
@@ -179,11 +197,12 @@ export default function InvoiceDetail() {
           {/* Header: Invoice number left, Company right */}
           <div className="inv-head">
             <div className="inv-head-left">
-              <h1>Faktura</h1>
+              <h1>{invoice.invoice_type === 'proforma' ? 'Proforma faktura' : invoice.invoice_type === 'credit_note' ? 'Dobropis' : 'Faktura'}</h1>
               <div className="inv-num">{invoice.invoice_number}</div>
               <span className={`inv-badge inv-badge-${invoice.status}`}>{statusLabels[invoice.status]}</span>
             </div>
             <div className="inv-head-right">
+              {co.logo && <img src={co.logo} alt="Logo" style={{ maxWidth: 150, maxHeight: 50, objectFit: 'contain', marginBottom: 8, display: 'block', marginLeft: 'auto' }} />}
               <div className="inv-company">{co.name || 'Rainbow Family Investment'}</div>
               <div className="inv-company-info">
                 {co.ico && <>IČO: {co.ico}<br/></>}
@@ -355,6 +374,76 @@ export default function InvoiceDetail() {
           <div className="inv-accent-bottom"></div>
         </div>
       </div>
+
+      {/* Partial payments */}
+      {payments.length > 0 && (
+        <div className="card" style={{ marginTop: '1rem' }}>
+          <div className="card-title" style={{ marginBottom: '0.75rem' }}>Platby ({payments.length})</div>
+          <div className="table-responsive">
+            <table>
+              <thead><tr><th>Datum</th><th className="text-right">Částka</th><th>Poznámka</th><th>Zapsal</th></tr></thead>
+              <tbody>
+                {payments.map(p => (
+                  <tr key={p.id}>
+                    <td>{fmtDate(p.date)}</td>
+                    <td className="text-right" style={{ fontWeight: 600 }}>{fmt(p.amount, p.currency)}</td>
+                    <td>{p.note || '—'}</td>
+                    <td>{p.created_by_name || '—'}</td>
+                  </tr>
+                ))}
+                <tr style={{ fontWeight: 700, borderTop: '2px solid #e2e8f0' }}>
+                  <td>Zaplaceno celkem</td>
+                  <td className="text-right">{fmt(payments.reduce((s, p) => s + p.amount, 0), invoice.currency)}</td>
+                  <td colSpan={2} className="text-right">Zbývá: {fmt(invoice.total - payments.reduce((s, p) => s + p.amount, 0), invoice.currency)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Related invoices */}
+      {invoice.invoice_type === 'credit_note' && invoice.related_invoice_id && (
+        <div style={{ marginTop: '1rem', padding: '0.75rem', background: '#fef2f2', borderRadius: 'var(--radius)', border: '1px solid #fecaca' }}>
+          Dobropis k faktuře: <Link to={`/invoices/${invoice.related_invoice_id}`} style={{ fontWeight: 600 }}>Zobrazit původní fakturu</Link>
+        </div>
+      )}
+
+      {/* Payment modal */}
+      {showPayment && (
+        <div className="modal-overlay" onClick={() => setShowPayment(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 400 }}>
+            <div className="modal-header">
+              <h3 className="modal-title">Zaznamenat platbu</h3>
+              <button className="modal-close" onClick={() => setShowPayment(false)}>&times;</button>
+            </div>
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              await api.addInvoicePayment(id, { amount: parseFloat(payForm.amount), date: payForm.date, note: payForm.note });
+              setShowPayment(false);
+              const [inv, pays] = await Promise.all([api.getInvoice(id), api.getInvoicePayments(id)]);
+              setInvoice(inv); setPayments(pays);
+            }}>
+              <div className="form-group">
+                <label className="form-label">Částka *</label>
+                <input className="form-input" type="number" step="0.01" value={payForm.amount} onChange={e => setPayForm(f => ({ ...f, amount: e.target.value }))} required />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Datum *</label>
+                <input className="form-input" type="date" value={payForm.date} onChange={e => setPayForm(f => ({ ...f, date: e.target.value }))} required />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Poznámka</label>
+                <input className="form-input" value={payForm.note} onChange={e => setPayForm(f => ({ ...f, note: e.target.value }))} />
+              </div>
+              <div className="btn-group">
+                <button type="submit" className="btn btn-primary">Uložit platbu</button>
+                <button type="button" className="btn btn-outline" onClick={() => setShowPayment(false)}>Zrušit</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

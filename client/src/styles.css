@@ -337,3 +337,35 @@ tr:hover td { background: rgba(77,150,255,0.03); }
 .inv-issuer-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: #9ca3af; font-weight: 700; margin-bottom: 4px; }
 .inv-issuer-name { font-size: 14px; font-weight: 600; color: #1a1a2e; margin-bottom: 8px; }
 .inv-signature-img { max-width: 180px; max-height: 80px; }
+
+/* ─── DARK MODE ────────────────────────────────── */
+[data-theme="dark"] {
+  --gray-50: #1e293b;
+  --gray-100: #1e293b;
+  --gray-200: #334155;
+  --gray-300: #475569;
+  --gray-500: #94a3b8;
+  --gray-700: #cbd5e1;
+  --gray-900: #f1f5f9;
+  --shadow: 0 1px 3px rgba(0,0,0,0.3);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.3);
+}
+[data-theme="dark"] body { background: #0f172a; color: #e2e8f0; }
+[data-theme="dark"] .main-area { background: #0f172a; }
+[data-theme="dark"] .topbar { background: #1e293b; border-bottom-color: #334155; }
+[data-theme="dark"] .topbar-title { color: #e2e8f0; }
+[data-theme="dark"] .card { background: #1e293b; border-color: #334155; }
+[data-theme="dark"] .kpi-card { background: #1e293b; border-color: #334155; }
+[data-theme="dark"] table { border-color: #334155; }
+[data-theme="dark"] thead { background: #1e293b; }
+[data-theme="dark"] th { border-color: #334155; color: #94a3b8; }
+[data-theme="dark"] td { border-color: #334155; color: #cbd5e1; }
+[data-theme="dark"] .form-input, [data-theme="dark"] .form-select, [data-theme="dark"] .form-textarea { background: #0f172a; border-color: #334155; color: #e2e8f0; }
+[data-theme="dark"] .modal { background: #1e293b; }
+[data-theme="dark"] .modal-overlay { background: rgba(0,0,0,0.6); }
+[data-theme="dark"] .btn-outline { border-color: #475569; color: #cbd5e1; }
+[data-theme="dark"] .btn-outline:hover { background: #334155; }
+[data-theme="dark"] .page-title { color: #f1f5f9; }
+[data-theme="dark"] .sidebar-link:hover, [data-theme="dark"] .sidebar-link.active { background: rgba(255,255,255,0.15); }
+[data-theme="dark"] a { color: var(--primary); }
+.dark-toggle { background: none; border: 1px solid #475569; border-radius: 8px; padding: 4px 10px; cursor: pointer; font-size: 16px; margin-left: 8px; }

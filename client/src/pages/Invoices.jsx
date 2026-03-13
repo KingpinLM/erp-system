@@ -7,12 +7,15 @@ const statusLabels = { draft: 'Koncept', sent: 'Odesláno', paid: 'Zaplaceno', o
 const fmt = (n, cur = 'CZK') => new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: cur, maximumFractionDigits: 2 }).format(n);
 const fmtDate = (d) => { if (!d) return '—'; const p = d.slice(0,10).split('-'); return p.length === 3 ? `${p[2]}.${p[1]}.${p[0]}` : d; };
 
+const typeLabels = { regular: 'Faktura', proforma: 'Proforma', credit_note: 'Dobropis' };
+
 export default function Invoices() {
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({ status: '', currency: '' });
   const [sortBy, setSortBy] = useState('created_at');
   const [sortDir, setSortDir] = useState('desc');
+  const [selected, setSelected] = useState(new Set());
   const { can } = useAuth();
 
   const load = () => {
@@ -64,10 +67,23 @@ export default function Invoices() {
     <div>
       <div className="page-header">
         <h1 className="page-title">Faktury</h1>
-        {can('admin', 'accountant') && (
-          <Link to="/invoices/new" className="btn btn-primary">+ Nová faktura</Link>
-        )}
+        <div className="btn-group">
+          <a href="/api/export/invoices" className="btn btn-outline btn-sm" download>CSV Export</a>
+          {can('admin', 'accountant') && (
+            <Link to="/invoices/new" className="btn btn-primary">+ Nová faktura</Link>
+          )}
+        </div>
       </div>
+
+      {selected.size > 0 && can('admin', 'accountant', 'manager') && (
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem', alignItems: 'center', background: '#eff6ff', padding: '0.5rem 1rem', borderRadius: 'var(--radius)' }}>
+          <strong style={{ fontSize: '0.85rem' }}>{selected.size} vybráno</strong>
+          <button className="btn btn-sm btn-outline" onClick={async () => { await api.bulkStatus([...selected], 'sent'); setSelected(new Set()); load(); }}>Odeslat</button>
+          <button className="btn btn-sm btn-success" onClick={async () => { await api.bulkStatus([...selected], 'paid'); setSelected(new Set()); load(); }}>Zaplaceno</button>
+          <button className="btn btn-sm btn-warning" onClick={async () => { await api.bulkStatus([...selected], 'cancelled'); setSelected(new Set()); load(); }}>Zrušit</button>
+          <button className="btn btn-sm btn-outline" onClick={() => setSelected(new Set())}>Zrušit výběr</button>
+        </div>
+      )}
 
       <div className="filters" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
         <select className="form-select" value={filters.status} onChange={e => setFilters(f => ({ ...f, status: e.target.value }))}>
@@ -105,6 +121,7 @@ export default function Invoices() {
             <table>
               <thead>
                 <tr>
+                  <th style={{ width: 32 }}><input type="checkbox" onChange={e => { if (e.target.checked) setSelected(new Set(sorted.map(i => i.id))); else setSelected(new Set()); }} checked={selected.size === sorted.length && sorted.length > 0} /></th>
                   <th style={{ cursor: 'pointer' }} onClick={() => toggleSort('invoice_number')}>Číslo<SortIcon col="invoice_number" /></th>
                   <th style={{ cursor: 'pointer' }} onClick={() => toggleSort('client_name')}>Klient<SortIcon col="client_name" /></th>
                   <th style={{ cursor: 'pointer' }} onClick={() => toggleSort('issue_date')}>Datum vystavení<SortIcon col="issue_date" /></th>
@@ -118,8 +135,9 @@ export default function Invoices() {
               </thead>
               <tbody>
                 {sorted.map(inv => (
-                  <tr key={inv.id}>
-                    <td><Link to={`/invoices/${inv.id}`} style={{ color: 'var(--primary)', fontWeight: 600 }}>{inv.invoice_number}</Link></td>
+                  <tr key={inv.id} style={{ background: selected.has(inv.id) ? '#eff6ff' : '' }}>
+                    <td><input type="checkbox" checked={selected.has(inv.id)} onChange={e => { const s = new Set(selected); if (e.target.checked) s.add(inv.id); else s.delete(inv.id); setSelected(s); }} /></td>
+                    <td><Link to={`/invoices/${inv.id}`} style={{ color: 'var(--primary)', fontWeight: 600 }}>{inv.invoice_number}</Link>{inv.invoice_type && inv.invoice_type !== 'regular' && <span style={{ fontSize: 10, color: '#94a3b8', marginLeft: 4 }}>({typeLabels[inv.invoice_type]})</span>}</td>
                     <td>{inv.client_name}</td>
                     <td>{fmtDate(inv.issue_date)}</td>
                     <td>{fmtDate(inv.due_date)}</td>

@@ -577,7 +577,7 @@ app.get('/api/invoices/:id', ...tenanted, (req, res) => {
 });
 
 app.post('/api/invoices', ...tenanted, authorize('admin', 'accountant'), (req, res) => {
-  const { invoice_number, client_id, issue_date, due_date, supply_date, payment_method, status, currency, note, items, variable_symbol } = req.body;
+  const { invoice_number, client_id, issue_date, due_date, supply_date, payment_method, status, currency, note, items, variable_symbol, invoice_type } = req.body;
   const curr = db.prepare('SELECT rate_to_czk FROM currencies WHERE code = ?').get(currency || 'CZK');
   const rate = curr ? curr.rate_to_czk : 1;
 
@@ -607,9 +607,9 @@ app.post('/api/invoices', ...tenanted, authorize('admin', 'accountant'), (req, r
   const totalCzk = total * rate;
 
   const result = db.prepare(`
-    INSERT INTO invoices (tenant_id, invoice_number, type, client_id, issue_date, due_date, supply_date, payment_method, status, currency, subtotal, tax_rate, tax_amount, total, total_czk, note, created_by, variable_symbol)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-  `).run(req.tenant_id, finalNumber, 'issued', client_id, issue_date, due_date, supply_date || issue_date, payment_method || 'bank_transfer', status || 'draft', currency || 'CZK', subtotal, 0, totalTax, total, totalCzk, note || null, req.user.id, finalVS);
+    INSERT INTO invoices (tenant_id, invoice_number, type, client_id, issue_date, due_date, supply_date, payment_method, status, currency, subtotal, tax_rate, tax_amount, total, total_czk, note, created_by, variable_symbol, invoice_type)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+  `).run(req.tenant_id, finalNumber, 'issued', client_id, issue_date, due_date, supply_date || issue_date, payment_method || 'bank_transfer', status || 'draft', currency || 'CZK', subtotal, 0, totalTax, total, totalCzk, note || null, req.user.id, finalVS, invoice_type || 'regular');
 
   const invoiceId = result.lastInsertRowid;
   const insertItem = db.prepare('INSERT INTO invoice_items (invoice_id, description, quantity, unit, unit_price, total, tax_rate, tax_amount, total_with_tax) VALUES (?,?,?,?,?,?,?,?,?)');
@@ -762,7 +762,11 @@ app.get('/api/company', ...tenanted, (req, res) => {
 });
 
 app.put('/api/company', ...tenanted, authorize('admin'), (req, res) => {
-  const { name, ico, dic, email, phone, address, city, zip, country, bank_account, bank_code, iban, swift, invoice_prefix, invoice_counter, default_due_days, vat_payer, invoice_format, invoice_separator, invoice_padding, invoice_year_format } = req.body;
+  const { name, ico, dic, email, phone, address, city, zip, country, bank_account, bank_code, iban, swift, invoice_prefix, invoice_counter, default_due_days, vat_payer, invoice_format, invoice_separator, invoice_padding, invoice_year_format, logo } = req.body;
+  // Handle logo separately if provided
+  if (logo !== undefined) {
+    db.prepare('UPDATE company SET logo = ? WHERE tenant_id = ?').run(logo, req.tenant_id);
+  }
   const existing = db.prepare('SELECT id FROM company WHERE tenant_id = ?').get(req.tenant_id);
   if (existing) {
     db.prepare('UPDATE company SET name=?,ico=?,dic=?,email=?,phone=?,address=?,city=?,zip=?,country=?,bank_account=?,bank_code=?,iban=?,swift=?,invoice_prefix=?,invoice_counter=?,default_due_days=?,vat_payer=?,invoice_format=?,invoice_separator=?,invoice_padding=?,invoice_year_format=? WHERE tenant_id=?')
@@ -897,6 +901,331 @@ app.delete('/api/category-rules/:id', ...tenanted, authorize('admin'), (req, res
   db.prepare('DELETE FROM category_rules WHERE id = ? AND tenant_id = ?').run(req.params.id, req.tenant_id);
   res.json({ ok: true });
 });
+
+// ─── ARES LOOKUP ────────────────────────────────────────────
+app.get('/api/ares/:ico', ...tenanted, (req, res) => {
+  const ico = req.params.ico.replace(/\s/g, '');
+  if (!/^\d{7,8}$/.test(ico)) return res.status(400).json({ error: 'Neplatné IČO' });
+  https.get(`https://ares.gov.cz/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty/${ico}`, (resp) => {
+    let data = '';
+    resp.on('data', chunk => data += chunk);
+    resp.on('end', () => {
+      try {
+        const j = JSON.parse(data);
+        const addr = j.sidlo || {};
+        const result = {
+          name: j.obchodniJmeno || '',
+          ico: j.ico || ico,
+          dic: j.dic || '',
+          address: [addr.nazevUlice, addr.cisloDomovni ? `${addr.cisloDomovni}${addr.cisloOrientacni ? '/' + addr.cisloOrientacni : ''}` : ''].filter(Boolean).join(' '),
+          city: addr.nazevObce || '',
+          zip: addr.psc ? String(addr.psc) : '',
+          country: 'CZ'
+        };
+        res.json(result);
+      } catch (e) {
+        res.status(404).json({ error: 'Subjekt nenalezen v ARES' });
+      }
+    });
+    resp.on('error', () => res.status(500).json({ error: 'Chyba při komunikaci s ARES' }));
+  }).on('error', () => res.status(500).json({ error: 'Chyba při komunikaci s ARES' }));
+});
+
+// ─── GLOBAL SEARCH ──────────────────────────────────────────
+app.get('/api/search', ...tenanted, (req, res) => {
+  const q = (req.query.q || '').trim();
+  if (!q || q.length < 2) return res.json({ invoices: [], clients: [], evidence: [] });
+  const like = `%${q}%`;
+  const invoices = db.prepare(`SELECT i.id, i.invoice_number, i.total, i.currency, i.status, c.name as client_name
+    FROM invoices i LEFT JOIN clients c ON i.client_id = c.id
+    WHERE i.tenant_id = ? AND (i.invoice_number LIKE ? OR c.name LIKE ? OR i.variable_symbol LIKE ? OR i.note LIKE ?)
+    ORDER BY i.created_at DESC LIMIT 10`).all(req.tenant_id, like, like, like, like);
+  const clients = db.prepare(`SELECT id, name, ico, email, city FROM clients WHERE tenant_id = ? AND (name LIKE ? OR ico LIKE ? OR email LIKE ? OR dic LIKE ?) ORDER BY name LIMIT 10`).all(req.tenant_id, like, like, like, like);
+  const evidence = db.prepare(`SELECT id, title, amount, currency, date, type FROM evidence WHERE tenant_id = ? AND (title LIKE ? OR description LIKE ? OR category LIKE ?) ORDER BY date DESC LIMIT 10`).all(req.tenant_id, like, like, like);
+  res.json({ invoices, clients, evidence });
+});
+
+// ─── CSV EXPORT ─────────────────────────────────────────────
+app.get('/api/export/invoices', ...tenanted, (req, res) => {
+  const rows = db.prepare(`SELECT i.invoice_number, i.type, i.issue_date, i.due_date, i.paid_date, i.status, i.currency, i.subtotal, i.tax_amount, i.total, i.total_czk, i.variable_symbol, i.payment_method, i.note, c.name as client_name, c.ico as client_ico
+    FROM invoices i LEFT JOIN clients c ON i.client_id = c.id WHERE i.tenant_id = ? ORDER BY i.created_at DESC`).all(req.tenant_id);
+  const header = 'Číslo;Typ;Klient;IČO klienta;Datum vystavení;Splatnost;Datum úhrady;Stav;Měna;Základ;DPH;Celkem;CZK;VS;Způsob úhrady;Poznámka\n';
+  const csv = header + rows.map(r => [r.invoice_number, r.type, r.client_name||'', r.client_ico||'', r.issue_date, r.due_date, r.paid_date||'', r.status, r.currency, r.subtotal, r.tax_amount, r.total, r.total_czk, r.variable_symbol||'', r.payment_method||'', (r.note||'').replace(/[\n;]/g,' ')].join(';')).join('\n');
+  res.set({ 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename=faktury.csv' });
+  res.send('\uFEFF' + csv);
+});
+
+app.get('/api/export/clients', ...tenanted, (req, res) => {
+  const rows = db.prepare('SELECT name, ico, dic, email, phone, address, city, zip, country FROM clients WHERE tenant_id = ? ORDER BY name').all(req.tenant_id);
+  const header = 'Název;IČO;DIČ;Email;Telefon;Adresa;Město;PSČ;Země\n';
+  const csv = header + rows.map(r => [r.name, r.ico||'', r.dic||'', r.email||'', r.phone||'', r.address||'', r.city||'', r.zip||'', r.country||''].join(';')).join('\n');
+  res.set({ 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename=klienti.csv' });
+  res.send('\uFEFF' + csv);
+});
+
+app.get('/api/export/evidence', ...tenanted, (req, res) => {
+  const rows = db.prepare('SELECT type, title, description, amount, currency, date, category FROM evidence WHERE tenant_id = ? ORDER BY date DESC').all(req.tenant_id);
+  const header = 'Typ;Název;Popis;Částka;Měna;Datum;Kategorie\n';
+  const csv = header + rows.map(r => [r.type, r.title, (r.description||'').replace(/[\n;]/g,' '), r.amount||'', r.currency||'', r.date, r.category||''].join(';')).join('\n');
+  res.set({ 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename=evidence.csv' });
+  res.send('\uFEFF' + csv);
+});
+
+// ─── DUPLICATE INVOICE ──────────────────────────────────────
+app.post('/api/invoices/:id/duplicate', ...tenanted, authorize('admin', 'accountant'), (req, res) => {
+  const orig = db.prepare('SELECT * FROM invoices WHERE id = ? AND tenant_id = ?').get(req.params.id, req.tenant_id);
+  if (!orig) return res.status(404).json({ error: 'Faktura nenalezena' });
+  const comp = db.prepare('SELECT * FROM company WHERE tenant_id = ?').get(req.tenant_id);
+  const newNumber = generateInvoiceNumber(comp);
+  const newVS = generateVariableSymbol(comp);
+  db.prepare('UPDATE company SET invoice_counter = ? WHERE tenant_id = ?').run((comp?.invoice_counter || 1) + 1, req.tenant_id);
+  const today = new Date().toISOString().slice(0, 10);
+  const dueDays = comp?.default_due_days || 14;
+  const due = new Date(); due.setDate(due.getDate() + dueDays);
+  const dueDate = due.toISOString().slice(0, 10);
+  const result = db.prepare(`INSERT INTO invoices (tenant_id, invoice_number, type, client_id, issue_date, due_date, supply_date, payment_method, status, currency, subtotal, tax_rate, tax_amount, total, total_czk, note, created_by, variable_symbol, invoice_type)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(req.tenant_id, newNumber, orig.type, orig.client_id, today, dueDate, today, orig.payment_method, 'draft', orig.currency, orig.subtotal, orig.tax_rate, orig.tax_amount, orig.total, orig.total_czk, orig.note, req.user.id, newVS, 'regular');
+  const newId = result.lastInsertRowid;
+  const items = db.prepare('SELECT * FROM invoice_items WHERE invoice_id = ?').all(req.params.id);
+  const ins = db.prepare('INSERT INTO invoice_items (invoice_id, description, quantity, unit, unit_price, total, tax_rate, tax_amount, total_with_tax) VALUES (?,?,?,?,?,?,?,?,?)');
+  items.forEach(i => ins.run(newId, i.description, i.quantity, i.unit, i.unit_price, i.total, i.tax_rate, i.tax_amount, i.total_with_tax));
+  db.prepare("INSERT INTO audit_log (tenant_id, user_id, action, entity, entity_id, details) VALUES (?, ?, 'create', 'invoice', ?, ?)").run(req.tenant_id, req.user.id, newId, `Duplikována faktura z ${orig.invoice_number}`);
+  res.json({ id: newId });
+});
+
+// ─── CREDIT NOTE ────────────────────────────────────────────
+app.post('/api/invoices/:id/credit-note', ...tenanted, authorize('admin', 'accountant'), (req, res) => {
+  const orig = db.prepare('SELECT * FROM invoices WHERE id = ? AND tenant_id = ?').get(req.params.id, req.tenant_id);
+  if (!orig) return res.status(404).json({ error: 'Faktura nenalezena' });
+  const comp = db.prepare('SELECT * FROM company WHERE tenant_id = ?').get(req.tenant_id);
+  const newNumber = generateInvoiceNumber(comp);
+  const newVS = generateVariableSymbol(comp);
+  db.prepare('UPDATE company SET invoice_counter = ? WHERE tenant_id = ?').run((comp?.invoice_counter || 1) + 1, req.tenant_id);
+  const today = new Date().toISOString().slice(0, 10);
+  const result = db.prepare(`INSERT INTO invoices (tenant_id, invoice_number, type, client_id, issue_date, due_date, supply_date, payment_method, status, currency, subtotal, tax_rate, tax_amount, total, total_czk, note, created_by, variable_symbol, invoice_type, related_invoice_id)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(req.tenant_id, newNumber, orig.type, orig.client_id, today, today, today, orig.payment_method, 'draft', orig.currency, -orig.subtotal, orig.tax_rate, -orig.tax_amount, -orig.total, -orig.total_czk, `Dobropis k faktuře ${orig.invoice_number}`, req.user.id, newVS, 'credit_note', req.params.id);
+  const newId = result.lastInsertRowid;
+  const items = db.prepare('SELECT * FROM invoice_items WHERE invoice_id = ?').all(req.params.id);
+  const ins = db.prepare('INSERT INTO invoice_items (invoice_id, description, quantity, unit, unit_price, total, tax_rate, tax_amount, total_with_tax) VALUES (?,?,?,?,?,?,?,?,?)');
+  items.forEach(i => ins.run(newId, i.description, -i.quantity, i.unit, i.unit_price, -i.total, i.tax_rate, -i.tax_amount, -(i.total_with_tax || i.total)));
+  db.prepare("INSERT INTO audit_log (tenant_id, user_id, action, entity, entity_id, details) VALUES (?, ?, 'create', 'invoice', ?, ?)").run(req.tenant_id, req.user.id, newId, `Vytvořen dobropis k ${orig.invoice_number}`);
+  res.json({ id: newId });
+});
+
+// ─── PROFORMA ───────────────────────────────────────────────
+app.post('/api/invoices/:id/to-invoice', ...tenanted, authorize('admin', 'accountant'), (req, res) => {
+  const proforma = db.prepare("SELECT * FROM invoices WHERE id = ? AND tenant_id = ? AND invoice_type = 'proforma'").get(req.params.id, req.tenant_id);
+  if (!proforma) return res.status(404).json({ error: 'Proforma nenalezena' });
+  const comp = db.prepare('SELECT * FROM company WHERE tenant_id = ?').get(req.tenant_id);
+  const newNumber = generateInvoiceNumber(comp);
+  const newVS = generateVariableSymbol(comp);
+  db.prepare('UPDATE company SET invoice_counter = ? WHERE tenant_id = ?').run((comp?.invoice_counter || 1) + 1, req.tenant_id);
+  const today = new Date().toISOString().slice(0, 10);
+  const dueDays = comp?.default_due_days || 14;
+  const due = new Date(); due.setDate(due.getDate() + dueDays);
+  const result = db.prepare(`INSERT INTO invoices (tenant_id, invoice_number, type, client_id, issue_date, due_date, supply_date, payment_method, status, currency, subtotal, tax_rate, tax_amount, total, total_czk, note, created_by, variable_symbol, invoice_type, related_invoice_id)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(req.tenant_id, newNumber, proforma.type, proforma.client_id, today, due.toISOString().slice(0,10), today, proforma.payment_method, 'draft', proforma.currency, proforma.subtotal, proforma.tax_rate, proforma.tax_amount, proforma.total, proforma.total_czk, proforma.note, req.user.id, newVS, 'regular', req.params.id);
+  const newId = result.lastInsertRowid;
+  const items = db.prepare('SELECT * FROM invoice_items WHERE invoice_id = ?').all(req.params.id);
+  const ins = db.prepare('INSERT INTO invoice_items (invoice_id, description, quantity, unit, unit_price, total, tax_rate, tax_amount, total_with_tax) VALUES (?,?,?,?,?,?,?,?,?)');
+  items.forEach(i => ins.run(newId, i.description, i.quantity, i.unit, i.unit_price, i.total, i.tax_rate, i.tax_amount, i.total_with_tax));
+  db.prepare("UPDATE invoices SET status = 'paid', note = ? WHERE id = ? AND tenant_id = ?").run(`Převedeno na fakturu ${newNumber}`, req.params.id, req.tenant_id);
+  res.json({ id: newId });
+});
+
+// ─── BULK STATUS CHANGE ─────────────────────────────────────
+app.patch('/api/invoices/bulk-status', ...tenanted, authorize('admin', 'accountant', 'manager'), (req, res) => {
+  const { ids, status } = req.body;
+  if (!ids || !Array.isArray(ids) || !status) return res.status(400).json({ error: 'Chybí parametry' });
+  const paid_date = status === 'paid' ? new Date().toISOString().slice(0, 10) : null;
+  const stmt = paid_date
+    ? db.prepare("UPDATE invoices SET status=?, paid_date=?, updated_at=datetime('now') WHERE id=? AND tenant_id=?")
+    : db.prepare("UPDATE invoices SET status=?, updated_at=datetime('now') WHERE id=? AND tenant_id=?");
+  ids.forEach(id => {
+    if (paid_date) stmt.run(status, paid_date, id, req.tenant_id);
+    else stmt.run(status, id, req.tenant_id);
+  });
+  res.json({ ok: true, count: ids.length });
+});
+
+// ─── PARTIAL PAYMENTS ───────────────────────────────────────
+app.get('/api/invoices/:id/payments', ...tenanted, (req, res) => {
+  const payments = db.prepare('SELECT p.*, u.full_name as created_by_name FROM invoice_payments p LEFT JOIN users u ON p.created_by = u.id WHERE p.invoice_id = ? ORDER BY p.date DESC').all(req.params.id);
+  res.json(payments);
+});
+
+app.post('/api/invoices/:id/payments', ...tenanted, authorize('admin', 'accountant'), (req, res) => {
+  const { amount, date, note } = req.body;
+  const invoice = db.prepare('SELECT * FROM invoices WHERE id = ? AND tenant_id = ?').get(req.params.id, req.tenant_id);
+  if (!invoice) return res.status(404).json({ error: 'Faktura nenalezena' });
+  db.prepare('INSERT INTO invoice_payments (invoice_id, amount, currency, date, note, created_by) VALUES (?,?,?,?,?,?)').run(req.params.id, amount, invoice.currency, date, note||null, req.user.id);
+  const totalPaid = db.prepare('SELECT COALESCE(SUM(amount),0) as total FROM invoice_payments WHERE invoice_id = ?').get(req.params.id).total;
+  db.prepare("UPDATE invoices SET paid_amount = ?, updated_at = datetime('now') WHERE id = ?").run(totalPaid, req.params.id);
+  if (totalPaid >= invoice.total) {
+    db.prepare("UPDATE invoices SET status = 'paid', paid_date = ?, updated_at = datetime('now') WHERE id = ?").run(date, req.params.id);
+  }
+  db.prepare("INSERT INTO audit_log (tenant_id, user_id, action, entity, entity_id, details) VALUES (?, ?, 'payment', 'invoice', ?, ?)").run(req.tenant_id, req.user.id, req.params.id, `Platba ${amount} ${invoice.currency}`);
+  res.json({ ok: true, totalPaid });
+});
+
+// ─── RECURRING INVOICES ─────────────────────────────────────
+app.get('/api/recurring', ...tenanted, (req, res) => {
+  const rows = db.prepare(`SELECT r.*, c.name as client_name FROM recurring_invoices r LEFT JOIN clients c ON r.client_id = c.id WHERE r.tenant_id = ? ORDER BY r.next_date`).all(req.tenant_id);
+  res.json(rows.map(r => ({ ...r, items: JSON.parse(r.items || '[]') })));
+});
+
+app.post('/api/recurring', ...tenanted, authorize('admin', 'accountant'), (req, res) => {
+  const { client_id, currency, payment_method, note, items, interval, next_date, end_date } = req.body;
+  const result = db.prepare('INSERT INTO recurring_invoices (tenant_id, client_id, currency, payment_method, note, items, interval, next_date, end_date, created_by) VALUES (?,?,?,?,?,?,?,?,?,?)').run(req.tenant_id, client_id||null, currency||'CZK', payment_method||'bank_transfer', note||null, JSON.stringify(items||[]), interval||'monthly', next_date, end_date||null, req.user.id);
+  res.json({ id: result.lastInsertRowid });
+});
+
+app.put('/api/recurring/:id', ...tenanted, authorize('admin', 'accountant'), (req, res) => {
+  const { client_id, currency, payment_method, note, items, interval, next_date, end_date, active } = req.body;
+  db.prepare('UPDATE recurring_invoices SET client_id=?, currency=?, payment_method=?, note=?, items=?, interval=?, next_date=?, end_date=?, active=? WHERE id=? AND tenant_id=?').run(client_id||null, currency||'CZK', payment_method||'bank_transfer', note||null, JSON.stringify(items||[]), interval||'monthly', next_date, end_date||null, active??1, req.params.id, req.tenant_id);
+  res.json({ ok: true });
+});
+
+app.delete('/api/recurring/:id', ...tenanted, authorize('admin', 'accountant'), (req, res) => {
+  db.prepare('DELETE FROM recurring_invoices WHERE id = ? AND tenant_id = ?').run(req.params.id, req.tenant_id);
+  res.json({ ok: true });
+});
+
+// ─── AGING REPORT ───────────────────────────────────────────
+app.get('/api/reports/aging', ...tenanted, (req, res) => {
+  const today = new Date().toISOString().slice(0, 10);
+  const invoices = db.prepare(`SELECT i.id, i.invoice_number, i.due_date, i.total, i.total_czk, i.currency, i.status, i.paid_amount, c.name as client_name
+    FROM invoices i LEFT JOIN clients c ON i.client_id = c.id
+    WHERE i.tenant_id = ? AND i.status IN ('sent','overdue') AND i.type = 'issued'
+    ORDER BY i.due_date`).all(req.tenant_id);
+  const buckets = { current: [], '1_30': [], '31_60': [], '61_90': [], '90_plus': [] };
+  invoices.forEach(inv => {
+    const remaining = inv.total - (inv.paid_amount || 0);
+    if (remaining <= 0) return;
+    const daysPast = Math.floor((new Date(today) - new Date(inv.due_date)) / 86400000);
+    const item = { ...inv, remaining, daysPast };
+    if (daysPast <= 0) buckets.current.push(item);
+    else if (daysPast <= 30) buckets['1_30'].push(item);
+    else if (daysPast <= 60) buckets['31_60'].push(item);
+    else if (daysPast <= 90) buckets['61_90'].push(item);
+    else buckets['90_plus'].push(item);
+  });
+  const totals = {};
+  Object.entries(buckets).forEach(([k, items]) => { totals[k] = items.reduce((s, i) => s + i.remaining, 0); });
+  res.json({ buckets, totals });
+});
+
+// ─── ISDOC EXPORT ───────────────────────────────────────────
+app.get('/api/invoices/:id/isdoc', ...tenanted, (req, res) => {
+  const invoice = db.prepare('SELECT i.*, c.name as client_name, c.ico as client_ico, c.dic as client_dic, c.address as client_address, c.city as client_city, c.zip as client_zip, c.email as client_email FROM invoices i LEFT JOIN clients c ON i.client_id = c.id WHERE i.id = ? AND i.tenant_id = ?').get(req.params.id, req.tenant_id);
+  if (!invoice) return res.status(404).json({ error: 'Faktura nenalezena' });
+  const company = db.prepare('SELECT * FROM company WHERE tenant_id = ?').get(req.tenant_id);
+  const items = db.prepare('SELECT * FROM invoice_items WHERE invoice_id = ?').all(req.params.id);
+  const co = company || {};
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<Invoice xmlns="http://isdoc.cz/namespace/2013" version="6.0.1">
+  <DocumentType>1</DocumentType>
+  <ID>${invoice.invoice_number}</ID>
+  <UUID>${invoice.id}</UUID>
+  <IssueDate>${invoice.issue_date}</IssueDate>
+  <TaxPointDate>${invoice.supply_date || invoice.issue_date}</TaxPointDate>
+  <VATApplicable>${co.vat_payer ? 'true' : 'false'}</VATApplicable>
+  <Note>${(invoice.note || '').replace(/&/g,'&amp;').replace(/</g,'&lt;')}</Note>
+  <LocalCurrencyCode>CZK</LocalCurrencyCode>
+  <ForeignCurrencyCode>${invoice.currency}</ForeignCurrencyCode>
+  <CurrRate>${invoice.total_czk && invoice.total ? (invoice.total_czk / invoice.total).toFixed(4) : '1.0000'}</CurrRate>
+  <RefCurrRate>1</RefCurrRate>
+  <AccountingSupplierParty>
+    <Party>
+      <PartyIdentification><ID>${co.ico || ''}</ID></PartyIdentification>
+      <PartyName><Name>${(co.name || '').replace(/&/g,'&amp;')}</Name></PartyName>
+      <PostalAddress><StreetName>${(co.address||'').replace(/&/g,'&amp;')}</StreetName><CityName>${co.city||''}</CityName><PostalZone>${co.zip||''}</PostalZone><Country><IdentificationCode>${co.country||'CZ'}</IdentificationCode></Country></PostalAddress>
+    </Party>
+  </AccountingSupplierParty>
+  <AccountingCustomerParty>
+    <Party>
+      <PartyIdentification><ID>${invoice.client_ico || ''}</ID></PartyIdentification>
+      <PartyName><Name>${(invoice.client_name || '').replace(/&/g,'&amp;')}</Name></PartyName>
+      <PostalAddress><StreetName>${(invoice.client_address||'').replace(/&/g,'&amp;')}</StreetName><CityName>${invoice.client_city||''}</CityName><PostalZone>${invoice.client_zip||''}</PostalZone><Country><IdentificationCode>CZ</IdentificationCode></Country></PostalAddress>
+    </Party>
+  </AccountingCustomerParty>
+  <InvoiceLines>
+${items.map((it, i) => `    <InvoiceLine>
+      <ID>${i+1}</ID>
+      <InvoicedQuantity unitCode="${it.unit||'ks'}">${it.quantity}</InvoicedQuantity>
+      <LineExtensionAmount>${it.total.toFixed(2)}</LineExtensionAmount>
+      <LineExtensionAmountTaxInclusive>${(it.total_with_tax || it.total).toFixed(2)}</LineExtensionAmountTaxInclusive>
+      <LineExtensionTaxAmount>${(it.tax_amount||0).toFixed(2)}</LineExtensionTaxAmount>
+      <UnitPrice>${it.unit_price.toFixed(2)}</UnitPrice>
+      <ClassifiedTaxCategory><Percent>${it.tax_rate||0}</Percent></ClassifiedTaxCategory>
+      <Item><Description>${(it.description||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')}</Description></Item>
+    </InvoiceLine>`).join('\n')}
+  </InvoiceLines>
+  <TaxTotal><TaxAmount>${invoice.tax_amount.toFixed(2)}</TaxAmount></TaxTotal>
+  <LegalMonetaryTotal>
+    <TaxExclusiveAmount>${invoice.subtotal.toFixed(2)}</TaxExclusiveAmount>
+    <TaxInclusiveAmount>${invoice.total.toFixed(2)}</TaxInclusiveAmount>
+    <PayableAmount>${invoice.total.toFixed(2)}</PayableAmount>
+  </LegalMonetaryTotal>
+  <PaymentMeans>
+    <Payment><PaidAmount>${invoice.total.toFixed(2)}</PaidAmount><PaymentMeansCode>42</PaymentMeansCode><Details><PaymentDueDate>${invoice.due_date}</PaymentDueDate>${co.iban ? `<ID>${co.iban}</ID>` : ''}${invoice.variable_symbol ? `<VariableSymbol>${invoice.variable_symbol}</VariableSymbol>` : ''}</Details></Payment>
+  </PaymentMeans>
+</Invoice>`;
+  res.set({ 'Content-Type': 'application/xml; charset=utf-8', 'Content-Disposition': `attachment; filename=${invoice.invoice_number}.isdoc` });
+  res.send(xml);
+});
+
+// ─── DB BACKUP ──────────────────────────────────────────────
+app.get('/api/backup', ...tenanted, authorize('admin'), (req, res) => {
+  const dbPath = path.join(__dirname, '..', 'erp.db');
+  res.set({ 'Content-Type': 'application/octet-stream', 'Content-Disposition': `attachment; filename=erp-backup-${new Date().toISOString().slice(0,10)}.db` });
+  res.sendFile(dbPath);
+});
+
+// ─── AUTO OVERDUE DETECTION ─────────────────────────────────
+function checkOverdueInvoices() {
+  const today = new Date().toISOString().slice(0, 10);
+  const updated = db.prepare("UPDATE invoices SET status = 'overdue', updated_at = datetime('now') WHERE status = 'sent' AND due_date < ?").run(today);
+  if (updated.changes > 0) console.log(`Auto-marked ${updated.changes} invoices as overdue`);
+}
+checkOverdueInvoices();
+setInterval(checkOverdueInvoices, 60 * 60 * 1000); // Check every hour
+
+// ─── RECURRING INVOICE PROCESSING ───────────────────────────
+function processRecurringInvoices() {
+  const today = new Date().toISOString().slice(0, 10);
+  const due = db.prepare("SELECT r.*, c.name as client_name FROM recurring_invoices r LEFT JOIN clients c ON r.client_id = c.id WHERE r.active = 1 AND r.next_date <= ? AND (r.end_date IS NULL OR r.end_date >= ?)").all(today, today);
+  due.forEach(rec => {
+    const comp = db.prepare('SELECT * FROM company WHERE tenant_id = ?').get(rec.tenant_id);
+    if (!comp || (!comp.bank_account && !comp.iban)) return;
+    const items = JSON.parse(rec.items || '[]');
+    const curr = db.prepare('SELECT rate_to_czk FROM currencies WHERE code = ?').get(rec.currency || 'CZK');
+    const rate = curr ? curr.rate_to_czk : 1;
+    let subtotal = 0, totalTax = 0;
+    items.forEach(i => { const lt = (i.quantity||1)*(i.unit_price||0); const tx = lt*((i.tax_rate??0)/100); subtotal+=lt; totalTax+=tx; });
+    const total = subtotal + totalTax;
+    const newNumber = generateInvoiceNumber(comp);
+    const newVS = generateVariableSymbol(comp);
+    db.prepare('UPDATE company SET invoice_counter = ? WHERE tenant_id = ?').run((comp.invoice_counter||1)+1, rec.tenant_id);
+    const dueDays = comp.default_due_days || 14;
+    const dueDate = new Date(rec.next_date); dueDate.setDate(dueDate.getDate()+dueDays);
+    const result = db.prepare(`INSERT INTO invoices (tenant_id, invoice_number, type, client_id, issue_date, due_date, supply_date, payment_method, status, currency, subtotal, tax_rate, tax_amount, total, total_czk, note, created_by, variable_symbol) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+      .run(rec.tenant_id, newNumber, 'issued', rec.client_id, rec.next_date, dueDate.toISOString().slice(0,10), rec.next_date, rec.payment_method, 'draft', rec.currency, subtotal, 0, totalTax, total, total*rate, rec.note, rec.created_by, newVS);
+    const invoiceId = result.lastInsertRowid;
+    const ins = db.prepare('INSERT INTO invoice_items (invoice_id, description, quantity, unit, unit_price, total, tax_rate, tax_amount, total_with_tax) VALUES (?,?,?,?,?,?,?,?,?)');
+    items.forEach(i => { const lt=(i.quantity||1)*(i.unit_price||0); const tr=i.tax_rate??0; const tx=lt*(tr/100); ins.run(invoiceId,i.description,i.quantity||1,i.unit||'ks',i.unit_price||0,lt,tr,tx,lt+tx); });
+    // Advance next_date
+    const next = new Date(rec.next_date);
+    if (rec.interval === 'weekly') next.setDate(next.getDate()+7);
+    else if (rec.interval === 'monthly') next.setMonth(next.getMonth()+1);
+    else if (rec.interval === 'quarterly') next.setMonth(next.getMonth()+3);
+    else if (rec.interval === 'yearly') next.setFullYear(next.getFullYear()+1);
+    db.prepare('UPDATE recurring_invoices SET next_date = ? WHERE id = ?').run(next.toISOString().slice(0,10), rec.id);
+    console.log(`Generated recurring invoice ${newNumber} for tenant ${rec.tenant_id}`);
+  });
+}
+processRecurringInvoices();
+setInterval(processRecurringInvoices, 6 * 60 * 60 * 1000); // Every 6 hours
 
 // GET-based login (bypasses POST issues with port forwarding)
 app.get('/api/auth/get-login', (req, res) => {

@@ -26,7 +26,7 @@ export default function InvoiceForm() {
   const [form, setForm] = useState({
     invoice_number: '', variable_symbol: '', client_id: '', issue_date: new Date().toISOString().slice(0, 10),
     due_date: '', supply_date: '', status: 'draft', currency: 'CZK',
-    payment_method: 'bank_transfer', note: '',
+    payment_method: 'bank_transfer', note: '', invoice_type: 'regular',
     items: [{ description: '', quantity: 1, unit: 'ks', unit_price: 0, tax_rate: 21 }]
   });
   const [error, setError] = useState('');
@@ -200,6 +200,15 @@ export default function InvoiceForm() {
                 {paymentMethods.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
               </select>
             </div>
+            {!isEdit && (
+              <div className="form-group">
+                <label className="form-label">Typ dokladu</label>
+                <select className="form-select" value={form.invoice_type} onChange={e => updateField('invoice_type', e.target.value)}>
+                  <option value="regular">Faktura</option>
+                  <option value="proforma">Proforma</option>
+                </select>
+              </div>
+            )}
           </div>
           <div className="form-row">
             <div className="form-group">

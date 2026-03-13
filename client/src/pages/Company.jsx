@@ -234,6 +234,34 @@ export default function Company() {
         </div>
         <button type="submit" className="btn btn-primary">Uložit nastavení</button>
       </form>
+
+      <div className="card" style={{ marginTop: '1.5rem' }}>
+        <div className="card-title" style={{ marginBottom: '1rem' }}>Logo společnosti</div>
+        {form.logo && (
+          <div style={{ marginBottom: '1rem' }}>
+            <img src={form.logo} alt="Logo" style={{ maxWidth: 200, maxHeight: 80, objectFit: 'contain' }} />
+            <button className="btn btn-outline btn-sm" style={{ marginLeft: '0.5rem' }} onClick={async () => { await api.updateCompany({ ...form, logo: null }); setForm(f => ({ ...f, logo: null })); }}>Odstranit</button>
+          </div>
+        )}
+        <input type="file" accept="image/*" onChange={(e) => {
+          const file = e.target.files[0]; if (!file) return;
+          const reader = new FileReader();
+          reader.onload = async (ev) => {
+            const logo = ev.target.result;
+            setForm(f => ({ ...f, logo }));
+            await api.updateCompany({ ...form, logo });
+            setSaved(true); setTimeout(() => setSaved(false), 3000);
+          };
+          reader.readAsDataURL(file);
+        }} />
+        <small style={{ color: 'var(--gray-500)', fontSize: '0.75rem', display: 'block', marginTop: '0.5rem' }}>PNG nebo JPG, max 200px šířka. Zobrazí se na fakturách.</small>
+      </div>
+
+      <div className="card" style={{ marginTop: '1.5rem' }}>
+        <div className="card-title" style={{ marginBottom: '1rem' }}>Správa dat</div>
+        <a href="/api/backup" className="btn btn-outline" download>Stáhnout zálohu databáze</a>
+        <small style={{ color: 'var(--gray-500)', fontSize: '0.75rem', display: 'block', marginTop: '0.5rem' }}>Stáhne kompletní zálohu databáze (SQLite soubor)</small>
+      </div>
     </div>
   );
 }

@@ -18,6 +18,8 @@ import Profile from './pages/Profile';
 import UserDetail from './pages/UserDetail';
 import ClientDetail from './pages/ClientDetail';
 import SuperAdmin from './pages/SuperAdmin';
+import RecurringInvoices from './pages/RecurringInvoices';
+import AgingReport from './pages/AgingReport';
 import './styles.css';
 
 export const AuthContext = createContext(null);
@@ -96,6 +98,8 @@ function Sidebar({ open, onClose }) {
     { to: '/evidence', label: 'Evidence', icon: '📋' },
     { to: '/clients', label: 'Klienti', icon: '👥' },
     { to: '/currencies', label: 'Měny', icon: '💱' },
+    { to: '/recurring', label: 'Opakované', icon: '🔄' },
+    { to: '/aging', label: 'Pohledávky', icon: '📅' },
   ];
   if (can('admin')) {
     links.push({ to: '/company', label: 'Společnost', icon: '🏢' });
@@ -146,6 +150,68 @@ function Sidebar({ open, onClose }) {
   );
 }
 
+function GlobalSearch() {
+  const [q, setQ] = useState('');
+  const [results, setResults] = useState(null);
+  const [open, setOpen] = useState(false);
+  const navigate = useNavigate();
+  const ref = React.useRef();
+
+  React.useEffect(() => {
+    if (!q || q.length < 2) { setResults(null); return; }
+    const t = setTimeout(() => { api.search(q).then(setResults).catch(() => {}); }, 300);
+    return () => clearTimeout(t);
+  }, [q]);
+
+  React.useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const go = (path) => { navigate(path); setOpen(false); setQ(''); setResults(null); };
+  const hasResults = results && (results.invoices?.length || results.clients?.length || results.evidence?.length);
+
+  return (
+    <div ref={ref} style={{ position: 'relative', flex: 1, maxWidth: 360 }}>
+      <input className="form-input" placeholder="Hledat faktury, klienty..." value={q}
+        onChange={e => { setQ(e.target.value); setOpen(true); }}
+        onFocus={() => setOpen(true)}
+        style={{ fontSize: 13, padding: '6px 12px', background: '#f1f5f9', border: 'none', borderRadius: 8 }}
+      />
+      {open && hasResults && (
+        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, boxShadow: '0 8px 30px rgba(0,0,0,0.12)', zIndex: 1000, maxHeight: 400, overflow: 'auto', marginTop: 4 }}>
+          {results.invoices?.length > 0 && (<>
+            <div style={{ padding: '8px 12px', fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>Faktury</div>
+            {results.invoices.map(i => (
+              <div key={'i'+i.id} onClick={() => go(`/invoices/${i.id}`)} style={{ padding: '8px 12px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9' }} onMouseOver={e => e.currentTarget.style.background='#f8fafc'} onMouseOut={e => e.currentTarget.style.background=''}>
+                <span><strong>{i.invoice_number}</strong> {i.client_name && <span style={{ color: '#64748b' }}>— {i.client_name}</span>}</span>
+                <span className={`badge badge-${i.status}`} style={{ fontSize: 10 }}>{i.status}</span>
+              </div>
+            ))}
+          </>)}
+          {results.clients?.length > 0 && (<>
+            <div style={{ padding: '8px 12px', fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>Klienti</div>
+            {results.clients.map(c => (
+              <div key={'c'+c.id} onClick={() => go(`/clients/${c.id}`)} style={{ padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid #f1f5f9' }} onMouseOver={e => e.currentTarget.style.background='#f8fafc'} onMouseOut={e => e.currentTarget.style.background=''}>
+                <strong>{c.name}</strong> {c.ico && <span style={{ color: '#64748b' }}>IČ: {c.ico}</span>}
+              </div>
+            ))}
+          </>)}
+          {results.evidence?.length > 0 && (<>
+            <div style={{ padding: '8px 12px', fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>Evidence</div>
+            {results.evidence.map(e => (
+              <div key={'e'+e.id} onClick={() => go('/evidence')} style={{ padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid #f1f5f9' }} onMouseOver={ev => ev.currentTarget.style.background='#f8fafc'} onMouseOut={ev => ev.currentTarget.style.background=''}>
+                <strong>{e.title}</strong> {e.amount && <span style={{ color: '#64748b' }}>{e.amount} {e.currency}</span>}
+              </div>
+            ))}
+          </>)}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Layout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { tenant } = useAuth();
@@ -157,6 +223,16 @@ function Layout({ children }) {
           <button className="menu-btn" onClick={() => setSidebarOpen(true)}>☰</button>
           <Link to="/" style={{ textDecoration: 'none' }}><h1 className="topbar-title">RFI ERP</h1></Link>
           {tenant && <span style={{ fontSize: 12, color: '#94a3b8', marginLeft: 8 }}>{tenant.name}</span>}
+          <div style={{ flex: 1 }} />
+          <GlobalSearch />
+          <button className="dark-toggle" onClick={() => {
+            const html = document.documentElement;
+            const next = html.getAttribute('data-theme') === 'dark' ? '' : 'dark';
+            html.setAttribute('data-theme', next);
+            localStorage.setItem('erp_theme', next);
+          }} title="Tmavý/světlý režim">
+            🌓
+          </button>
         </header>
         <main className="content">{children}</main>
       </div>
@@ -191,6 +267,8 @@ export default function App() {
                   <Route path="/clients" element={<Clients />} />
                   <Route path="/clients/:id" element={<ClientDetail />} />
                   <Route path="/currencies" element={<Currencies />} />
+                  <Route path="/recurring" element={<RecurringInvoices />} />
+                  <Route path="/aging" element={<AgingReport />} />
                   <Route path="/company" element={<Company />} />
                   <Route path="/users" element={<Users />} />
                   <Route path="/users/:id" element={<UserDetail />} />

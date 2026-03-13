@@ -153,6 +153,33 @@ db.exec(`
     weight INTEGER DEFAULT 1,
     created_at TEXT DEFAULT (datetime('now'))
   );
+
+  CREATE TABLE IF NOT EXISTS recurring_invoices (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tenant_id INTEGER NOT NULL REFERENCES tenants(id),
+    client_id INTEGER REFERENCES clients(id),
+    currency TEXT NOT NULL DEFAULT 'CZK' REFERENCES currencies(code),
+    payment_method TEXT DEFAULT 'bank_transfer',
+    note TEXT,
+    items TEXT NOT NULL,
+    interval TEXT NOT NULL DEFAULT 'monthly' CHECK(interval IN ('weekly','monthly','quarterly','yearly')),
+    next_date TEXT NOT NULL,
+    end_date TEXT,
+    active INTEGER NOT NULL DEFAULT 1,
+    created_by INTEGER REFERENCES users(id),
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS invoice_payments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    invoice_id INTEGER NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
+    amount REAL NOT NULL,
+    currency TEXT NOT NULL DEFAULT 'CZK',
+    date TEXT NOT NULL,
+    note TEXT,
+    created_by INTEGER REFERENCES users(id),
+    created_at TEXT DEFAULT (datetime('now'))
+  );
 `);
 
 // ─── MIGRATIONS ──────────────────────────────────────────
@@ -191,6 +218,13 @@ safeAlter('ALTER TABLE evidence ADD COLUMN tenant_id INTEGER REFERENCES tenants(
 safeAlter('ALTER TABLE clients ADD COLUMN tenant_id INTEGER REFERENCES tenants(id)');
 safeAlter('ALTER TABLE audit_log ADD COLUMN tenant_id INTEGER REFERENCES tenants(id)');
 safeAlter('ALTER TABLE category_rules ADD COLUMN tenant_id INTEGER REFERENCES tenants(id)');
+
+// New feature migrations
+safeAlter("ALTER TABLE invoices ADD COLUMN invoice_type TEXT DEFAULT 'regular'"); // regular, proforma, credit_note
+safeAlter('ALTER TABLE invoices ADD COLUMN related_invoice_id INTEGER REFERENCES invoices(id)');
+safeAlter('ALTER TABLE invoices ADD COLUMN paid_amount REAL DEFAULT 0');
+safeAlter('ALTER TABLE company ADD COLUMN logo TEXT'); // base64 logo
+safeAlter('ALTER TABLE company ADD COLUMN reminder_days TEXT'); // JSON array e.g. [3,7,14]
 
 // Migrate full_name → first_name + last_name
 try {

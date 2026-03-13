@@ -63,7 +63,10 @@ export default function Clients() {
     <div>
       <div className="page-header">
         <h1 className="page-title">Klienti</h1>
-        {can('admin', 'accountant', 'manager') && <button className="btn btn-primary" onClick={openNew}>+ Nový klient</button>}
+        <div className="btn-group">
+          <a href="/api/export/clients" className="btn btn-outline btn-sm" download>CSV Export</a>
+          {can('admin', 'accountant', 'manager') && <button className="btn btn-primary" onClick={openNew}>+ Nový klient</button>}
+        </div>
       </div>
 
       <div className="filters" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -131,7 +134,19 @@ export default function Clients() {
                 <input className="form-input" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required />
               </div>
               <div className="form-row">
-                <div className="form-group"><label className="form-label">IČO</label><input className="form-input" value={form.ico} onChange={e => setForm(f => ({ ...f, ico: e.target.value }))} /></div>
+                <div className="form-group">
+                  <label className="form-label">IČO</label>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <input className="form-input" value={form.ico} onChange={e => setForm(f => ({ ...f, ico: e.target.value }))} />
+                    <button type="button" className="btn btn-outline btn-sm" style={{ whiteSpace: 'nowrap' }} onClick={async () => {
+                      if (!form.ico) return;
+                      try {
+                        const data = await api.aresLookup(form.ico);
+                        setForm(f => ({ ...f, name: data.name || f.name, dic: data.dic || f.dic, address: data.address || f.address, city: data.city || f.city, zip: data.zip || f.zip, country: data.country || f.country }));
+                      } catch (e) { alert(e.message); }
+                    }}>ARES</button>
+                  </div>
+                </div>
                 <div className="form-group"><label className="form-label">DIČ</label><input className="form-input" value={form.dic} onChange={e => setForm(f => ({ ...f, dic: e.target.value }))} /></div>
               </div>
               <div className="form-row">

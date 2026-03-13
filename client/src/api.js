@@ -71,6 +71,23 @@ export const api = {
   updateInvoiceStatus: (id, status, paid_date) => request(`/invoices/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status, paid_date }) }),
   deleteInvoice: (id) => request(`/invoices/${id}`, { method: 'DELETE' }),
   getInvoiceQR: (id) => request(`/invoices/${id}/qr`),
+  duplicateInvoice: (id) => request(`/invoices/${id}/duplicate`, { method: 'POST' }),
+  createCreditNote: (id) => request(`/invoices/${id}/credit-note`, { method: 'POST' }),
+  convertProforma: (id) => request(`/invoices/${id}/to-invoice`, { method: 'POST' }),
+  bulkStatus: (ids, status) => request('/invoices/bulk-status', { method: 'PATCH', body: JSON.stringify({ ids, status }) }),
+  getInvoicePayments: (id) => request(`/invoices/${id}/payments`),
+  addInvoicePayment: (id, data) => request(`/invoices/${id}/payments`, { method: 'POST', body: JSON.stringify(data) }),
+
+  // Recurring
+  getRecurring: () => request('/recurring'),
+  createRecurring: (data) => request('/recurring', { method: 'POST', body: JSON.stringify(data) }),
+  updateRecurring: (id, data) => request(`/recurring/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteRecurring: (id) => request(`/recurring/${id}`, { method: 'DELETE' }),
+
+  // Search & Reports
+  search: (q) => request(`/search?q=${encodeURIComponent(q)}`),
+  getAgingReport: () => request('/reports/aging'),
+  aresLookup: (ico) => request(`/ares/${ico}`),
 
   // Evidence
   getEvidence: (params = {}) => {
