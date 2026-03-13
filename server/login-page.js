@@ -25,7 +25,7 @@ module.exports = function getLoginPage(error) {
         radial-gradient(circle at 50% 80%, rgba(124,58,237,0.3) 0%, transparent 40%),
         radial-gradient(circle at 30% 70%, rgba(45,212,191,0.3) 0%, transparent 35%),
         radial-gradient(circle at 70% 60%, rgba(6,182,212,0.25) 0%, transparent 35%);
-      animation: bgDrift 40s ease-in-out infinite alternate;
+      animation: bgDrift 30s linear infinite;
       will-change: transform;
     }
     .bg-animated::after {
@@ -34,16 +34,20 @@ module.exports = function getLoginPage(error) {
         radial-gradient(circle at 60% 40%, rgba(13,148,136,0.3) 0%, transparent 35%),
         radial-gradient(circle at 30% 60%, rgba(124,58,237,0.25) 0%, transparent 40%),
         radial-gradient(circle at 80% 70%, rgba(45,212,191,0.3) 0%, transparent 35%);
-      animation: bgDrift2 50s ease-in-out infinite alternate;
+      animation: bgDrift2 36s linear infinite;
       will-change: transform;
     }
     @keyframes bgDrift {
       0%   { transform: translate(0%, 0%) rotate(0deg); }
-      100% { transform: translate(10%, 8%) rotate(30deg); }
+      33%  { transform: translate(8%, -5%) rotate(120deg); }
+      66%  { transform: translate(-5%, 8%) rotate(240deg); }
+      100% { transform: translate(0%, 0%) rotate(360deg); }
     }
     @keyframes bgDrift2 {
       0%   { transform: translate(0%, 0%) rotate(0deg); }
-      100% { transform: translate(-8%, 6%) rotate(-20deg); }
+      33%  { transform: translate(-6%, 7%) rotate(-120deg); }
+      66%  { transform: translate(7%, -4%) rotate(-240deg); }
+      100% { transform: translate(0%, 0%) rotate(-360deg); }
     }
 
     .login-container {
