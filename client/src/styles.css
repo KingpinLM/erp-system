@@ -843,3 +843,70 @@ a:hover { opacity: 0.85; }
 [data-theme="dark"] .perm-toggle:hover { background: rgba(255,255,255,0.04); }
 [data-theme="dark"] .logo-upload-area { border-color: #475569; }
 [data-theme="dark"] .logo-upload-area:hover { border-color: var(--primary); background: rgba(99, 102, 241, 0.08); }
+
+/* ═══════════════════════════════════════════════════
+   RILLION-INSPIRED: Performance Strip & Cash Flow
+   ═══════════════════════════════════════════════════ */
+
+.dash-perf-strip {
+  display: flex; align-items: center; gap: 0;
+  background: white; border-radius: var(--radius-lg);
+  border: 1px solid var(--gray-200); padding: 0;
+  margin-bottom: 1.5rem; overflow: hidden;
+}
+.dash-perf-item {
+  flex: 1; padding: 1rem 1.25rem;
+  text-align: center;
+}
+.dash-perf-label {
+  font-size: 0.7rem; font-weight: 600; color: var(--gray-500);
+  text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem;
+}
+.dash-perf-value {
+  font-size: 1.1rem; font-weight: 800; color: var(--gray-900);
+  letter-spacing: -0.02em; font-variant-numeric: tabular-nums;
+}
+.dash-perf-sep {
+  width: 1px; height: 36px; background: var(--gray-200); flex-shrink: 0;
+}
+
+/* Live indicator */
+.dash-live-indicator {
+  display: flex; align-items: center; gap: 0.4rem;
+  padding: 0.3rem 0.7rem; border-radius: 20px;
+  background: rgba(5, 150, 105, 0.06); border: 1px solid rgba(5, 150, 105, 0.15);
+}
+.dash-live-text {
+  font-size: 0.7rem; color: #059669; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.05em;
+}
+
+/* Currency icon wrap */
+.dash-currency-icon-wrap {
+  width: 36px; height: 36px; border-radius: 8px;
+  background: var(--gray-50); border: 1px solid var(--gray-200);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+
+/* Rank position - cleaner */
+.dash-rank-pos {
+  font-size: 0.7rem; font-weight: 700; color: var(--gray-400);
+  width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;
+  background: var(--gray-50); border-radius: 6px; flex-shrink: 0;
+  border: 1px solid var(--gray-200);
+}
+
+/* Dark mode for new elements */
+[data-theme="dark"] .dash-perf-strip { background: #1e293b; border-color: #334155; }
+[data-theme="dark"] .dash-perf-sep { background: #334155; }
+[data-theme="dark"] .dash-live-indicator { background: rgba(5, 150, 105, 0.1); border-color: rgba(5, 150, 105, 0.2); }
+[data-theme="dark"] .dash-currency-icon-wrap { background: rgba(255,255,255,0.04); border-color: #334155; }
+[data-theme="dark"] .dash-rank-pos { background: rgba(255,255,255,0.04); border-color: #334155; }
+
+/* Performance strip responsive */
+@media (max-width: 768px) {
+  .dash-perf-strip { flex-wrap: wrap; }
+  .dash-perf-item { flex: 1 1 45%; min-width: 120px; }
+  .dash-perf-sep { display: none; }
+}

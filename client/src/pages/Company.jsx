@@ -7,37 +7,204 @@ const invoiceLayouts = [
     name: 'Klasický',
     desc: 'Standardní moderní layout s gradientovým pruhem a přehledným rozložením.',
     accent: '#6366f1',
-    preview: { headerAlign: 'left-right', accentType: 'gradient-bar', partyStyle: 'grid-border', totalsStyle: 'right-aligned' }
+    accentGrad: 'linear-gradient(90deg, #6366f1, #8b5cf6)',
   },
   {
     key: 'minimalisticky',
     name: 'Minimalistický',
     desc: 'Čistý design s maximem bílého prostoru. Žádné barvy, pouze typografie.',
     accent: '#1e293b',
-    preview: { headerAlign: 'left-only', accentType: 'none', partyStyle: 'simple', totalsStyle: 'right-aligned' }
+    accentGrad: null,
   },
   {
     key: 'korporatni',
     name: 'Korporátní',
     desc: 'Profesionální firemní styl s tmavou hlavičkou a výrazným logem.',
     accent: '#0f172a',
-    preview: { headerAlign: 'dark-header', accentType: 'full-header', partyStyle: 'boxed', totalsStyle: 'highlighted' }
+    accentGrad: null,
   },
   {
     key: 'elegantni',
     name: 'Elegantní',
     desc: 'Jemné barvy, zaoblené rohy a rafinovaná typografie pro prémiový dojem.',
     accent: '#8b5cf6',
-    preview: { headerAlign: 'center', accentType: 'subtle-line', partyStyle: 'card', totalsStyle: 'card' }
+    accentGrad: 'linear-gradient(90deg, #c4b5fd, #8b5cf6, #c4b5fd)',
   },
   {
     key: 'kompaktni',
     name: 'Kompaktní',
     desc: 'Úsporné rozložení pro maximum informací na jedné stránce.',
     accent: '#059669',
-    preview: { headerAlign: 'inline', accentType: 'left-border', partyStyle: 'inline', totalsStyle: 'compact' }
+    accentGrad: null,
   },
 ];
+
+// Realistic invoice preview renderer
+function InvoicePreview({ layout, companyName }) {
+  const name = companyName || 'Firma s.r.o.';
+  const items = [
+    { desc: 'Webový design — kompletní redesign', qty: 1, price: 25000 },
+    { desc: 'SEO optimalizace', qty: 1, price: 8500 },
+    { desc: 'Hosting 12 měs.', qty: 12, price: 300 },
+  ];
+  const subtotal = 37100;
+  const vat = 7791;
+  const total = 44891;
+  const fmtN = n => n.toLocaleString('cs-CZ');
+
+  const isKorp = layout.key === 'korporatni';
+  const isMin = layout.key === 'minimalisticky';
+  const isEleg = layout.key === 'elegantni';
+  const isComp = layout.key === 'kompaktni';
+
+  const fs = isComp ? 0.85 : 1;
+  const pad = isComp ? 14 : 20;
+  const bg = 'white';
+  const text = '#1e293b';
+  const muted = '#94a3b8';
+  const border = isEleg ? '#e9d5ff' : isMin ? '#e2e8f0' : '#e2e8f0';
+
+  return (
+    <div style={{ padding: pad, background: bg, fontSize: 10 * fs, color: text, fontFamily: "'Inter', sans-serif", lineHeight: 1.5 }}>
+      {/* Top accent */}
+      {layout.accentGrad && !isKorp && (
+        <div style={{ height: isEleg ? 1.5 : 3, background: layout.accentGrad, borderRadius: 2, marginBottom: 14 }} />
+      )}
+      {isComp && (
+        <div style={{ height: 2, background: layout.accent, marginBottom: 10 }} />
+      )}
+
+      {/* Corporate dark header */}
+      {isKorp && (
+        <div style={{ background: '#0f172a', margin: `-${pad}px -${pad}px 12px`, padding: `14px ${pad}px 10px` }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <div style={{ fontSize: 7, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Faktura</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: '#ffffff', letterSpacing: '-0.02em' }}>FV-2026-001</div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ width: 40, height: 12, background: 'rgba(255,255,255,0.12)', borderRadius: 3, marginBottom: 4, marginLeft: 'auto' }} />
+              <div style={{ fontSize: 8, color: '#94a3b8', fontWeight: 500 }}>{name}</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Elegant centered header */}
+      {isEleg && (
+        <div style={{ textAlign: 'center', marginBottom: 14 }}>
+          <div style={{ fontSize: 7, fontWeight: 600, color: layout.accent, textTransform: 'uppercase', letterSpacing: '0.15em' }}>Faktura</div>
+          <div style={{ fontSize: 20, fontWeight: 300, color: '#1e1b4b', letterSpacing: '-0.01em' }}>FV-2026-001</div>
+          <div style={{ fontSize: 7, color: muted, marginTop: 2 }}>{name}</div>
+        </div>
+      )}
+
+      {/* Standard / Minimal / Compact header */}
+      {!isKorp && !isEleg && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: isComp ? 8 : 14 }}>
+          <div>
+            <div style={{ fontSize: isMin ? 6 : 7, fontWeight: isMin ? 600 : 800, color: isMin ? text : layout.accent, textTransform: 'uppercase', letterSpacing: isMin ? '0.15em' : '0.08em' }}>Faktura</div>
+            <div style={{ fontSize: isComp ? 14 : 17, fontWeight: isMin ? 400 : 800, color: text, letterSpacing: '-0.02em' }}>FV-2026-001</div>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: 9 * fs, fontWeight: 700, color: text }}>{name}</div>
+            <div style={{ fontSize: 7 * fs, color: muted }}>IČ: 12345678</div>
+          </div>
+        </div>
+      )}
+
+      {/* Parties */}
+      <div style={{
+        display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0, marginBottom: isComp ? 8 : 12,
+        border: `1px solid ${border}`, borderRadius: isEleg ? 8 : isComp ? 4 : 6, overflow: 'hidden',
+        ...(isMin ? { borderLeft: 'none', borderRight: 'none', borderRadius: 0 } : {}),
+      }}>
+        <div style={{ padding: isComp ? '5px 8px' : '8px 10px', borderRight: `1px solid ${border}` }}>
+          <div style={{ fontSize: 6, fontWeight: 700, color: isEleg ? layout.accent : muted, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>Dodavatel</div>
+          <div style={{ fontSize: 8 * fs, fontWeight: 700, color: text }}>{name}</div>
+          <div style={{ fontSize: 6, color: muted }}>Ulice 123, Praha</div>
+          <div style={{ fontSize: 6, color: muted }}>IČ: 12345678</div>
+        </div>
+        <div style={{ padding: isComp ? '5px 8px' : '8px 10px' }}>
+          <div style={{ fontSize: 6, fontWeight: 700, color: isEleg ? layout.accent : muted, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>Odběratel</div>
+          <div style={{ fontSize: 8 * fs, fontWeight: 700, color: text }}>Klient a.s.</div>
+          <div style={{ fontSize: 6, color: muted }}>Firemní 456, Brno</div>
+          <div style={{ fontSize: 6, color: muted }}>IČ: 87654321</div>
+        </div>
+      </div>
+
+      {/* Meta row */}
+      <div style={{ display: 'flex', gap: isComp ? 6 : 10, marginBottom: isComp ? 6 : 10, padding: isComp ? '4px 6px' : '6px 8px', background: '#f8fafc', borderRadius: 4, border: '1px solid #f1f5f9' }}>
+        {[{ l: 'Vystaveno', v: '01.03.2026' }, { l: 'Splatnost', v: '15.03.2026' }, { l: 'Způsob', v: 'Převodem' }].map((m, i) => (
+          <div key={i} style={{ flex: 1 }}>
+            <div style={{ fontSize: 5, fontWeight: 700, color: muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{m.l}</div>
+            <div style={{ fontSize: 7 * fs, fontWeight: 600, color: text }}>{m.v}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Items table */}
+      <div style={{ marginBottom: isComp ? 6 : 10 }}>
+        <div style={{
+          display: 'grid', gridTemplateColumns: '1fr 32px 50px 55px', gap: 0, padding: '3px 6px', fontSize: 6,
+          fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em',
+          background: isKorp ? '#0f172a' : isEleg ? '#faf5ff' : isComp ? '#ecfdf5' : '#f8fafc',
+          color: isKorp ? '#e2e8f0' : isEleg ? '#7c3aed' : isComp ? '#059669' : muted,
+          borderBottom: isMin ? '1.5px solid #1e293b' : `1px solid ${border}`,
+        }}>
+          <span>Popis</span><span style={{ textAlign: 'right' }}>Ks</span><span style={{ textAlign: 'right' }}>Cena</span><span style={{ textAlign: 'right' }}>Celkem</span>
+        </div>
+        {items.map((item, i) => (
+          <div key={i} style={{
+            display: 'grid', gridTemplateColumns: '1fr 32px 50px 55px', gap: 0, padding: '3px 6px', fontSize: 7 * fs,
+            color: '#475569', borderBottom: `1px solid ${isEleg ? '#f3e8ff' : isKorp ? '#1e293b' : '#f1f5f9'}`,
+          }}>
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.desc}</span>
+            <span style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{item.qty}</span>
+            <span style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{fmtN(item.price)}</span>
+            <span style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>{fmtN(item.qty * item.price)}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Totals */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <div style={{ width: '55%' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 7 * fs, color: muted, marginBottom: 2 }}>
+            <span>Základ</span><span style={{ fontVariantNumeric: 'tabular-nums' }}>{fmtN(subtotal)} Kč</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 7 * fs, color: muted, marginBottom: 3 }}>
+            <span>DPH 21%</span><span style={{ fontVariantNumeric: 'tabular-nums' }}>{fmtN(vat)} Kč</span>
+          </div>
+          <div style={{
+            display: 'flex', justifyContent: 'space-between', fontSize: isComp ? 10 : 12, fontWeight: 800,
+            color: isEleg ? '#1e1b4b' : text,
+            borderTop: `2px solid ${isEleg ? '#7c3aed' : isMin ? '#1e293b' : isKorp ? '#475569' : text}`,
+            paddingTop: 4, marginTop: 2,
+          }}>
+            <span>Celkem</span><span style={{ fontVariantNumeric: 'tabular-nums' }}>{fmtN(total)} Kč</span>
+          </div>
+        </div>
+      </div>
+
+      {/* QR / payment info */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: isComp ? 8 : 12, padding: '6px 8px', background: '#f8fafc', borderRadius: 4, border: '1px solid #f1f5f9' }}>
+        <div style={{ width: 28, height: 28, background: '#e2e8f0', borderRadius: 3, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="3" height="3"/><rect x="18" y="18" width="3" height="3"/></svg>
+        </div>
+        <div>
+          <div style={{ fontSize: 6, fontWeight: 700, color: muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Platební údaje</div>
+          <div style={{ fontSize: 7, color: text }}>123456789/0800</div>
+        </div>
+      </div>
+
+      {/* Bottom accent */}
+      {layout.accentGrad && !isKorp && (
+        <div style={{ height: isEleg ? 1 : 2, background: layout.accentGrad, borderRadius: 1, marginTop: isComp ? 8 : 12, opacity: 0.4 }} />
+      )}
+    </div>
+  );
+}
 
 const formatTemplates = [
   { value: '{prefix}{sep}{year}{sep}{num}', label: 'Prefix-Rok-Číslo', example: 'FV-2026-001' },
@@ -274,7 +441,7 @@ export default function Company() {
         </div>
         <div className="card" style={{ position: 'relative' }}>
           <div className="card-title" style={{ marginBottom: '0.5rem' }}>Vzhled faktury</div>
-          <p style={{ fontSize: '0.8rem', color: 'var(--gray-500)', marginBottom: '1.25rem' }}>Zvolte layout, který se použije při zobrazení a tisku faktur. Najeďte myší pro náhled.</p>
+          <p style={{ fontSize: '0.8rem', color: 'var(--gray-500)', marginBottom: '1.25rem' }}>Zvolte layout, který se použije při zobrazení a tisku faktur. Najeďte myší pro realistický náhled.</p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.75rem' }}>
             {invoiceLayouts.map(layout => {
               const selected = (form.invoice_layout || 'klasicky') === layout.key;
@@ -292,73 +459,10 @@ export default function Company() {
                     transform: selected ? 'translateY(-2px)' : hovered ? 'translateY(-3px) scale(1.02)' : 'none',
                   }}
                 >
-                  {/* Mini preview */}
-                  <div style={{ padding: '12px 14px 10px', background: selected ? `${layout.accent}08` : hovered ? `${layout.accent}05` : 'var(--gray-50)', borderBottom: `1px solid ${selected ? layout.accent + '30' : 'var(--gray-200)'}`, transition: 'background 0.2s' }}>
-                    {layout.preview.accentType === 'gradient-bar' && (
-                      <div style={{ height: 3, background: `linear-gradient(90deg, ${layout.accent}, #8b5cf6)`, borderRadius: 2, marginBottom: 8 }} />
-                    )}
-                    {layout.preview.accentType === 'full-header' && (
-                      <div style={{ height: 20, background: layout.accent, borderRadius: 4, marginBottom: 8, display: 'flex', alignItems: 'center', padding: '0 6px' }}>
-                        <div style={{ width: 24, height: 6, background: 'rgba(255,255,255,0.7)', borderRadius: 2 }} />
-                        <div style={{ marginLeft: 'auto', width: 16, height: 6, background: 'rgba(255,255,255,0.4)', borderRadius: 2 }} />
-                      </div>
-                    )}
-                    {layout.preview.accentType === 'subtle-line' && (
-                      <div style={{ height: 1.5, background: layout.accent, opacity: 0.3, marginBottom: 8 }} />
-                    )}
-                    {layout.preview.accentType === 'left-border' && (
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        <div style={{ width: 3, background: layout.accent, borderRadius: 2, alignSelf: 'stretch' }} />
-                        <div style={{ flex: 1 }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                            <div style={{ width: 32, height: 5, background: 'var(--gray-300)', borderRadius: 2 }} />
-                            <div style={{ width: 20, height: 5, background: 'var(--gray-200)', borderRadius: 2 }} />
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                    {layout.preview.accentType !== 'left-border' && (
-                      <div style={{ display: 'flex', justifyContent: layout.preview.headerAlign === 'center' ? 'center' : 'space-between', marginBottom: 6 }}>
-                        <div style={{ width: 32, height: 5, background: 'var(--gray-300)', borderRadius: 2 }} />
-                        {layout.preview.headerAlign !== 'center' && layout.preview.headerAlign !== 'left-only' && (
-                          <div style={{ width: 20, height: 5, background: 'var(--gray-200)', borderRadius: 2 }} />
-                        )}
-                      </div>
-                    )}
-                    {/* Mini party boxes */}
-                    <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
-                      <div style={{
-                        flex: 1, height: 16, borderRadius: 3,
-                        background: layout.preview.partyStyle === 'boxed' ? 'var(--gray-200)' : 'transparent',
-                        border: layout.preview.partyStyle === 'card' ? '1px solid var(--gray-200)' : layout.preview.partyStyle === 'grid-border' ? '1px solid var(--gray-200)' : 'none',
-                      }}>
-                        <div style={{ width: '60%', height: 3, background: 'var(--gray-300)', borderRadius: 1, margin: '4px 4px' }} />
-                        <div style={{ width: '40%', height: 2, background: 'var(--gray-200)', borderRadius: 1, margin: '2px 4px' }} />
-                      </div>
-                      <div style={{
-                        flex: 1, height: 16, borderRadius: 3,
-                        background: layout.preview.partyStyle === 'boxed' ? 'var(--gray-200)' : 'transparent',
-                        border: layout.preview.partyStyle === 'card' ? '1px solid var(--gray-200)' : layout.preview.partyStyle === 'grid-border' ? '1px solid var(--gray-200)' : 'none',
-                      }}>
-                        <div style={{ width: '50%', height: 3, background: 'var(--gray-300)', borderRadius: 1, margin: '4px 4px' }} />
-                        <div style={{ width: '35%', height: 2, background: 'var(--gray-200)', borderRadius: 1, margin: '2px 4px' }} />
-                      </div>
-                    </div>
-                    {/* Mini table */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                      <div style={{ height: 3, background: 'var(--gray-200)', borderRadius: 1 }} />
-                      <div style={{ height: 2, background: 'var(--gray-100)', borderRadius: 1, width: '90%' }} />
-                      <div style={{ height: 2, background: 'var(--gray-100)', borderRadius: 1, width: '75%' }} />
-                    </div>
-                    {/* Mini total */}
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 6 }}>
-                      <div style={{
-                        width: layout.preview.totalsStyle === 'compact' ? '35%' : layout.preview.totalsStyle === 'card' ? '45%' : '40%',
-                        height: layout.preview.totalsStyle === 'highlighted' ? 8 : 5,
-                        background: layout.preview.totalsStyle === 'highlighted' ? layout.accent : 'var(--gray-300)',
-                        borderRadius: 2,
-                        opacity: layout.preview.totalsStyle === 'highlighted' ? 0.7 : 1
-                      }} />
+                  {/* Mini realistic preview thumbnail */}
+                  <div style={{ background: selected ? `${layout.accent}06` : hovered ? `${layout.accent}04` : '#fff', borderBottom: `1px solid ${selected ? layout.accent + '30' : 'var(--gray-200)'}`, transition: 'background 0.2s', padding: 6, overflow: 'hidden' }}>
+                    <div style={{ transform: 'scale(0.52)', transformOrigin: 'top left', width: '192%', pointerEvents: 'none' }}>
+                      <InvoicePreview layout={layout} companyName={form.name} />
                     </div>
                   </div>
                   {/* Label */}
@@ -378,125 +482,25 @@ export default function Company() {
               );
             })}
           </div>
-          {/* Large hover preview popup */}
+          {/* Large hover preview popup - realistic invoice */}
           {hoveredLayout && (() => {
             const layout = invoiceLayouts.find(l => l.key === hoveredLayout);
             if (!layout) return null;
-            const isKorporatni = layout.key === 'korporatni';
-            const isMinimal = layout.key === 'minimalisticky';
-            const isElegant = layout.key === 'elegantni';
-            const isCompact = layout.key === 'kompaktni';
-            const bg = isKorporatni ? '#0f172a' : 'white';
-            const textColor = isKorporatni ? '#e2e8f0' : '#1e293b';
-            const mutedColor = isKorporatni ? '#94a3b8' : '#94a3b8';
-            const borderColor = isElegant ? '#e9d5ff' : isMinimal ? '#cbd5e1' : '#e2e8f0';
-            const accentColor = layout.accent;
-            const pad = isCompact ? 14 : 20;
             return (
               <div style={{
-                position: 'absolute', right: -340, top: 0, width: 320,
+                position: 'fixed', right: 40, top: '50%', transform: 'translateY(-50%)',
+                width: 380, maxHeight: '85vh', overflowY: 'auto',
                 background: 'white', borderRadius: 'var(--radius-lg)',
-                border: `2px solid ${accentColor}40`,
-                boxShadow: '0 20px 40px rgba(0,0,0,0.12), 0 4px 12px rgba(0,0,0,0.06)',
-                zIndex: 50, overflow: 'hidden', pointerEvents: 'none',
-                animation: 'fadeIn 0.2s ease-out',
+                border: `2px solid ${layout.accent}30`,
+                boxShadow: '0 25px 60px rgba(0,0,0,0.15), 0 8px 20px rgba(0,0,0,0.08)',
+                zIndex: 1000, overflow: 'hidden', pointerEvents: 'none',
+                animation: 'fadeIn 0.15s ease-out',
               }}>
-                <div style={{ padding: `4px ${pad}px 0`, fontSize: '0.65rem', fontWeight: 700, color: mutedColor, textTransform: 'uppercase', letterSpacing: '0.1em', background: 'var(--gray-50)', paddingTop: 8, paddingBottom: 6, borderBottom: `1px solid ${borderColor}` }}>
+                <div style={{ padding: '8px 16px', fontSize: '0.7rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <div style={{ width: 6, height: 6, borderRadius: '50%', background: layout.accent }} />
                   Náhled: {layout.name}
                 </div>
-                <div style={{ padding: pad, background: bg, fontSize: isCompact ? 9 : 10 }}>
-                  {/* Accent bar */}
-                  {!isKorporatni && !isMinimal && (
-                    <div style={{ height: isElegant ? 1.5 : isCompact ? 2 : 3, background: isElegant ? `linear-gradient(90deg, #c4b5fd, ${accentColor}, #c4b5fd)` : isCompact ? accentColor : `linear-gradient(90deg, ${accentColor}, #8b5cf6)`, borderRadius: isCompact ? 0 : 2, marginBottom: isCompact ? 8 : 12 }} />
-                  )}
-                  {/* Corporate dark header */}
-                  {isKorporatni && (
-                    <div style={{ background: '#0f172a', margin: `0 -${pad}px`, padding: `10px ${pad}px 8px`, marginBottom: 10, marginTop: -pad }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                        <div>
-                          <div style={{ fontSize: 7, fontWeight: 800, color: '#e2e8f0', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Faktura</div>
-                          <div style={{ fontSize: isCompact ? 13 : 16, fontWeight: 800, color: '#ffffff' }}>FV-2026-001</div>
-                        </div>
-                        <div style={{ textAlign: 'right' }}>
-                          <div style={{ width: 50, height: 14, background: 'rgba(255,255,255,0.15)', borderRadius: 3, marginBottom: 3 }} />
-                          <div style={{ fontSize: 7, color: '#94a3b8' }}>Firma s.r.o.</div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  {/* Standard header */}
-                  {!isKorporatni && (
-                    <div style={{ display: 'flex', justifyContent: isElegant ? 'center' : 'space-between', alignItems: isElegant ? 'center' : 'flex-start', marginBottom: isCompact ? 8 : 12, flexDirection: isElegant ? 'column' : 'row' }}>
-                      <div style={{ textAlign: isElegant ? 'center' : 'left' }}>
-                        <div style={{ fontSize: isMinimal ? 6 : 7, fontWeight: isMinimal ? 600 : 800, color: isMinimal ? '#1e293b' : accentColor, textTransform: 'uppercase', letterSpacing: isMinimal ? '0.15em' : '0.08em' }}>Faktura</div>
-                        <div style={{ fontSize: isElegant ? 18 : isCompact ? 13 : 16, fontWeight: isElegant ? 300 : isMinimal ? 400 : 800, color: isElegant ? '#1e1b4b' : textColor }}>FV-2026-001</div>
-                      </div>
-                      {!isElegant && (
-                        <div style={{ textAlign: 'right' }}>
-                          <div style={{ fontSize: isCompact ? 8 : 10, fontWeight: 700, color: textColor }}>{form.name || 'Firma s.r.o.'}</div>
-                          <div style={{ fontSize: 7, color: mutedColor }}>IČ: 12345678</div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  {/* Parties */}
-                  <div style={{
-                    display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0, marginBottom: isCompact ? 6 : 10,
-                    border: `1px solid ${borderColor}`, borderRadius: isElegant ? 10 : isMinimal ? 0 : isCompact ? 4 : 6,
-                    borderLeft: isMinimal ? 'none' : undefined, borderRight: isMinimal ? 'none' : undefined,
-                    overflow: 'hidden',
-                  }}>
-                    <div style={{ padding: isCompact ? '5px 7px' : '7px 9px', borderRight: isMinimal ? 'none' : `1px solid ${borderColor}` }}>
-                      <div style={{ fontSize: 6, fontWeight: 700, color: isElegant ? accentColor : mutedColor, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>Dodavatel</div>
-                      <div style={{ fontSize: isCompact ? 7 : 8, fontWeight: 700, color: textColor }}>{form.name || 'Firma s.r.o.'}</div>
-                      <div style={{ fontSize: 6, color: mutedColor }}>IČ: 12345678</div>
-                    </div>
-                    <div style={{ padding: isCompact ? '5px 7px' : '7px 9px' }}>
-                      <div style={{ fontSize: 6, fontWeight: 700, color: isElegant ? accentColor : mutedColor, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>Odběratel</div>
-                      <div style={{ fontSize: isCompact ? 7 : 8, fontWeight: 700, color: textColor }}>Klient a.s.</div>
-                      <div style={{ fontSize: 6, color: mutedColor }}>IČ: 87654321</div>
-                    </div>
-                  </div>
-                  {/* Items table */}
-                  <div style={{ marginBottom: isCompact ? 6 : 10 }}>
-                    <div style={{
-                      display: 'flex', justifyContent: 'space-between', padding: '3px 5px', fontSize: 6, fontWeight: 700,
-                      background: isKorporatni ? '#0f172a' : isElegant ? '#faf5ff' : isCompact ? '#f0fdf4' : '#f8fafc',
-                      color: isKorporatni ? '#e2e8f0' : isElegant ? '#7c3aed' : isMinimal ? '#1e293b' : isCompact ? '#059669' : '#94a3b8',
-                      borderBottom: isMinimal ? '1px solid #1e293b' : `1px solid ${borderColor}`, textTransform: 'uppercase', letterSpacing: '0.05em',
-                    }}>
-                      <span>Popis</span><span>Celkem</span>
-                    </div>
-                    {[{ name: 'Webový design', price: '25 000' }, { name: 'SEO optimalizace', price: '8 500' }, { name: 'Hosting 12 měs.', price: '3 600' }].map((item, i) => (
-                      <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 5px', fontSize: isCompact ? 6 : 7, color: textColor === '#e2e8f0' ? '#cbd5e1' : '#475569', borderBottom: `1px solid ${isElegant ? '#f3e8ff' : isKorporatni ? '#1e293b' : '#f1f5f9'}` }}>
-                        <span>{item.name}</span><span style={{ fontVariantNumeric: 'tabular-nums' }}>{item.price} Kč</span>
-                      </div>
-                    ))}
-                  </div>
-                  {/* Totals */}
-                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                    <div style={{ width: '55%' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 6, color: mutedColor, marginBottom: 2 }}>
-                        <span>Základ</span><span>37 100 Kč</span>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 6, color: mutedColor, marginBottom: 3 }}>
-                        <span>DPH 21%</span><span>7 791 Kč</span>
-                      </div>
-                      <div style={{
-                        display: 'flex', justifyContent: 'space-between', fontSize: isCompact ? 9 : 11, fontWeight: 800,
-                        color: isElegant ? '#1e1b4b' : isKorporatni ? '#ffffff' : textColor,
-                        borderTop: `2px solid ${isElegant ? '#7c3aed' : isKorporatni ? '#e2e8f0' : isMinimal ? '#1e293b' : textColor}`,
-                        paddingTop: 3, marginTop: 2,
-                      }}>
-                        <span>Celkem</span><span>44 891 Kč</span>
-                      </div>
-                    </div>
-                  </div>
-                  {/* Bottom accent */}
-                  {!isKorporatni && !isMinimal && (
-                    <div style={{ height: isElegant ? 1 : 2, background: isCompact ? accentColor : isElegant ? `linear-gradient(90deg, #c4b5fd, ${accentColor}, #c4b5fd)` : `linear-gradient(90deg, ${accentColor}, #8b5cf6)`, borderRadius: 1, marginTop: isCompact ? 8 : 12, opacity: 0.5 }} />
-                  )}
-                </div>
+                <InvoicePreview layout={layout} companyName={form.name} />
               </div>
             );
           })()}
