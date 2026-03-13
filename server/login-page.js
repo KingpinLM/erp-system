@@ -14,40 +14,36 @@ module.exports = function getLoginPage(error) {
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; display: flex; align-items: center; justify-content: center; overflow: hidden; background: #0a0f1e; -webkit-font-smoothing: antialiased; }
     /* CSS animated orbs as visible layer behind glass */
-    .orb {
-      position: fixed; border-radius: 50%; filter: blur(80px); opacity: 0.55; z-index: 0; pointer-events: none;
+    .bg-animated {
+      position: fixed; inset: 0; z-index: 0; overflow: hidden;
     }
-    .orb-1 { width: 500px; height: 500px; background: #0d9488; top: -10%; left: -5%; animation: orbFloat1 14s ease-in-out infinite; }
-    .orb-2 { width: 400px; height: 400px; background: #0891b2; top: 10%; right: -10%; animation: orbFloat2 18s ease-in-out infinite; }
-    .orb-3 { width: 450px; height: 450px; background: #7c3aed; bottom: -15%; left: 30%; animation: orbFloat3 20s ease-in-out infinite; }
-    .orb-4 { width: 350px; height: 350px; background: #2dd4bf; bottom: 10%; right: 10%; animation: orbFloat4 16s ease-in-out infinite; }
-    @keyframes orbFloat1 {
-      0%   { transform: translate(0, 0) scale(1); }
-      25%  { transform: translate(160px, 80px) scale(1.15); }
-      50%  { transform: translate(100px, 200px) scale(0.95); }
-      75%  { transform: translate(-60px, 120px) scale(1.1); }
-      100% { transform: translate(0, 0) scale(1); }
+    .bg-animated::before {
+      content: ''; position: absolute; width: 200%; height: 200%; top: -50%; left: -50%;
+      background:
+        radial-gradient(circle at 20% 30%, rgba(13,148,136,0.4) 0%, transparent 40%),
+        radial-gradient(circle at 80% 20%, rgba(8,145,178,0.35) 0%, transparent 40%),
+        radial-gradient(circle at 50% 80%, rgba(124,58,237,0.3) 0%, transparent 40%),
+        radial-gradient(circle at 30% 70%, rgba(45,212,191,0.3) 0%, transparent 35%),
+        radial-gradient(circle at 70% 60%, rgba(6,182,212,0.25) 0%, transparent 35%);
+      animation: bgDrift 20s ease-in-out infinite alternate;
+      will-change: transform;
     }
-    @keyframes orbFloat2 {
-      0%   { transform: translate(0, 0) scale(1); }
-      25%  { transform: translate(-140px, 100px) scale(1.1); }
-      50%  { transform: translate(-80px, -120px) scale(1.2); }
-      75%  { transform: translate(60px, -60px) scale(0.9); }
-      100% { transform: translate(0, 0) scale(1); }
+    .bg-animated::after {
+      content: ''; position: absolute; width: 200%; height: 200%; top: -50%; left: -50%;
+      background:
+        radial-gradient(circle at 60% 40%, rgba(13,148,136,0.3) 0%, transparent 35%),
+        radial-gradient(circle at 30% 60%, rgba(124,58,237,0.25) 0%, transparent 40%),
+        radial-gradient(circle at 80% 70%, rgba(45,212,191,0.3) 0%, transparent 35%);
+      animation: bgDrift2 25s ease-in-out infinite alternate;
+      will-change: transform;
     }
-    @keyframes orbFloat3 {
-      0%   { transform: translate(0, 0) scale(1); }
-      25%  { transform: translate(120px, -100px) scale(1.2); }
-      50%  { transform: translate(-100px, -60px) scale(1.05); }
-      75%  { transform: translate(-160px, 80px) scale(1.15); }
-      100% { transform: translate(0, 0) scale(1); }
+    @keyframes bgDrift {
+      0%   { transform: translate(0%, 0%) rotate(0deg); }
+      100% { transform: translate(10%, 8%) rotate(30deg); }
     }
-    @keyframes orbFloat4 {
-      0%   { transform: translate(0, 0) scale(1); }
-      25%  { transform: translate(-100px, -140px) scale(1.15); }
-      50%  { transform: translate(80px, -80px) scale(0.95); }
-      75%  { transform: translate(140px, 60px) scale(1.1); }
-      100% { transform: translate(0, 0) scale(1); }
+    @keyframes bgDrift2 {
+      0%   { transform: translate(0%, 0%) rotate(0deg); }
+      100% { transform: translate(-8%, 6%) rotate(-20deg); }
     }
 
     .login-container {
@@ -163,10 +159,7 @@ module.exports = function getLoginPage(error) {
   </style>
 </head>
 <body>
-  <div class="orb orb-1"></div>
-  <div class="orb orb-2"></div>
-  <div class="orb orb-3"></div>
-  <div class="orb orb-4"></div>
+  <div class="bg-animated"></div>
 
   <div class="login-container">
     <div class="brand">
