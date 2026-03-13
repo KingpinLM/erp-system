@@ -136,6 +136,13 @@ export const api = {
   deleteRole: (id) => request(`/roles/${id}`, { method: 'DELETE' }),
   updateUserRole: (id, role) => request(`/users/${id}/role`, { method: 'PATCH', body: JSON.stringify({ role }) }),
 
+  // User Groups
+  getUserGroups: () => request('/user-groups'),
+  createUserGroup: (data) => request('/user-groups', { method: 'POST', body: JSON.stringify(data) }),
+  updateUserGroup: (id, data) => request(`/user-groups/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteUserGroup: (id) => request(`/user-groups/${id}`, { method: 'DELETE' }),
+  setGroupMembers: (id, user_ids) => request(`/user-groups/${id}/members`, { method: 'POST', body: JSON.stringify({ user_ids }) }),
+
   // Company
   getCompany: () => request('/company'),
   updateCompany: (data) => request('/company', { method: 'PUT', body: JSON.stringify(data) }),

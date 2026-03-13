@@ -382,6 +382,27 @@ db.exec(`
   );
 `);
 
+// ─── USER GROUPS ─────────────────────────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS user_groups (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tenant_id INTEGER NOT NULL REFERENCES tenants(id),
+    name TEXT NOT NULL,
+    description TEXT,
+    permissions TEXT DEFAULT '[]',
+    color TEXT DEFAULT '#6366f1',
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(tenant_id, name)
+  );
+
+  CREATE TABLE IF NOT EXISTS user_group_members (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    group_id INTEGER NOT NULL REFERENCES user_groups(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE(group_id, user_id)
+  );
+`);
+
 // ─── MIGRATIONS ──────────────────────────────────────────
 const safeAlter = (sql) => { try { db.exec(sql); } catch (e) { /* already exists */ } };
 

@@ -41,6 +41,12 @@ export default function Users() {
   const [editingRole, setEditingRole] = useState(null);
   const [roleForm, setRoleForm] = useState({ name: '', description: '', base_role: 'viewer', permissions: [] });
   const [roleAssignUser, setRoleAssignUser] = useState(null);
+  const [groups, setGroups] = useState([]);
+  const [showGroupModal, setShowGroupModal] = useState(false);
+  const [editingGroup, setEditingGroup] = useState(null);
+  const [groupForm, setGroupForm] = useState({ name: '', description: '', permissions: [], color: '#6366f1' });
+  const [showGroupMembers, setShowGroupMembers] = useState(null);
+  const [groupMemberIds, setGroupMemberIds] = useState([]);
   const { can } = useAuth();
 
   const load = () => {
@@ -54,7 +60,11 @@ export default function Users() {
     api.getRoles().then(setRoles).catch(() => {});
   };
 
-  useEffect(() => { load(); loadRoles(); }, []);
+  const loadGroups = () => {
+    api.getUserGroups().then(setGroups).catch(() => {});
+  };
+
+  useEffect(() => { load(); loadRoles(); loadGroups(); }, []);
 
   const openNew = () => { setEditing(null); setForm({ username: '', email: '', password: '', first_name: '', last_name: '', role: 'viewer', active: 1 }); setError(''); setShowModal(true); };
   const openEdit = (u) => {
@@ -126,6 +136,56 @@ export default function Users() {
     }
   };
 
+  const openNewGroup = () => {
+    setEditingGroup(null);
+    setGroupForm({ name: '', description: '', permissions: [], color: '#6366f1' });
+    setError('');
+    setShowGroupModal(true);
+  };
+
+  const openEditGroup = (group) => {
+    setEditingGroup(group);
+    setGroupForm({ name: group.name, description: group.description || '', permissions: group.permissions || [], color: group.color || '#6366f1' });
+    setError('');
+    setShowGroupModal(true);
+  };
+
+  const handleGroupSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    try {
+      if (editingGroup) {
+        await api.updateUserGroup(editingGroup.id, groupForm);
+      } else {
+        await api.createUserGroup(groupForm);
+      }
+      setShowGroupModal(false);
+      loadGroups();
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const openGroupMembers = (group) => {
+    setShowGroupMembers(group);
+    setGroupMemberIds((group.members || []).map(m => m.user_id));
+  };
+
+  const saveGroupMembers = async () => {
+    await api.setGroupMembers(showGroupMembers.id, groupMemberIds);
+    setShowGroupMembers(null);
+    loadGroups();
+  };
+
+  const toggleGroupPermission = (key) => {
+    setGroupForm(f => ({
+      ...f,
+      permissions: f.permissions.includes(key) ? f.permissions.filter(p => p !== key) : [...f.permissions, key]
+    }));
+  };
+
+  const groupColors = ['#6366f1', '#059669', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#0f172a'];
+
   const permissionGroups = [...new Set(allPermissions.map(p => p.group))];
 
   return (
@@ -135,6 +195,7 @@ export default function Users() {
         <div className="btn-group">
           {activeTab === 'users' && <button className="btn btn-primary" onClick={openNew}>+ Nový uživatel</button>}
           {activeTab === 'roles' && <button className="btn btn-primary" onClick={openNewRole}>+ Nová role</button>}
+          {activeTab === 'groups' && <button className="btn btn-primary" onClick={openNewGroup}>+ Nová skupina</button>}
         </div>
       </div>
 
@@ -161,6 +222,18 @@ export default function Users() {
               marginBottom: -1, transition: 'all 0.15s'
             }}
           >Role a oprávnění</button>
+        )}
+        {can('admin') && (
+          <button
+            onClick={() => setActiveTab('groups')}
+            style={{
+              padding: '0.75rem 1.25rem', border: 'none', background: 'none',
+              fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+              color: activeTab === 'groups' ? 'var(--primary)' : 'var(--gray-500)',
+              borderBottom: activeTab === 'groups' ? '2px solid var(--primary)' : '2px solid transparent',
+              marginBottom: -1, transition: 'all 0.15s'
+            }}
+          >Skupiny</button>
         )}
       </div>
 
@@ -347,6 +420,196 @@ export default function Users() {
             )}
           </div>
         </>
+      )}
+
+      {/* === GROUPS TAB === */}
+      {activeTab === 'groups' && can('admin') && (
+        <>
+          <div className="card">
+            <div className="card-header">
+              <div className="card-title">Skupiny uživatelů</div>
+            </div>
+            <p style={{ fontSize: '0.85rem', color: 'var(--gray-500)', marginBottom: '1rem' }}>
+              Vytvářejte skupiny uživatelů se sdílenými oprávněními. Oprávnění skupiny se přidají ke stávajícím oprávněním uživatele.
+            </p>
+            {groups.length === 0 ? (
+              <div className="empty-state" style={{ padding: '2rem' }}>
+                <div style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--gray-400)" strokeWidth="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                </div>
+                <div style={{ fontWeight: 600, color: 'var(--gray-700)' }}>Zatím žádné skupiny</div>
+                <div style={{ fontSize: '0.85rem', color: 'var(--gray-500)', marginBottom: '1rem' }}>Vytvořte skupinu pro sdílení oprávnění mezi uživateli.</div>
+                <button className="btn btn-primary" onClick={openNewGroup}>+ Vytvořit skupinu</button>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '0.75rem' }}>
+                {groups.map(group => (
+                  <div key={group.id} className="role-card" style={{ borderLeft: `4px solid ${group.color || '#6366f1'}` }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
+                      <div>
+                        <div style={{ fontWeight: 700, color: 'var(--gray-900)', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <div style={{ width: 10, height: 10, borderRadius: '50%', background: group.color || '#6366f1' }} />
+                          {group.name}
+                        </div>
+                        {group.description && <div style={{ fontSize: '0.8rem', color: 'var(--gray-500)', marginTop: 2 }}>{group.description}</div>}
+                      </div>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--gray-400)', whiteSpace: 'nowrap' }}>
+                        {(group.members || []).length} členů
+                      </span>
+                    </div>
+                    {/* Permissions badges */}
+                    {(group.permissions || []).length > 0 && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem', marginBottom: '0.5rem' }}>
+                        {(group.permissions || []).map(perm => {
+                          const p = allPermissions.find(ap => ap.key === perm);
+                          return p ? (
+                            <span key={perm} style={{
+                              fontSize: '0.6rem', padding: '0.1rem 0.35rem', borderRadius: 4,
+                              background: `${group.color || '#6366f1'}15`, color: group.color || '#6366f1', fontWeight: 600
+                            }}>{p.label}</span>
+                          ) : null;
+                        })}
+                      </div>
+                    )}
+                    {/* Members avatars */}
+                    {(group.members || []).length > 0 && (
+                      <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap', marginBottom: '0.5rem' }}>
+                        {(group.members || []).slice(0, 6).map(m => (
+                          <span key={m.user_id} style={{
+                            fontSize: '0.65rem', padding: '0.15rem 0.4rem', borderRadius: 6,
+                            background: 'var(--gray-100)', color: 'var(--gray-600)', fontWeight: 500
+                          }}>{m.full_name || m.username}</span>
+                        ))}
+                        {(group.members || []).length > 6 && (
+                          <span style={{ fontSize: '0.65rem', color: 'var(--gray-400)', alignSelf: 'center' }}>+{group.members.length - 6}</span>
+                        )}
+                      </div>
+                    )}
+                    <div className="btn-group">
+                      <button className="btn btn-outline btn-sm" onClick={() => openGroupMembers(group)}>Členové</button>
+                      <button className="btn btn-outline btn-sm" onClick={() => openEditGroup(group)}>Upravit</button>
+                      <button className="btn btn-danger btn-sm" onClick={async () => {
+                        if (confirm(`Smazat skupinu "${group.name}"?`)) {
+                          await api.deleteUserGroup(group.id);
+                          loadGroups();
+                        }
+                      }}>Smazat</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* Group modal */}
+      {showGroupModal && (
+        <div className="modal-overlay" onClick={() => setShowGroupModal(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 650 }}>
+            <div className="modal-header">
+              <h3 className="modal-title">{editingGroup ? 'Upravit skupinu' : 'Nová skupina'}</h3>
+              <button className="modal-close" onClick={() => setShowGroupModal(false)}>&times;</button>
+            </div>
+            {error && <div className="login-error">{error}</div>}
+            <form onSubmit={handleGroupSubmit}>
+              <div className="form-group">
+                <label className="form-label">Název skupiny *</label>
+                <input className="form-input" value={groupForm.name} onChange={e => setGroupForm(f => ({ ...f, name: e.target.value }))} required placeholder="např. Fakturanti, Správci banky" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Popis</label>
+                <input className="form-input" value={groupForm.description} onChange={e => setGroupForm(f => ({ ...f, description: e.target.value }))} placeholder="Volitelný popis skupiny" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Barva</label>
+                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                  {groupColors.map(c => (
+                    <div key={c} onClick={() => setGroupForm(f => ({ ...f, color: c }))}
+                      style={{
+                        width: 28, height: 28, borderRadius: 8, background: c, cursor: 'pointer',
+                        border: groupForm.color === c ? '3px solid var(--gray-900)' : '3px solid transparent',
+                        transition: 'all 0.15s', transform: groupForm.color === c ? 'scale(1.15)' : 'none',
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+              <div className="form-group">
+                <label className="form-label" style={{ marginBottom: '0.75rem' }}>Oprávnění skupiny</label>
+                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                  <button type="button" className="btn btn-outline btn-sm" onClick={() => setGroupForm(f => ({ ...f, permissions: allPermissions.map(p => p.key) }))}>Vybrat vše</button>
+                  <button type="button" className="btn btn-outline btn-sm" onClick={() => setGroupForm(f => ({ ...f, permissions: [] }))}>Zrušit vše</button>
+                </div>
+                {permissionGroups.map(group => (
+                  <div key={group} style={{ marginBottom: '0.75rem' }}>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.4rem' }}>{group}</div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
+                      {allPermissions.filter(p => p.group === group).map(perm => (
+                        <label key={perm.key} className="perm-toggle" style={{
+                          background: groupForm.permissions.includes(perm.key) ? `${groupForm.color}15` : 'var(--gray-50)',
+                          border: `1px solid ${groupForm.permissions.includes(perm.key) ? groupForm.color : 'var(--gray-200)'}`,
+                          borderRadius: 8, transition: 'all 0.15s ease'
+                        }}>
+                          <input type="checkbox" checked={groupForm.permissions.includes(perm.key)}
+                            onChange={() => toggleGroupPermission(perm.key)}
+                            style={{ width: 16, height: 16, accentColor: groupForm.color }}
+                          />
+                          <span style={{ fontSize: '0.8rem', fontWeight: 500, color: groupForm.permissions.includes(perm.key) ? 'var(--gray-800)' : 'var(--gray-600)' }}>
+                            {perm.label}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="btn-group" style={{ marginTop: '0.5rem' }}>
+                <button type="submit" className="btn btn-primary">{editingGroup ? 'Uložit' : 'Vytvořit skupinu'}</button>
+                <button type="button" className="btn btn-outline" onClick={() => setShowGroupModal(false)}>Zrušit</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Group members modal */}
+      {showGroupMembers && (
+        <div className="modal-overlay" onClick={() => setShowGroupMembers(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 500 }}>
+            <div className="modal-header">
+              <h3 className="modal-title">Členové: {showGroupMembers.name}</h3>
+              <button className="modal-close" onClick={() => setShowGroupMembers(null)}>&times;</button>
+            </div>
+            <p style={{ fontSize: '0.85rem', color: 'var(--gray-500)', marginBottom: '1rem' }}>
+              Vyberte uživatele, kteří budou součástí této skupiny. Oprávnění skupiny se přidají k jejich stávajícím oprávněním.
+            </p>
+            <div style={{ maxHeight: 400, overflowY: 'auto' }}>
+              {users.map(u => (
+                <label key={u.id} style={{
+                  display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.5rem 0.75rem',
+                  borderRadius: 8, cursor: 'pointer', marginBottom: '0.25rem',
+                  background: groupMemberIds.includes(u.id) ? `${showGroupMembers.color || '#6366f1'}10` : 'transparent',
+                  border: `1px solid ${groupMemberIds.includes(u.id) ? (showGroupMembers.color || '#6366f1') + '40' : 'transparent'}`,
+                  transition: 'all 0.15s',
+                }}>
+                  <input type="checkbox" checked={groupMemberIds.includes(u.id)}
+                    onChange={() => setGroupMemberIds(ids => ids.includes(u.id) ? ids.filter(id => id !== u.id) : [...ids, u.id])}
+                    style={{ width: 18, height: 18, accentColor: showGroupMembers.color || '#6366f1' }}
+                  />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--gray-900)' }}>{u.full_name}</div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--gray-500)' }}>{u.username} · {roleLabels[u.role]}</div>
+                  </div>
+                </label>
+              ))}
+            </div>
+            <div className="btn-group" style={{ marginTop: '1rem' }}>
+              <button className="btn btn-primary" onClick={saveGroupMembers}>Uložit ({groupMemberIds.length} vybraných)</button>
+              <button className="btn btn-outline" onClick={() => setShowGroupMembers(null)}>Zrušit</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* User modal */}

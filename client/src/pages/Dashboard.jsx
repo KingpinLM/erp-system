@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { BarChart, Bar, LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { api } from '../api';
 import { useAuth } from '../App';
 
@@ -292,7 +292,7 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Main chart */}
+          {/* Main chart - Bar */}
           <div className="dash-card dash-card-chart">
             <div className="dash-card-head">
               <div>
@@ -305,24 +305,24 @@ export default function Dashboard() {
               </div>
             </div>
             <ResponsiveContainer width="100%" height={340}>
-              <AreaChart data={monthlyData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+              <BarChart data={monthlyData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }} barGap={2}>
                 <defs>
-                  <linearGradient id="gradIncome" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#6366f1" stopOpacity={0.3} />
-                    <stop offset="100%" stopColor="#6366f1" stopOpacity={0.02} />
+                  <linearGradient id="gradBarIncome" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#818cf8" />
+                    <stop offset="100%" stopColor="#6366f1" />
                   </linearGradient>
-                  <linearGradient id="gradExpense" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#f43f5e" stopOpacity={0.2} />
-                    <stop offset="100%" stopColor="#f43f5e" stopOpacity={0.02} />
+                  <linearGradient id="gradBarExpense" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#fb7185" />
+                    <stop offset="100%" stopColor="#f43f5e" />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--gray-200)" vertical={false} />
                 <XAxis dataKey="name" fontSize={12} tick={{ fill: 'var(--gray-500)' }} axisLine={false} tickLine={false} />
                 <YAxis fontSize={12} tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} tick={{ fill: 'var(--gray-500)' }} axisLine={false} tickLine={false} />
                 <Tooltip content={<CustomTooltip />} />
-                <Area type="monotone" dataKey="issued" name="Příjmy" stroke="#6366f1" strokeWidth={2.5} fill="url(#gradIncome)" dot={false} activeDot={{ r: 6, strokeWidth: 2, fill: '#fff', stroke: '#6366f1' }} />
-                <Area type="monotone" dataKey="expenses" name="Výdaje" stroke="#f43f5e" strokeWidth={2.5} fill="url(#gradExpense)" dot={false} activeDot={{ r: 6, strokeWidth: 2, fill: '#fff', stroke: '#f43f5e' }} />
-              </AreaChart>
+                <Bar dataKey="issued" name="Příjmy" fill="url(#gradBarIncome)" radius={[6, 6, 0, 0]} barSize={24} />
+                <Bar dataKey="expenses" name="Výdaje" fill="url(#gradBarExpense)" radius={[6, 6, 0, 0]} barSize={24} />
+              </BarChart>
             </ResponsiveContainer>
           </div>
 
@@ -532,23 +532,29 @@ export default function Dashboard() {
       {/* === REPORTS === */}
       {tab === 'reports' && (
         <div className="dash-content dash-fade-in">
-          {/* Revenue & Expenses area chart */}
+          {/* Revenue & Expenses bar chart */}
           <div className="dash-card dash-card-chart">
             <div className="dash-card-head">
               <div>
                 <h3 className="dash-card-title">Příjmy vs. Výdaje</h3>
                 <span className="dash-card-desc">{chartYear ? `Rok ${chartYear}` : 'Měsíční porovnání'}</span>
               </div>
+              <div className="dash-legend">
+                <span className="dash-legend-item"><span className="dash-legend-dot" style={{ background: '#6366f1' }} /> Příjmy</span>
+                <span className="dash-legend-item"><span className="dash-legend-dot" style={{ background: '#f43f5e' }} /> Výdaje</span>
+                <span className="dash-legend-item"><span className="dash-legend-dot" style={{ background: '#10b981' }} /> Zisk</span>
+              </div>
             </div>
             <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={monthlyData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+              <BarChart data={monthlyData.map(d => ({ ...d, profit: d.issued - d.expenses }))} margin={{ top: 10, right: 10, left: 0, bottom: 0 }} barGap={1}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--gray-200)" vertical={false} />
                 <XAxis dataKey="name" fontSize={12} tick={{ fill: 'var(--gray-500)' }} axisLine={false} tickLine={false} />
                 <YAxis fontSize={12} tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} tick={{ fill: 'var(--gray-500)' }} axisLine={false} tickLine={false} />
                 <Tooltip content={<CustomTooltip />} />
-                <Line type="monotone" dataKey="issued" name="Příjmy" stroke="#6366f1" strokeWidth={2.5} dot={{ r: 4, fill: '#fff', stroke: '#6366f1', strokeWidth: 2 }} activeDot={{ r: 7 }} />
-                <Line type="monotone" dataKey="expenses" name="Výdaje" stroke="#f43f5e" strokeWidth={2.5} dot={{ r: 4, fill: '#fff', stroke: '#f43f5e', strokeWidth: 2 }} activeDot={{ r: 7 }} />
-              </LineChart>
+                <Bar dataKey="issued" name="Příjmy" fill="#6366f1" radius={[4, 4, 0, 0]} barSize={18} />
+                <Bar dataKey="expenses" name="Výdaje" fill="#f43f5e" radius={[4, 4, 0, 0]} barSize={18} />
+                <Bar dataKey="profit" name="Zisk" fill="#10b981" radius={[4, 4, 0, 0]} barSize={18} />
+              </BarChart>
             </ResponsiveContainer>
           </div>
 

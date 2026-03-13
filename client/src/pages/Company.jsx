@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../api';
 
 const invoiceLayouts = [
@@ -63,6 +63,8 @@ export default function Company() {
   });
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(false);
+  const [hoveredLayout, setHoveredLayout] = useState(null);
+  const hoverRef = useRef(null);
 
   useEffect(() => {
     api.getCompany().then(data => {
@@ -270,25 +272,28 @@ export default function Company() {
             </div>
           </div>
         </div>
-        <div className="card">
+        <div className="card" style={{ position: 'relative' }}>
           <div className="card-title" style={{ marginBottom: '0.5rem' }}>Vzhled faktury</div>
-          <p style={{ fontSize: '0.8rem', color: 'var(--gray-500)', marginBottom: '1.25rem' }}>Zvolte layout, který se použije při zobrazení a tisku faktur.</p>
+          <p style={{ fontSize: '0.8rem', color: 'var(--gray-500)', marginBottom: '1.25rem' }}>Zvolte layout, který se použije při zobrazení a tisku faktur. Najeďte myší pro náhled.</p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.75rem' }}>
             {invoiceLayouts.map(layout => {
               const selected = (form.invoice_layout || 'klasicky') === layout.key;
+              const hovered = hoveredLayout === layout.key;
               return (
                 <div key={layout.key}
                   onClick={() => setForm(f => ({ ...f, invoice_layout: layout.key }))}
+                  onMouseEnter={(e) => { setHoveredLayout(layout.key); hoverRef.current = e.currentTarget; }}
+                  onMouseLeave={() => setHoveredLayout(null)}
                   style={{
-                    border: selected ? `2px solid ${layout.accent}` : '2px solid var(--gray-200)',
+                    border: selected ? `2px solid ${layout.accent}` : hovered ? `2px solid ${layout.accent}80` : '2px solid var(--gray-200)',
                     borderRadius: 'var(--radius-lg)', padding: 0, cursor: 'pointer',
                     transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)', overflow: 'hidden',
-                    boxShadow: selected ? `0 4px 16px ${layout.accent}20` : 'none',
-                    transform: selected ? 'translateY(-2px)' : 'none',
+                    boxShadow: selected ? `0 4px 16px ${layout.accent}20` : hovered ? `0 4px 12px ${layout.accent}15` : 'none',
+                    transform: selected ? 'translateY(-2px)' : hovered ? 'translateY(-3px) scale(1.02)' : 'none',
                   }}
                 >
                   {/* Mini preview */}
-                  <div style={{ padding: '12px 14px 10px', background: selected ? `${layout.accent}08` : 'var(--gray-50)', borderBottom: `1px solid ${selected ? layout.accent + '30' : 'var(--gray-200)'}` }}>
+                  <div style={{ padding: '12px 14px 10px', background: selected ? `${layout.accent}08` : hovered ? `${layout.accent}05` : 'var(--gray-50)', borderBottom: `1px solid ${selected ? layout.accent + '30' : 'var(--gray-200)'}`, transition: 'background 0.2s' }}>
                     {layout.preview.accentType === 'gradient-bar' && (
                       <div style={{ height: 3, background: `linear-gradient(90deg, ${layout.accent}, #8b5cf6)`, borderRadius: 2, marginBottom: 8 }} />
                     )}
@@ -373,6 +378,128 @@ export default function Company() {
               );
             })}
           </div>
+          {/* Large hover preview popup */}
+          {hoveredLayout && (() => {
+            const layout = invoiceLayouts.find(l => l.key === hoveredLayout);
+            if (!layout) return null;
+            const isKorporatni = layout.key === 'korporatni';
+            const isMinimal = layout.key === 'minimalisticky';
+            const isElegant = layout.key === 'elegantni';
+            const isCompact = layout.key === 'kompaktni';
+            const bg = isKorporatni ? '#0f172a' : 'white';
+            const textColor = isKorporatni ? '#e2e8f0' : '#1e293b';
+            const mutedColor = isKorporatni ? '#94a3b8' : '#94a3b8';
+            const borderColor = isElegant ? '#e9d5ff' : isMinimal ? '#cbd5e1' : '#e2e8f0';
+            const accentColor = layout.accent;
+            const pad = isCompact ? 14 : 20;
+            return (
+              <div style={{
+                position: 'absolute', right: -340, top: 0, width: 320,
+                background: 'white', borderRadius: 'var(--radius-lg)',
+                border: `2px solid ${accentColor}40`,
+                boxShadow: '0 20px 40px rgba(0,0,0,0.12), 0 4px 12px rgba(0,0,0,0.06)',
+                zIndex: 50, overflow: 'hidden', pointerEvents: 'none',
+                animation: 'fadeIn 0.2s ease-out',
+              }}>
+                <div style={{ padding: `4px ${pad}px 0`, fontSize: '0.65rem', fontWeight: 700, color: mutedColor, textTransform: 'uppercase', letterSpacing: '0.1em', background: 'var(--gray-50)', paddingTop: 8, paddingBottom: 6, borderBottom: `1px solid ${borderColor}` }}>
+                  Náhled: {layout.name}
+                </div>
+                <div style={{ padding: pad, background: bg, fontSize: isCompact ? 9 : 10 }}>
+                  {/* Accent bar */}
+                  {!isKorporatni && !isMinimal && (
+                    <div style={{ height: isElegant ? 1.5 : isCompact ? 2 : 3, background: isElegant ? `linear-gradient(90deg, #c4b5fd, ${accentColor}, #c4b5fd)` : isCompact ? accentColor : `linear-gradient(90deg, ${accentColor}, #8b5cf6)`, borderRadius: isCompact ? 0 : 2, marginBottom: isCompact ? 8 : 12 }} />
+                  )}
+                  {/* Corporate dark header */}
+                  {isKorporatni && (
+                    <div style={{ background: '#0f172a', margin: `0 -${pad}px`, padding: `10px ${pad}px 8px`, marginBottom: 10, marginTop: -pad }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <div>
+                          <div style={{ fontSize: 7, fontWeight: 800, color: '#e2e8f0', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Faktura</div>
+                          <div style={{ fontSize: isCompact ? 13 : 16, fontWeight: 800, color: '#ffffff' }}>FV-2026-001</div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ width: 50, height: 14, background: 'rgba(255,255,255,0.15)', borderRadius: 3, marginBottom: 3 }} />
+                          <div style={{ fontSize: 7, color: '#94a3b8' }}>Firma s.r.o.</div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  {/* Standard header */}
+                  {!isKorporatni && (
+                    <div style={{ display: 'flex', justifyContent: isElegant ? 'center' : 'space-between', alignItems: isElegant ? 'center' : 'flex-start', marginBottom: isCompact ? 8 : 12, flexDirection: isElegant ? 'column' : 'row' }}>
+                      <div style={{ textAlign: isElegant ? 'center' : 'left' }}>
+                        <div style={{ fontSize: isMinimal ? 6 : 7, fontWeight: isMinimal ? 600 : 800, color: isMinimal ? '#1e293b' : accentColor, textTransform: 'uppercase', letterSpacing: isMinimal ? '0.15em' : '0.08em' }}>Faktura</div>
+                        <div style={{ fontSize: isElegant ? 18 : isCompact ? 13 : 16, fontWeight: isElegant ? 300 : isMinimal ? 400 : 800, color: isElegant ? '#1e1b4b' : textColor }}>FV-2026-001</div>
+                      </div>
+                      {!isElegant && (
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontSize: isCompact ? 8 : 10, fontWeight: 700, color: textColor }}>{form.name || 'Firma s.r.o.'}</div>
+                          <div style={{ fontSize: 7, color: mutedColor }}>IČ: 12345678</div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {/* Parties */}
+                  <div style={{
+                    display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0, marginBottom: isCompact ? 6 : 10,
+                    border: `1px solid ${borderColor}`, borderRadius: isElegant ? 10 : isMinimal ? 0 : isCompact ? 4 : 6,
+                    borderLeft: isMinimal ? 'none' : undefined, borderRight: isMinimal ? 'none' : undefined,
+                    overflow: 'hidden',
+                  }}>
+                    <div style={{ padding: isCompact ? '5px 7px' : '7px 9px', borderRight: isMinimal ? 'none' : `1px solid ${borderColor}` }}>
+                      <div style={{ fontSize: 6, fontWeight: 700, color: isElegant ? accentColor : mutedColor, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>Dodavatel</div>
+                      <div style={{ fontSize: isCompact ? 7 : 8, fontWeight: 700, color: textColor }}>{form.name || 'Firma s.r.o.'}</div>
+                      <div style={{ fontSize: 6, color: mutedColor }}>IČ: 12345678</div>
+                    </div>
+                    <div style={{ padding: isCompact ? '5px 7px' : '7px 9px' }}>
+                      <div style={{ fontSize: 6, fontWeight: 700, color: isElegant ? accentColor : mutedColor, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>Odběratel</div>
+                      <div style={{ fontSize: isCompact ? 7 : 8, fontWeight: 700, color: textColor }}>Klient a.s.</div>
+                      <div style={{ fontSize: 6, color: mutedColor }}>IČ: 87654321</div>
+                    </div>
+                  </div>
+                  {/* Items table */}
+                  <div style={{ marginBottom: isCompact ? 6 : 10 }}>
+                    <div style={{
+                      display: 'flex', justifyContent: 'space-between', padding: '3px 5px', fontSize: 6, fontWeight: 700,
+                      background: isKorporatni ? '#0f172a' : isElegant ? '#faf5ff' : isCompact ? '#f0fdf4' : '#f8fafc',
+                      color: isKorporatni ? '#e2e8f0' : isElegant ? '#7c3aed' : isMinimal ? '#1e293b' : isCompact ? '#059669' : '#94a3b8',
+                      borderBottom: isMinimal ? '1px solid #1e293b' : `1px solid ${borderColor}`, textTransform: 'uppercase', letterSpacing: '0.05em',
+                    }}>
+                      <span>Popis</span><span>Celkem</span>
+                    </div>
+                    {[{ name: 'Webový design', price: '25 000' }, { name: 'SEO optimalizace', price: '8 500' }, { name: 'Hosting 12 měs.', price: '3 600' }].map((item, i) => (
+                      <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 5px', fontSize: isCompact ? 6 : 7, color: textColor === '#e2e8f0' ? '#cbd5e1' : '#475569', borderBottom: `1px solid ${isElegant ? '#f3e8ff' : isKorporatni ? '#1e293b' : '#f1f5f9'}` }}>
+                        <span>{item.name}</span><span style={{ fontVariantNumeric: 'tabular-nums' }}>{item.price} Kč</span>
+                      </div>
+                    ))}
+                  </div>
+                  {/* Totals */}
+                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    <div style={{ width: '55%' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 6, color: mutedColor, marginBottom: 2 }}>
+                        <span>Základ</span><span>37 100 Kč</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 6, color: mutedColor, marginBottom: 3 }}>
+                        <span>DPH 21%</span><span>7 791 Kč</span>
+                      </div>
+                      <div style={{
+                        display: 'flex', justifyContent: 'space-between', fontSize: isCompact ? 9 : 11, fontWeight: 800,
+                        color: isElegant ? '#1e1b4b' : isKorporatni ? '#ffffff' : textColor,
+                        borderTop: `2px solid ${isElegant ? '#7c3aed' : isKorporatni ? '#e2e8f0' : isMinimal ? '#1e293b' : textColor}`,
+                        paddingTop: 3, marginTop: 2,
+                      }}>
+                        <span>Celkem</span><span>44 891 Kč</span>
+                      </div>
+                    </div>
+                  </div>
+                  {/* Bottom accent */}
+                  {!isKorporatni && !isMinimal && (
+                    <div style={{ height: isElegant ? 1 : 2, background: isCompact ? accentColor : isElegant ? `linear-gradient(90deg, #c4b5fd, ${accentColor}, #c4b5fd)` : `linear-gradient(90deg, ${accentColor}, #8b5cf6)`, borderRadius: 1, marginTop: isCompact ? 8 : 12, opacity: 0.5 }} />
+                  )}
+                </div>
+              </div>
+            );
+          })()}
         </div>
         <button type="submit" className="btn btn-primary">Uložit nastavení</button>
       </form>

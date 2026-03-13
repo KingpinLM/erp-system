@@ -367,6 +367,58 @@ app.patch('/api/users/:id/role', ...tenanted, authorize('admin'), (req, res) => 
   res.json({ ok: true });
 });
 
+// ─── USER GROUPS (admin only) ────────────────────────────
+app.get('/api/user-groups', ...tenanted, authorize('admin'), (req, res) => {
+  const groups = db.prepare('SELECT * FROM user_groups WHERE tenant_id = ? ORDER BY name').all(req.tenant_id);
+  const members = db.prepare(`
+    SELECT ugm.group_id, ugm.user_id, u.full_name, u.username, u.role
+    FROM user_group_members ugm
+    JOIN users u ON u.id = ugm.user_id
+    WHERE u.tenant_id = ?
+  `).all(req.tenant_id);
+  res.json(groups.map(g => ({
+    ...g,
+    permissions: JSON.parse(g.permissions || '[]'),
+    members: members.filter(m => m.group_id === g.id),
+  })));
+});
+
+app.post('/api/user-groups', ...tenanted, authorize('admin'), (req, res) => {
+  const { name, description, permissions, color } = req.body;
+  if (!name) return res.status(400).json({ error: 'Název skupiny je povinný' });
+  const existing = db.prepare('SELECT id FROM user_groups WHERE tenant_id = ? AND name = ?').get(req.tenant_id, name);
+  if (existing) return res.status(400).json({ error: 'Skupina s tímto názvem již existuje' });
+  const result = db.prepare('INSERT INTO user_groups (tenant_id, name, description, permissions, color) VALUES (?,?,?,?,?)').run(
+    req.tenant_id, name, description || '', JSON.stringify(permissions || []), color || '#6366f1'
+  );
+  res.json({ id: result.lastInsertRowid, name, description, permissions: permissions || [], color: color || '#6366f1', members: [] });
+});
+
+app.put('/api/user-groups/:id', ...tenanted, authorize('admin'), (req, res) => {
+  const { name, description, permissions, color } = req.body;
+  db.prepare('UPDATE user_groups SET name=?, description=?, permissions=?, color=? WHERE id=? AND tenant_id=?').run(
+    name, description || '', JSON.stringify(permissions || []), color || '#6366f1', req.params.id, req.tenant_id
+  );
+  res.json({ ok: true });
+});
+
+app.delete('/api/user-groups/:id', ...tenanted, authorize('admin'), (req, res) => {
+  db.prepare('DELETE FROM user_groups WHERE id = ? AND tenant_id = ?').run(req.params.id, req.tenant_id);
+  res.json({ ok: true });
+});
+
+app.post('/api/user-groups/:id/members', ...tenanted, authorize('admin'), (req, res) => {
+  const { user_ids } = req.body;
+  const del = db.prepare('DELETE FROM user_group_members WHERE group_id = ?');
+  const ins = db.prepare('INSERT OR IGNORE INTO user_group_members (group_id, user_id) VALUES (?, ?)');
+  const txn = db.transaction(() => {
+    del.run(req.params.id);
+    (user_ids || []).forEach(uid => ins.run(req.params.id, uid));
+  });
+  txn();
+  res.json({ ok: true });
+});
+
 app.get('/api/auth/me', authenticate, (req, res) => {
   if (req.user.role === 'superadmin') {
     const sa = db.prepare('SELECT id, username, email, full_name, created_at FROM superadmins WHERE id = ?').get(req.user.id);
