@@ -946,3 +946,17 @@ a:hover { opacity: 0.85; }
   .dash-perf-item { flex: 1 1 45%; min-width: 120px; }
   .dash-perf-sep { display: none; }
 }
+
+/* Search spinner */
+.search-spinner {
+  display: inline-block;
+  width: 16px; height: 16px;
+  border: 2px solid var(--gray-200);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: search-spin 0.6s linear infinite;
+  vertical-align: middle;
+}
+@keyframes search-spin {
+  to { transform: rotate(360deg); }
+}

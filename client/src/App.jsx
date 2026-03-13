@@ -22,6 +22,7 @@ import RecurringInvoices from './pages/RecurringInvoices';
 import Accounting from './pages/Accounting';
 import VatReport from './pages/VatReport';
 import Bank from './pages/Bank';
+import SearchResults from './pages/SearchResults';
 import './styles.css';
 
 export const AuthContext = createContext(null);
@@ -202,16 +203,39 @@ function Sidebar({ open, onClose }) {
   );
 }
 
+function HighlightMatch({ text, query }) {
+  if (!text || !query) return <>{text}</>;
+  const idx = String(text).toLowerCase().indexOf(query.toLowerCase());
+  if (idx === -1) return <>{text}</>;
+  const str = String(text);
+  return <>{str.slice(0, idx)}<mark style={{ background: '#fef08a', padding: 0, borderRadius: 2 }}>{str.slice(idx, idx + query.length)}</mark>{str.slice(idx + query.length)}</>;
+}
+
 function GlobalSearch() {
   const [q, setQ] = useState('');
   const [results, setResults] = useState(null);
   const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [activeIdx, setActiveIdx] = useState(-1);
   const navigate = useNavigate();
   const ref = React.useRef();
+  const inputRef = React.useRef();
+
+  const flatItems = React.useMemo(() => {
+    if (!results) return [];
+    const items = [];
+    (results.invoices || []).forEach(i => items.push({ type: 'invoice', data: i, path: `/invoices/${i.id}` }));
+    (results.clients || []).forEach(c => items.push({ type: 'client', data: c, path: `/clients/${c.id}` }));
+    (results.evidence || []).forEach(e => items.push({ type: 'evidence', data: e, path: `/evidence` }));
+    return items;
+  }, [results]);
 
   React.useEffect(() => {
-    if (!q || q.length < 2) { setResults(null); return; }
-    const t = setTimeout(() => { api.search(q).then(setResults).catch(() => {}); }, 300);
+    if (!q || q.length < 2) { setResults(null); setLoading(false); return; }
+    setLoading(true);
+    const t = setTimeout(() => {
+      api.search(q).then(r => { setResults(r); setLoading(false); setActiveIdx(-1); }).catch(() => setLoading(false));
+    }, 300);
     return () => clearTimeout(t);
   }, [q]);
 
@@ -221,45 +245,125 @@ function GlobalSearch() {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const go = (path) => { navigate(path); setOpen(false); setQ(''); setResults(null); };
+  React.useEffect(() => {
+    const handler = (e) => {
+      if ((e.key === 'k' || e.key === 'K') && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        inputRef.current?.focus();
+        setOpen(true);
+      }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, []);
+
+  const go = (path) => { navigate(path); setOpen(false); setQ(''); setResults(null); setActiveIdx(-1); };
   const hasResults = results && (results.invoices?.length || results.clients?.length || results.evidence?.length);
+  const searched = q.length >= 2 && results && !loading;
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Escape') { setOpen(false); inputRef.current?.blur(); return; }
+    if (e.key === 'Enter') {
+      if (activeIdx >= 0 && activeIdx < flatItems.length) {
+        go(flatItems[activeIdx].path);
+      } else if (q.length >= 2) {
+        go(`/search?q=${encodeURIComponent(q)}`);
+      }
+      return;
+    }
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setActiveIdx(prev => prev < flatItems.length - 1 ? prev + 1 : 0);
+    }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActiveIdx(prev => prev > 0 ? prev - 1 : flatItems.length - 1);
+    }
+  };
+
+  let itemIndex = -1;
+  const dropdownItemStyle = (idx) => ({
+    padding: '8px 12px', cursor: 'pointer', borderRadius: 8, transition: 'background 0.1s',
+    background: idx === activeIdx ? 'var(--primary-50)' : '',
+    display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+  });
 
   return (
-    <div ref={ref} style={{ position: 'relative', flex: 1, maxWidth: 380 }}>
+    <div ref={ref} style={{ position: 'relative', flex: 1, maxWidth: 420 }}>
       <div style={{ position: 'relative' }}>
-        <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', pointerEvents: 'none' }}><NavIcon name="search" size={16} /></span>
-        <input className="form-input" placeholder="Hledat faktury, klienty..." value={q}
-          onChange={e => { setQ(e.target.value); setOpen(true); }}
+        <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', pointerEvents: 'none' }}>
+          {loading ? <span className="search-spinner" /> : <NavIcon name="search" size={16} />}
+        </span>
+        <input ref={inputRef} className="form-input" placeholder="Hledat faktury, klienty...  (Ctrl+K)" value={q}
+          onChange={e => { setQ(e.target.value); setOpen(true); setActiveIdx(-1); }}
           onFocus={() => setOpen(true)}
+          onKeyDown={handleKeyDown}
           style={{ fontSize: 13, padding: '8px 12px 8px 34px', background: 'var(--gray-100)', border: '1px solid var(--gray-200)', borderRadius: 10 }}
         />
+        {q && (
+          <button onClick={() => { setQ(''); setResults(null); setActiveIdx(-1); inputRef.current?.focus(); }}
+            style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: '2px 4px', fontSize: 16, lineHeight: 1 }}
+            title="Vymazat">&times;</button>
+        )}
       </div>
-      {open && hasResults && (
-        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'white', border: '1px solid var(--gray-200)', borderRadius: 12, boxShadow: '0 12px 40px rgba(0,0,0,0.12)', zIndex: 1000, maxHeight: 400, overflow: 'auto', marginTop: 6, padding: '4px' }}>
-          {results.invoices?.length > 0 && (<>
-            <div style={{ padding: '8px 12px 4px', fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Faktury</div>
-            {results.invoices.map(i => (
-              <div key={'i'+i.id} onClick={() => go(`/invoices/${i.id}`)} style={{ padding: '8px 12px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', borderRadius: 8, transition: 'background 0.1s' }} onMouseOver={e => e.currentTarget.style.background='var(--primary-50)'} onMouseOut={e => e.currentTarget.style.background=''}>
-                <span><strong style={{ fontWeight: 600 }}>{i.invoice_number}</strong> {i.client_name && <span style={{ color: '#64748b' }}>— {i.client_name}</span>}</span>
-                <span className={`badge badge-${i.status}`} style={{ fontSize: 10 }}>{i.status}</span>
-              </div>
-            ))}
-          </>)}
-          {results.clients?.length > 0 && (<>
-            <div style={{ padding: '8px 12px 4px', fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Klienti</div>
-            {results.clients.map(c => (
-              <div key={'c'+c.id} onClick={() => go(`/clients/${c.id}`)} style={{ padding: '8px 12px', cursor: 'pointer', borderRadius: 8, transition: 'background 0.1s' }} onMouseOver={e => e.currentTarget.style.background='var(--primary-50)'} onMouseOut={e => e.currentTarget.style.background=''}>
-                <strong style={{ fontWeight: 600 }}>{c.name}</strong> {c.ico && <span style={{ color: '#64748b' }}>IČ: {c.ico}</span>}
-              </div>
-            ))}
-          </>)}
-          {results.evidence?.length > 0 && (<>
-            <div style={{ padding: '8px 12px 4px', fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Evidence</div>
-            {results.evidence.map(e => (
-              <div key={'e'+e.id} onClick={() => go('/evidence')} style={{ padding: '8px 12px', cursor: 'pointer', borderRadius: 8, transition: 'background 0.1s' }} onMouseOver={ev => ev.currentTarget.style.background='var(--primary-50)'} onMouseOut={ev => ev.currentTarget.style.background=''}>
-                <strong style={{ fontWeight: 600 }}>{e.title}</strong> {e.amount && <span style={{ color: '#64748b' }}>{e.amount} {e.currency}</span>}
-              </div>
-            ))}
+      {open && q.length >= 2 && (
+        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--card-bg, white)', border: '1px solid var(--gray-200)', borderRadius: 12, boxShadow: '0 12px 40px rgba(0,0,0,0.12)', zIndex: 1000, maxHeight: 420, overflow: 'auto', marginTop: 6, padding: '4px' }}>
+          {loading && (
+            <div style={{ padding: '16px', textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>
+              <span className="search-spinner" style={{ marginRight: 8 }} />Hledám...
+            </div>
+          )}
+          {searched && !hasResults && (
+            <div style={{ padding: '20px 16px', textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>
+              Žádné výsledky pro „<strong>{q}</strong>"
+            </div>
+          )}
+          {hasResults && (<>
+            {results.invoices?.length > 0 && (<>
+              <div style={{ padding: '8px 12px 4px', fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Faktury</div>
+              {results.invoices.map(i => {
+                itemIndex++;
+                const idx = itemIndex;
+                return (
+                  <div key={'i'+i.id} onClick={() => go(`/invoices/${i.id}`)} style={dropdownItemStyle(idx)}
+                    onMouseEnter={() => setActiveIdx(idx)}>
+                    <span><strong style={{ fontWeight: 600 }}><HighlightMatch text={i.invoice_number} query={q} /></strong> {i.client_name && <span style={{ color: '#64748b' }}>— <HighlightMatch text={i.client_name} query={q} /></span>}</span>
+                    <span className={`badge badge-${i.status}`} style={{ fontSize: 10 }}>{i.status}</span>
+                  </div>
+                );
+              })}
+            </>)}
+            {results.clients?.length > 0 && (<>
+              <div style={{ padding: '8px 12px 4px', fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Klienti</div>
+              {results.clients.map(c => {
+                itemIndex++;
+                const idx = itemIndex;
+                return (
+                  <div key={'c'+c.id} onClick={() => go(`/clients/${c.id}`)} style={dropdownItemStyle(idx)}
+                    onMouseEnter={() => setActiveIdx(idx)}>
+                    <strong style={{ fontWeight: 600 }}><HighlightMatch text={c.name} query={q} /></strong> {c.ico && <span style={{ color: '#64748b' }}>IČ: <HighlightMatch text={c.ico} query={q} /></span>}
+                  </div>
+                );
+              })}
+            </>)}
+            {results.evidence?.length > 0 && (<>
+              <div style={{ padding: '8px 12px 4px', fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Evidence</div>
+              {results.evidence.map(e => {
+                itemIndex++;
+                const idx = itemIndex;
+                return (
+                  <div key={'e'+e.id} onClick={() => go('/evidence')} style={dropdownItemStyle(idx)}
+                    onMouseEnter={() => setActiveIdx(idx)}>
+                    <strong style={{ fontWeight: 600 }}><HighlightMatch text={e.title} query={q} /></strong> {e.amount && <span style={{ color: '#64748b' }}>{e.amount} {e.currency}</span>}
+                  </div>
+                );
+              })}
+            </>)}
+            <div onClick={() => go(`/search?q=${encodeURIComponent(q)}`)}
+              style={{ padding: '10px 12px', cursor: 'pointer', borderTop: '1px solid var(--gray-200)', marginTop: 4, textAlign: 'center', color: 'var(--primary)', fontSize: 13, fontWeight: 600, borderRadius: '0 0 8px 8px' }}
+              onMouseOver={e => e.currentTarget.style.background='var(--primary-50)'} onMouseOut={e => e.currentTarget.style.background=''}>
+              Zobrazit všechny výsledky pro „{q}"
+            </div>
           </>)}
         </div>
       )}
@@ -314,6 +418,7 @@ export default function App() {
               <Layout>
                 <Routes>
                   <Route path="/" element={<Dashboard />} />
+                  <Route path="/search" element={<SearchResults />} />
                   <Route path="/invoices" element={<Invoices />} />
                   <Route path="/invoices/new" element={<InvoiceForm />} />
                   <Route path="/invoices/:id" element={<InvoiceDetail />} />
