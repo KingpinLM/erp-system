@@ -60,6 +60,7 @@ const bankRoutes = require('./routes-bank');
 const cashRoutes = require('./routes-cash');
 const productRoutes = require('./routes-products');
 const notificationRoutes = require('./routes-notifications');
+const approvalRoutes = require('./routes-approvals');
 const getLoginPage = require('./login-page');
 
 const cookieParser = require('cookie-parser');
@@ -101,6 +102,7 @@ app.use(bankRoutes);
 app.use(cashRoutes);
 app.use(productRoutes);
 app.use(notificationRoutes);
+app.use('/api/approvals', approvalRoutes);
 
 // ─── SUPERADMIN AUTH ────────────────────────────────────────
 app.post('/api/superadmin/login', (req, res) => {

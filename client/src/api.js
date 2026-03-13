@@ -223,4 +223,15 @@ export const api = {
   createStockMovement: (data) => request('/stock-movements', { method: 'POST', body: JSON.stringify(data) }),
   getStockReport: () => request('/stock/report'),
 
+  // Approvals (Schvalovací workflow)
+  getApprovalWorkflows: () => request('/approvals/workflows'),
+  createApprovalWorkflow: (data) => request('/approvals/workflows', { method: 'POST', body: JSON.stringify(data) }),
+  updateApprovalWorkflow: (id, data) => request(`/approvals/workflows/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteApprovalWorkflow: (id) => request(`/approvals/workflows/${id}`, { method: 'DELETE' }),
+  getApprovalRequests: (params = {}) => { const qs = new URLSearchParams(params).toString(); return request(`/approvals/requests${qs ? '?' + qs : ''}`); },
+  getMyPendingApprovals: () => request('/approvals/my-pending'),
+  createApprovalRequest: (data) => request('/approvals/requests', { method: 'POST', body: JSON.stringify(data) }),
+  approvalAction: (id, action, comment) => request(`/approvals/requests/${id}/action`, { method: 'POST', body: JSON.stringify({ action, comment }) }),
+  getApprovalActions: (id) => request(`/approvals/requests/${id}/actions`),
+  getApprovalStats: () => request('/approvals/stats'),
 };

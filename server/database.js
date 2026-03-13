@@ -390,7 +390,7 @@ db.exec(`
     name TEXT NOT NULL,
     description TEXT,
     permissions TEXT DEFAULT '[]',
-    color TEXT DEFAULT '#6366f1',
+    color TEXT DEFAULT '#1e40af',
     created_at TEXT DEFAULT (datetime('now')),
     UNIQUE(tenant_id, name)
   );
@@ -482,9 +482,52 @@ try {
   const companies = db.prepare("SELECT id FROM company WHERE logo IS NULL OR logo = ''").all();
   if (companies.length > 0) {
     // Simple dummy SVG logo as base64
-    const dummyLogo = 'data:image/svg+xml;base64,' + Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="180" height="60" viewBox="0 0 180 60"><rect width="180" height="60" rx="8" fill="#6366f1"/><text x="90" y="36" text-anchor="middle" fill="white" font-family="Arial,sans-serif" font-weight="bold" font-size="22">RFI ERP</text></svg>').toString('base64');
+    const dummyLogo = 'data:image/svg+xml;base64,' + Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="180" height="60" viewBox="0 0 180 60"><rect width="180" height="60" rx="8" fill="#1e40af"/><text x="90" y="36" text-anchor="middle" fill="white" font-family="Arial,sans-serif" font-weight="bold" font-size="22">RFI ERP</text></svg>').toString('base64');
     db.prepare("UPDATE company SET logo = ? WHERE logo IS NULL OR logo = ''").run(dummyLogo);
   }
 } catch (e) { /* ok */ }
+
+// ─── APPROVAL WORKFLOWS ──────────────────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS approval_workflows (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tenant_id INTEGER NOT NULL REFERENCES tenants(id),
+    name TEXT NOT NULL,
+    entity_type TEXT NOT NULL DEFAULT 'invoice' CHECK(entity_type IN ('invoice','expense','order')),
+    min_amount REAL DEFAULT 0,
+    max_amount REAL,
+    steps TEXT NOT NULL DEFAULT '[]',
+    active INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(tenant_id, name)
+  );
+
+  CREATE TABLE IF NOT EXISTS approval_requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tenant_id INTEGER NOT NULL REFERENCES tenants(id),
+    workflow_id INTEGER REFERENCES approval_workflows(id),
+    entity_type TEXT NOT NULL,
+    entity_id INTEGER NOT NULL,
+    entity_number TEXT,
+    entity_amount REAL DEFAULT 0,
+    entity_currency TEXT DEFAULT 'CZK',
+    current_step INTEGER DEFAULT 0,
+    total_steps INTEGER DEFAULT 1,
+    status TEXT DEFAULT 'pending' CHECK(status IN ('pending','approved','rejected','cancelled')),
+    requested_by INTEGER REFERENCES users(id),
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS approval_actions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    request_id INTEGER NOT NULL REFERENCES approval_requests(id) ON DELETE CASCADE,
+    step INTEGER NOT NULL,
+    user_id INTEGER REFERENCES users(id),
+    action TEXT NOT NULL CHECK(action IN ('approve','reject','comment')),
+    comment TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+`);
 
 module.exports = db;

@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area, LineChart, Line } from 'recharts';
 import { api } from '../api';
 import { useAuth } from '../App';
 
 const fmt = (n) => new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: 'CZK', maximumFractionDigits: 0 }).format(n);
 const fmtDate = (d) => { if (!d) return '—'; const p = d.slice(0,10).split('-'); return p.length === 3 ? `${p[2]}.${p[1]}.${p[0]}` : d; };
-const COLORS = ['#6366f1', '#06b6d4', '#f59e0b', '#ef4444', '#8b5cf6', '#64748b', '#14b8a6', '#f97316', '#84cc16', '#ec4899'];
+const COLORS = ['#1e40af', '#0d9488', '#f59e0b', '#ef4444', '#7c3aed', '#64748b', '#14b8a6', '#f97316', '#84cc16', '#ec4899'];
 const MONTHS = ['Led','Úno','Bře','Dub','Kvě','Čvn','Čvc','Srp','Zář','Říj','Lis','Pro'];
 
 function getDateRange(period) {
@@ -102,7 +102,7 @@ export default function Dashboard() {
   const { kpis, revenueByMonth, expensesByCategory, invoicesByStatus, recentInvoices, topClients, topSuppliers, currencyBreakdown, monthlyIssued, monthlyExpenses, pendingItems, chartYear } = data;
 
   const statusLabels = { draft: 'Koncept', sent: 'Odesláno', paid: 'Zaplaceno', overdue: 'Po splatnosti', cancelled: 'Zrušeno' };
-  const statusColors = { draft: '#94a3b8', sent: '#6366f1', paid: '#10b981', overdue: '#ef4444', cancelled: '#f59e0b' };
+  const statusColors = { draft: '#94a3b8', sent: '#1e40af', paid: '#10b981', overdue: '#ef4444', cancelled: '#f59e0b' };
   const pieData = invoicesByStatus.map(s => ({ name: statusLabels[s.status] || s.status, value: s.count, color: statusColors[s.status] || '#999' }));
 
   const supplierPieData = (topSuppliers || []).map((s, i) => ({ name: s.name, value: s.total, color: COLORS[i % COLORS.length] }));
@@ -118,8 +118,18 @@ export default function Dashboard() {
 
   const profitMargin = kpis.totalRevenue > 0 ? ((kpis.profit / kpis.totalRevenue) * 100).toFixed(1) : 0;
 
+  // Cash flow data (cumulative)
+  const cashFlowData = (() => {
+    let cumulative = 0;
+    return monthlyData.map(d => {
+      cumulative += (d.issued - d.expenses);
+      return { ...d, cashFlow: cumulative, profit: d.issued - d.expenses };
+    });
+  })();
+
   const tabs = [
     { key: 'overview', label: 'Přehled', icon: '📊' },
+    { key: 'analytics', label: 'Analýza', icon: '💹' },
     { key: 'pending', label: 'K vyřízení', icon: '⏳', badge: pendingCount },
     { key: 'reports', label: 'Reporty', icon: '📈' },
   ];
@@ -300,7 +310,7 @@ export default function Dashboard() {
                 <span className="dash-card-desc">{chartYear ? `Rok ${chartYear}` : 'Celé období'}</span>
               </div>
               <div className="dash-legend">
-                <span className="dash-legend-item"><span className="dash-legend-dot" style={{ background: '#6366f1' }} /> Příjmy</span>
+                <span className="dash-legend-item"><span className="dash-legend-dot" style={{ background: '#1e40af' }} /> Příjmy</span>
                 <span className="dash-legend-item"><span className="dash-legend-dot" style={{ background: '#f43f5e' }} /> Výdaje</span>
               </div>
             </div>
@@ -308,8 +318,8 @@ export default function Dashboard() {
               <BarChart data={monthlyData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }} barGap={2}>
                 <defs>
                   <linearGradient id="gradBarIncome" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#818cf8" />
-                    <stop offset="100%" stopColor="#6366f1" />
+                    <stop offset="0%" stopColor="#3b82f6" />
+                    <stop offset="100%" stopColor="#1e40af" />
                   </linearGradient>
                   <linearGradient id="gradBarExpense" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="#fb7185" />
@@ -422,6 +432,119 @@ export default function Dashboard() {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* === ANALYTICS === */}
+      {tab === 'analytics' && (
+        <div className="dash-content dash-fade-in">
+          {/* Cash Flow Area Chart */}
+          <div className="dash-card dash-card-chart">
+            <div className="dash-card-head">
+              <div>
+                <h3 className="dash-card-title">Cash Flow</h3>
+                <span className="dash-card-desc">Kumulativní peněžní tok {chartYear ? `za rok ${chartYear}` : ''}</span>
+              </div>
+              <div className="dash-legend">
+                <span className="dash-legend-item"><span className="dash-legend-dot" style={{ background: '#0d9488' }} /> Cash flow</span>
+              </div>
+            </div>
+            <ResponsiveContainer width="100%" height={300}>
+              <AreaChart data={cashFlowData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="gradCashFlow" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#0d9488" stopOpacity={0.3} />
+                    <stop offset="100%" stopColor="#0d9488" stopOpacity={0.02} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--gray-200)" vertical={false} />
+                <XAxis dataKey="name" fontSize={12} tick={{ fill: 'var(--gray-500)' }} axisLine={false} tickLine={false} />
+                <YAxis fontSize={12} tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} tick={{ fill: 'var(--gray-500)' }} axisLine={false} tickLine={false} />
+                <Tooltip content={<CustomTooltip />} />
+                <Area type="monotone" dataKey="cashFlow" name="Cash flow" stroke="#0d9488" fill="url(#gradCashFlow)" strokeWidth={2.5} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Profit by month */}
+          <div className="dash-card dash-card-chart">
+            <div className="dash-card-head">
+              <div>
+                <h3 className="dash-card-title">Měsíční zisk / ztráta</h3>
+                <span className="dash-card-desc">Rozdíl mezi příjmy a výdaji</span>
+              </div>
+            </div>
+            <ResponsiveContainer width="100%" height={260}>
+              <BarChart data={cashFlowData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--gray-200)" vertical={false} />
+                <XAxis dataKey="name" fontSize={12} tick={{ fill: 'var(--gray-500)' }} axisLine={false} tickLine={false} />
+                <YAxis fontSize={12} tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} tick={{ fill: 'var(--gray-500)' }} axisLine={false} tickLine={false} />
+                <Tooltip content={<CustomTooltip />} />
+                <Bar dataKey="profit" name="Zisk" radius={[6, 6, 0, 0]} barSize={28}>
+                  {cashFlowData.map((entry, i) => (
+                    <Cell key={i} fill={entry.profit >= 0 ? '#0d9488' : '#ef4444'} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          <div className="dash-grid-2">
+            {/* Spend Analytics by Category */}
+            <div className="dash-card">
+              <h3 className="dash-card-title" style={{ marginBottom: '1rem' }}>Analýza výdajů</h3>
+              {expensesByCategory.length === 0 ? (
+                <div className="dash-empty-small">Žádná data o výdajích</div>
+              ) : (
+                <>
+                  <ResponsiveContainer width="100%" height={220}>
+                    <PieChart>
+                      <Pie data={expensesByCategory.map((c, i) => ({ name: c.category || 'Nezařazeno', value: c.total, color: COLORS[i % COLORS.length] }))} cx="50%" cy="50%" outerRadius={85} innerRadius={55} dataKey="value" paddingAngle={2} strokeWidth={0}>
+                        {expensesByCategory.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                      </Pie>
+                      <Tooltip content={<PieTooltip />} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="dash-pie-legend">
+                    {expensesByCategory.slice(0, 6).map((c, i) => (
+                      <div key={c.category} className="dash-pie-legend-item">
+                        <span className="dash-pie-legend-dot" style={{ background: COLORS[i % COLORS.length] }} />
+                        <span className="dash-pie-legend-label">{c.category || 'Nezařazeno'}</span>
+                        <span className="dash-pie-legend-value">{fmt(c.total)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Financial summary KPIs */}
+            <div className="dash-card">
+              <h3 className="dash-card-title" style={{ marginBottom: '1rem' }}>Finanční souhrn</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem', background: 'var(--gray-50)', borderRadius: 'var(--radius)', border: '1px solid var(--gray-200)' }}>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--gray-600)', fontWeight: 500 }}>Celkové příjmy</span>
+                  <span style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--success)' }}>{fmt(kpis.totalRevenue)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem', background: 'var(--gray-50)', borderRadius: 'var(--radius)', border: '1px solid var(--gray-200)' }}>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--gray-600)', fontWeight: 500 }}>Celkové výdaje</span>
+                  <span style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--danger)' }}>{fmt(kpis.totalExpenses)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem', background: 'var(--primary-50)', borderRadius: 'var(--radius)', border: '1px solid var(--primary-100)' }}>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--gray-700)', fontWeight: 600 }}>Čistý zisk</span>
+                  <span style={{ fontSize: '1.1rem', fontWeight: 800, color: kpis.profit >= 0 ? 'var(--success)' : 'var(--danger)' }}>{fmt(kpis.profit)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem', background: 'var(--gray-50)', borderRadius: 'var(--radius)', border: '1px solid var(--gray-200)' }}>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--gray-600)', fontWeight: 500 }}>Marže</span>
+                  <span style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--primary)' }}>{profitMargin}%</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem', background: 'var(--gray-50)', borderRadius: 'var(--radius)', border: '1px solid var(--gray-200)' }}>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--gray-600)', fontWeight: 500 }}>Průměrná faktura</span>
+                  <span style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--gray-800)' }}>{kpis.totalClients > 0 ? fmt(kpis.totalRevenue / kpis.totalClients) : '—'}</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -540,7 +663,7 @@ export default function Dashboard() {
                 <span className="dash-card-desc">{chartYear ? `Rok ${chartYear}` : 'Měsíční porovnání'}</span>
               </div>
               <div className="dash-legend">
-                <span className="dash-legend-item"><span className="dash-legend-dot" style={{ background: '#6366f1' }} /> Příjmy</span>
+                <span className="dash-legend-item"><span className="dash-legend-dot" style={{ background: '#1e40af' }} /> Příjmy</span>
                 <span className="dash-legend-item"><span className="dash-legend-dot" style={{ background: '#f43f5e' }} /> Výdaje</span>
                 <span className="dash-legend-item"><span className="dash-legend-dot" style={{ background: '#10b981' }} /> Zisk</span>
               </div>
@@ -551,7 +674,7 @@ export default function Dashboard() {
                 <XAxis dataKey="name" fontSize={12} tick={{ fill: 'var(--gray-500)' }} axisLine={false} tickLine={false} />
                 <YAxis fontSize={12} tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} tick={{ fill: 'var(--gray-500)' }} axisLine={false} tickLine={false} />
                 <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="issued" name="Příjmy" fill="#6366f1" radius={[4, 4, 0, 0]} barSize={18} />
+                <Bar dataKey="issued" name="Příjmy" fill="#1e40af" radius={[4, 4, 0, 0]} barSize={18} />
                 <Bar dataKey="expenses" name="Výdaje" fill="#f43f5e" radius={[4, 4, 0, 0]} barSize={18} />
                 <Bar dataKey="profit" name="Zisk" fill="#10b981" radius={[4, 4, 0, 0]} barSize={18} />
               </BarChart>
