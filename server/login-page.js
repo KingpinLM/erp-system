@@ -13,41 +13,8 @@ module.exports = function getLoginPage(error) {
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; display: flex; align-items: center; justify-content: center; overflow: hidden; background: #0a0f1e; -webkit-font-smoothing: antialiased; }
-    /* CSS animated orbs as visible layer behind glass */
-    .bg-animated {
-      position: fixed; inset: 0; z-index: 0; overflow: hidden;
-    }
-    .bg-animated::before {
-      content: ''; position: absolute; width: 200%; height: 200%; top: -50%; left: -50%;
-      background:
-        radial-gradient(circle at 20% 30%, rgba(13,148,136,0.4) 0%, transparent 40%),
-        radial-gradient(circle at 80% 20%, rgba(8,145,178,0.35) 0%, transparent 40%),
-        radial-gradient(circle at 50% 80%, rgba(124,58,237,0.3) 0%, transparent 40%),
-        radial-gradient(circle at 30% 70%, rgba(45,212,191,0.3) 0%, transparent 35%),
-        radial-gradient(circle at 70% 60%, rgba(6,182,212,0.25) 0%, transparent 35%);
-      animation: bgDrift 30s linear infinite;
-      will-change: transform;
-    }
-    .bg-animated::after {
-      content: ''; position: absolute; width: 200%; height: 200%; top: -50%; left: -50%;
-      background:
-        radial-gradient(circle at 60% 40%, rgba(13,148,136,0.3) 0%, transparent 35%),
-        radial-gradient(circle at 30% 60%, rgba(124,58,237,0.25) 0%, transparent 40%),
-        radial-gradient(circle at 80% 70%, rgba(45,212,191,0.3) 0%, transparent 35%);
-      animation: bgDrift2 36s linear infinite;
-      will-change: transform;
-    }
-    @keyframes bgDrift {
-      0%   { transform: translate(0%, 0%) rotate(0deg); }
-      33%  { transform: translate(8%, -5%) rotate(120deg); }
-      66%  { transform: translate(-5%, 8%) rotate(240deg); }
-      100% { transform: translate(0%, 0%) rotate(360deg); }
-    }
-    @keyframes bgDrift2 {
-      0%   { transform: translate(0%, 0%) rotate(0deg); }
-      33%  { transform: translate(-6%, 7%) rotate(-120deg); }
-      66%  { transform: translate(7%, -4%) rotate(-240deg); }
-      100% { transform: translate(0%, 0%) rotate(-360deg); }
+    .bg-layer {
+      position: fixed; inset: -50%; width: 200%; height: 200%; z-index: 0; pointer-events: none;
     }
 
     .login-container {
@@ -180,7 +147,8 @@ module.exports = function getLoginPage(error) {
   </style>
 </head>
 <body>
-  <div class="bg-animated"></div>
+  <div id="layer1" class="bg-layer" style="background:radial-gradient(circle at 20% 30%, rgba(13,148,136,0.4) 0%, transparent 40%),radial-gradient(circle at 80% 20%, rgba(8,145,178,0.35) 0%, transparent 40%),radial-gradient(circle at 50% 80%, rgba(124,58,237,0.3) 0%, transparent 40%),radial-gradient(circle at 30% 70%, rgba(45,212,191,0.3) 0%, transparent 35%)"></div>
+  <div id="layer2" class="bg-layer" style="background:radial-gradient(circle at 60% 40%, rgba(13,148,136,0.3) 0%, transparent 35%),radial-gradient(circle at 30% 60%, rgba(124,58,237,0.25) 0%, transparent 40%),radial-gradient(circle at 80% 70%, rgba(45,212,191,0.3) 0%, transparent 35%)"></div>
 
   <div class="login-container">
     <div class="brand">
@@ -280,6 +248,26 @@ module.exports = function getLoginPage(error) {
     document.querySelector('form').addEventListener('submit', function() {
       document.getElementById('submitBtn').classList.add('loading');
     });
+
+    // JS animated background
+    (function() {
+      var l1 = document.getElementById('layer1');
+      var l2 = document.getElementById('layer2');
+      var t = 0;
+      function tick() {
+        t += 0.003;
+        var x1 = Math.sin(t * 0.7) * 5;
+        var y1 = Math.cos(t * 0.5) * 4;
+        var r1 = Math.sin(t * 0.3) * 15;
+        var x2 = Math.cos(t * 0.6) * 4;
+        var y2 = Math.sin(t * 0.8) * 5;
+        var r2 = Math.cos(t * 0.4) * -12;
+        l1.style.transform = 'translate(' + x1 + '%, ' + y1 + '%) rotate(' + r1 + 'deg)';
+        l2.style.transform = 'translate(' + x2 + '%, ' + y2 + '%) rotate(' + r2 + 'deg)';
+        requestAnimationFrame(tick);
+      }
+      tick();
+    })();
   </script>
 </body>
 </html>`;
