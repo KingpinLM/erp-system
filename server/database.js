@@ -382,6 +382,13 @@ db.exec(`
   );
 `);
 
+// ─── Add role_overrides column to company if missing ─────
+try {
+  db.prepare("SELECT role_overrides FROM company LIMIT 1").get();
+} catch (e) {
+  db.exec("ALTER TABLE company ADD COLUMN role_overrides TEXT DEFAULT '{}'");
+}
+
 // ─── USER GROUPS ─────────────────────────────────────────
 db.exec(`
   CREATE TABLE IF NOT EXISTS user_groups (

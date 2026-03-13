@@ -130,6 +130,8 @@ export const api = {
   rejectUser: (id) => request(`/users/${id}/reject`, { method: 'POST' }),
 
   // Roles & Permissions
+  getRoleOverrides: () => request('/role-overrides'),
+  saveRoleOverrides: (overrides) => request('/role-overrides', { method: 'PUT', body: JSON.stringify({ overrides }) }),
   getRoles: () => request('/roles'),
   createRole: (data) => request('/roles', { method: 'POST', body: JSON.stringify(data) }),
   updateRole: (id, data) => request(`/roles/${id}`, { method: 'PUT', body: JSON.stringify(data) }),

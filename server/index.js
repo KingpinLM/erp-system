@@ -320,6 +320,18 @@ app.post('/api/users/:id/reject', ...tenanted, authorize('admin'), (req, res) =>
   res.json({ ok: true });
 });
 
+// ─── SYSTEM ROLE OVERRIDES ──────────────────────────────────
+app.get('/api/role-overrides', ...tenanted, authorize('admin'), (req, res) => {
+  const comp = db.prepare('SELECT role_overrides FROM company WHERE tenant_id = ?').get(req.tenant_id);
+  res.json(JSON.parse((comp && comp.role_overrides) || '{}'));
+});
+
+app.put('/api/role-overrides', ...tenanted, authorize('admin'), (req, res) => {
+  const { overrides } = req.body;
+  db.prepare('UPDATE company SET role_overrides = ? WHERE tenant_id = ?').run(JSON.stringify(overrides || {}), req.tenant_id);
+  res.json({ ok: true });
+});
+
 // ─── ROLES & PERMISSIONS (admin only) ──────────────────────
 // Get all custom roles for tenant
 app.get('/api/roles', ...tenanted, authorize('admin'), (req, res) => {
