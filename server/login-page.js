@@ -104,19 +104,23 @@ module.exports = function getLoginPage(error) {
       box-shadow: 0 0 0 3px rgba(13,148,136,0.12);
       background: rgba(255,255,255,0.08);
     }
-    .input-wrap svg { position: absolute; left: 12px; color: rgba(255,255,255,0.3); pointer-events: none; transition: color 0.2s; }
-    .input-wrap:focus-within svg { color: #2dd4bf; }
+    .input-icon { position: absolute; left: 12px; color: rgba(255,255,255,0.3); pointer-events: none; transition: color 0.2s; }
+    .input-wrap:focus-within .input-icon { color: #2dd4bf; }
     .input-wrap input {
       width: 100%; padding: 0.7rem 0.75rem 0.7rem 40px;
       background: none; border: none; outline: none;
       font-size: 0.9rem; color: white; font-family: inherit;
     }
+    .input-wrap input[type="password"],
+    .input-wrap .has-toggle { padding-right: 44px; }
     .input-wrap input::placeholder { color: rgba(255,255,255,0.25); }
     .pw-toggle {
-      position: absolute; right: 12px; background: none; border: none;
-      cursor: pointer; color: rgba(255,255,255,0.3); padding: 2px; display: flex;
+      position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+      background: none; border: none;
+      cursor: pointer; color: rgba(255,255,255,0.3); padding: 4px; display: flex;
+      border-radius: 6px; transition: all 0.15s;
     }
-    .pw-toggle:hover { color: rgba(255,255,255,0.6); }
+    .pw-toggle:hover { color: rgba(255,255,255,0.6); background: rgba(255,255,255,0.08); }
 
     /* Submit */
     .submit-btn {
@@ -130,6 +134,12 @@ module.exports = function getLoginPage(error) {
     }
     .submit-btn:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(13,148,136,0.35); filter: brightness(1.1); }
     .submit-btn:active { transform: translateY(0); }
+    .submit-btn.loading { opacity: 0.7; pointer-events: none; }
+    .submit-btn .spinner { display: none; width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.6s linear infinite; }
+    .submit-btn.loading .spinner { display: block; }
+    .submit-btn.loading .btn-text { display: none; }
+    .submit-btn.loading .btn-arrow { display: none; }
+    @keyframes spin { to { transform: rotate(360deg); } }
 
     /* Links */
     .links { display: flex; justify-content: space-between; margin-top: 1.25rem; }
@@ -147,8 +157,15 @@ module.exports = function getLoginPage(error) {
     /* Demo */
     .demo { margin-top: 1.75rem; padding-top: 1.25rem; border-top: 1px solid rgba(255,255,255,0.06); }
     .demo-label { font-size: 0.7rem; font-weight: 700; color: rgba(255,255,255,0.25); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.5rem; }
-    .demo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.3rem 1rem; font-size: 0.75rem; color: rgba(255,255,255,0.3); }
+    .demo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem 1rem; font-size: 0.75rem; color: rgba(255,255,255,0.3); }
     .demo-grid strong { color: rgba(255,255,255,0.5); font-weight: 600; }
+    .demo-btn {
+      background: none; border: 1px solid rgba(255,255,255,0.06); color: rgba(255,255,255,0.35);
+      padding: 0.3rem 0.5rem; border-radius: 6px; cursor: pointer; font-family: inherit;
+      font-size: 0.75rem; text-align: left; transition: all 0.15s;
+    }
+    .demo-btn:hover { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.6); border-color: rgba(255,255,255,0.12); }
+    .demo-btn strong { color: rgba(255,255,255,0.55); font-weight: 600; }
 
     @media (max-width: 700px) {
       .login-container { flex-direction: column; max-width: 440px; }
@@ -204,7 +221,7 @@ module.exports = function getLoginPage(error) {
           <div class="field">
             <label>Uživatelské jméno</label>
             <div class="input-wrap">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg class="input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
               </svg>
               <input name="username" placeholder="Zadejte uživatelské jméno" required autocomplete="username" autofocus>
@@ -214,19 +231,21 @@ module.exports = function getLoginPage(error) {
           <div class="field">
             <label>Heslo</label>
             <div class="input-wrap">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg class="input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
               </svg>
-              <input id="pw" name="password" type="password" placeholder="Zadejte heslo" required autocomplete="current-password">
-              <button type="button" class="pw-toggle" onclick="var p=document.getElementById('pw');p.type=p.type==='password'?'text':'password'" tabindex="-1">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              <input id="pw" name="password" type="password" class="has-toggle" placeholder="Zadejte heslo" required autocomplete="current-password">
+              <button type="button" class="pw-toggle" onclick="var p=document.getElementById('pw');var e=this.querySelector('.eye-on'),h=this.querySelector('.eye-off');if(p.type==='password'){p.type='text';e.style.display='none';h.style.display='block';}else{p.type='password';e.style.display='block';h.style.display='none';}" tabindex="-1">
+                <svg class="eye-on" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                <svg class="eye-off" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
               </button>
             </div>
           </div>
 
-          <button type="submit" class="submit-btn">
-            Přihlásit se
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+          <button type="submit" class="submit-btn" id="submitBtn">
+            <span class="btn-text">Přihlásit se</span>
+            <svg class="btn-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+            <span class="spinner"></span>
           </button>
         </form>
 
@@ -238,16 +257,26 @@ module.exports = function getLoginPage(error) {
         <div class="demo">
           <div class="demo-label">Demo přístupy</div>
           <div class="demo-grid">
-            <span><strong>admin</strong> / admin123</span>
-            <span><strong>ucetni</strong> / ucetni123</span>
-            <span><strong>manager</strong> / manager123</span>
-            <span><strong>viewer</strong> / viewer123</span>
+            <button type="button" class="demo-btn" onclick="fillDemo('admin','admin123')"><strong>admin</strong> / admin123</button>
+            <button type="button" class="demo-btn" onclick="fillDemo('ucetni','ucetni123')"><strong>ucetni</strong> / ucetni123</button>
+            <button type="button" class="demo-btn" onclick="fillDemo('manager','manager123')"><strong>manager</strong> / manager123</button>
+            <button type="button" class="demo-btn" onclick="fillDemo('viewer','viewer123')"><strong>viewer</strong> / viewer123</button>
           </div>
         </div>
       </div>
     </div>
   </div>
 
+  <script>
+    function fillDemo(u, p) {
+      document.querySelector('input[name="username"]').value = u;
+      document.getElementById('pw').value = p;
+      document.querySelector('input[name="username"]').focus();
+    }
+    document.querySelector('form').addEventListener('submit', function() {
+      document.getElementById('submitBtn').classList.add('loading');
+    });
+  </script>
 </body>
 </html>`;
 };
