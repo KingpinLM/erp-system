@@ -16,53 +16,52 @@ module.exports = function getLoginPage(error) {
     .bg-wrap {
       position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none;
     }
-    .bg-layer {
-      position: absolute; width: 200%; height: 200%; top: -50%; left: -50%;
+    .blob {
+      position: absolute; border-radius: 50%; filter: blur(100px);
     }
-    #layer1 {
-      background:
-        radial-gradient(circle at 20% 30%, rgba(13,148,136,0.4) 0%, transparent 40%),
-        radial-gradient(circle at 80% 20%, rgba(8,145,178,0.35) 0%, transparent 40%),
-        radial-gradient(circle at 50% 80%, rgba(124,58,237,0.3) 0%, transparent 40%),
-        radial-gradient(circle at 30% 70%, rgba(45,212,191,0.3) 0%, transparent 35%);
-      -webkit-animation: drift1 30s linear infinite;
-      -moz-animation: drift1 30s linear infinite;
-      -o-animation: drift1 30s linear infinite;
-      animation: drift1 30s linear infinite;
+    .blob-1 {
+      width: 600px; height: 600px; background: rgba(13,148,136,0.45);
+      left: -10%; top: -15%;
+      animation: b1 16s ease-in-out infinite;
     }
-    #layer2 {
-      background:
-        radial-gradient(circle at 60% 40%, rgba(13,148,136,0.3) 0%, transparent 35%),
-        radial-gradient(circle at 30% 60%, rgba(124,58,237,0.25) 0%, transparent 40%),
-        radial-gradient(circle at 80% 70%, rgba(45,212,191,0.3) 0%, transparent 35%);
-      -webkit-animation: drift2 36s linear infinite;
-      -moz-animation: drift2 36s linear infinite;
-      -o-animation: drift2 36s linear infinite;
-      animation: drift2 36s linear infinite;
+    .blob-2 {
+      width: 500px; height: 500px; background: rgba(8,145,178,0.4);
+      right: -10%; top: 5%;
+      animation: b2 20s ease-in-out infinite;
     }
-    @-webkit-keyframes drift1 {
-      0%   { -webkit-transform: translate(0%,0%) rotate(0deg); }
-      33%  { -webkit-transform: translate(5%,-3%) rotate(120deg); }
-      66%  { -webkit-transform: translate(-3%,5%) rotate(240deg); }
-      100% { -webkit-transform: translate(0%,0%) rotate(360deg); }
+    .blob-3 {
+      width: 550px; height: 550px; background: rgba(124,58,237,0.35);
+      left: 25%; bottom: -20%;
+      animation: b3 18s ease-in-out infinite;
     }
-    @keyframes drift1 {
-      0%   { transform: translate(0%,0%) rotate(0deg); }
-      33%  { transform: translate(5%,-3%) rotate(120deg); }
-      66%  { transform: translate(-3%,5%) rotate(240deg); }
-      100% { transform: translate(0%,0%) rotate(360deg); }
+    .blob-4 {
+      width: 400px; height: 400px; background: rgba(45,212,191,0.35);
+      right: 5%; bottom: -5%;
+      animation: b4 22s ease-in-out infinite;
     }
-    @-webkit-keyframes drift2 {
-      0%   { -webkit-transform: translate(0%,0%) rotate(0deg); }
-      33%  { -webkit-transform: translate(-4%,5%) rotate(-120deg); }
-      66%  { -webkit-transform: translate(5%,-3%) rotate(-240deg); }
-      100% { -webkit-transform: translate(0%,0%) rotate(-360deg); }
+    @keyframes b1 {
+      0%, 100% { transform: translate(0, 0); }
+      25% { transform: translate(120px, 80px); }
+      50% { transform: translate(60px, 180px); }
+      75% { transform: translate(-40px, 100px); }
     }
-    @keyframes drift2 {
-      0%   { transform: translate(0%,0%) rotate(0deg); }
-      33%  { transform: translate(-4%,5%) rotate(-120deg); }
-      66%  { transform: translate(5%,-3%) rotate(-240deg); }
-      100% { transform: translate(0%,0%) rotate(-360deg); }
+    @keyframes b2 {
+      0%, 100% { transform: translate(0, 0); }
+      25% { transform: translate(-100px, 120px); }
+      50% { transform: translate(-60px, -80px); }
+      75% { transform: translate(80px, 40px); }
+    }
+    @keyframes b3 {
+      0%, 100% { transform: translate(0, 0); }
+      25% { transform: translate(100px, -80px); }
+      50% { transform: translate(-80px, -40px); }
+      75% { transform: translate(-120px, 60px); }
+    }
+    @keyframes b4 {
+      0%, 100% { transform: translate(0, 0); }
+      25% { transform: translate(-80px, -100px); }
+      50% { transform: translate(60px, -60px); }
+      75% { transform: translate(100px, 40px); }
     }
 
     .login-container {
@@ -196,8 +195,10 @@ module.exports = function getLoginPage(error) {
 </head>
 <body>
   <div class="bg-wrap">
-    <div id="layer1" class="bg-layer"></div>
-    <div id="layer2" class="bg-layer"></div>
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+    <div class="blob blob-3"></div>
+    <div class="blob blob-4"></div>
   </div>
 
   <div class="login-container">
