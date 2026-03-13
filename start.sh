@@ -5,10 +5,6 @@ cd "$(dirname "$0")"
 echo "🌈 Rainbow Family Investment - ERP System"
 echo "==========================================="
 
-# Stáhni nejnovější verzi
-echo "📥 Stahuji poslední verzi..."
-git pull origin main
-
 # Instalace závislostí
 echo "📦 Instaluji závislosti..."
 npm install --silent
