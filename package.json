@@ -6,7 +6,7 @@
     "server": "node server/index.js",
     "client": "cd client && npx vite --host 0.0.0.0",
     "dev": "concurrently \"npm run server\" \"npm run client\"",
-    "build": "cd client && npx vite build",
+    "build": "cd client && npm ci && npx vite build",
     "seed": "node server/seed.js",
     "start": "node server/index.js"
   },
