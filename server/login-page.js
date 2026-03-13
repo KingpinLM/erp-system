@@ -17,27 +17,27 @@ module.exports = function getLoginPage(error) {
       position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none;
     }
     .blob {
-      position: absolute; border-radius: 50%; filter: blur(100px);
+      position: absolute; border-radius: 50%; filter: blur(120px);
     }
     .blob-1 {
-      width: 600px; height: 600px; background: rgba(13,148,136,0.45);
-      left: -10%; top: -15%;
-      animation: b1 16s ease-in-out infinite;
+      width: 400px; height: 400px; background: rgba(13,148,136,0.2);
+      left: -5%; top: -10%;
+      animation: b1 20s ease-in-out infinite;
     }
     .blob-2 {
-      width: 500px; height: 500px; background: rgba(8,145,178,0.4);
-      right: -10%; top: 5%;
-      animation: b2 20s ease-in-out infinite;
+      width: 350px; height: 350px; background: rgba(8,145,178,0.18);
+      right: -5%; top: 10%;
+      animation: b2 26s ease-in-out infinite;
     }
     .blob-3 {
-      width: 550px; height: 550px; background: rgba(124,58,237,0.35);
-      left: 25%; bottom: -20%;
-      animation: b3 18s ease-in-out infinite;
+      width: 380px; height: 380px; background: rgba(99,80,180,0.15);
+      left: 25%; bottom: -15%;
+      animation: b3 22s ease-in-out infinite;
     }
     .blob-4 {
-      width: 400px; height: 400px; background: rgba(45,212,191,0.35);
-      right: 5%; bottom: -5%;
-      animation: b4 22s ease-in-out infinite;
+      width: 300px; height: 300px; background: rgba(45,180,170,0.16);
+      right: 10%; bottom: 0%;
+      animation: b4 28s ease-in-out infinite;
     }
     @keyframes b1 {
       0%, 100% { transform: translate(0, 0); }
