@@ -77,6 +77,14 @@ export const api = {
   bulkStatus: (ids, status) => request('/invoices/bulk-status', { method: 'PATCH', body: JSON.stringify({ ids, status }) }),
   getInvoicePayments: (id) => request(`/invoices/${id}/payments`),
   addInvoicePayment: (id, data) => request(`/invoices/${id}/payments`, { method: 'POST', body: JSON.stringify(data) }),
+  downloadInvoicePDF: (id) => {
+    const token = getToken();
+    return fetch(`${API}/invoices/${id}/pdf`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => { if (!r.ok) throw new Error('PDF error'); return r.blob(); });
+  },
+  sendInvoiceEmail: (id, data) => request(`/invoices/${id}/send-email`, { method: 'POST', body: JSON.stringify(data) }),
+  sendInvoiceReminder: (id) => request(`/invoices/${id}/send-reminder`, { method: 'POST' }),
+  getEmailStatus: () => request('/email/status'),
 
   // Recurring
   getRecurring: () => request('/recurring'),
@@ -116,6 +124,7 @@ export const api = {
   getUser: (id) => request(`/users/${id}`),
   createUser: (data) => request('/users', { method: 'POST', body: JSON.stringify(data) }),
   updateUser: (id, data) => request(`/users/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteUser: (id) => request(`/users/${id}`, { method: 'DELETE' }),
   getPendingUsers: () => request('/users/pending'),
   approveUser: (id, role) => request(`/users/${id}/approve`, { method: 'POST', body: JSON.stringify({ role }) }),
   rejectUser: (id) => request(`/users/${id}/reject`, { method: 'POST' }),
@@ -143,4 +152,69 @@ export const api = {
   createTenant: (data) => request('/superadmin/tenants', { method: 'POST', body: JSON.stringify(data) }),
   updateTenant: (id, data) => request(`/superadmin/tenants/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteTenant: (id) => request(`/superadmin/tenants/${id}`, { method: 'DELETE' }),
+
+  // Accounting (Účetnictví)
+  getAccounts: () => request('/accounts'),
+  createAccount: (data) => request('/accounts', { method: 'POST', body: JSON.stringify(data) }),
+  updateAccount: (id, data) => request(`/accounts/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteAccount: (id) => request(`/accounts/${id}`, { method: 'DELETE' }),
+  seedDefaultAccounts: () => request('/accounts/seed-default', { method: 'POST' }),
+
+  // Journal entries (Účetní deník)
+  getJournal: (params = {}) => { const qs = new URLSearchParams(params).toString(); return request(`/journal${qs ? '?' + qs : ''}`); },
+  getJournalEntry: (id) => request(`/journal/${id}`),
+  createJournalEntry: (data) => request('/journal', { method: 'POST', body: JSON.stringify(data) }),
+  updateJournalEntry: (id, data) => request(`/journal/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  postJournalEntry: (id) => request(`/journal/${id}/post`, { method: 'PATCH' }),
+  cancelJournalEntry: (id) => request(`/journal/${id}/cancel`, { method: 'PATCH' }),
+  deleteJournalEntry: (id) => request(`/journal/${id}`, { method: 'DELETE' }),
+
+  // Ledger (Hlavní kniha)
+  getLedger: (params = {}) => { const qs = new URLSearchParams(params).toString(); return request(`/ledger${qs ? '?' + qs : ''}`); },
+  getLedgerBalances: (params = {}) => { const qs = new URLSearchParams(params).toString(); return request(`/ledger/balances${qs ? '?' + qs : ''}`); },
+
+  // VAT (DPH)
+  getVatRecords: (params = {}) => { const qs = new URLSearchParams(params).toString(); return request(`/vat/records${qs ? '?' + qs : ''}`); },
+  getVatReport: (year, month) => request(`/vat/report?year=${year}&month=${month}`),
+  generateVatRecords: (year, month) => request('/vat/generate', { method: 'POST', body: JSON.stringify({ year, month }) }),
+
+  // Bank
+  getBankAccounts: () => request('/bank-accounts'),
+  createBankAccount: (data) => request('/bank-accounts', { method: 'POST', body: JSON.stringify(data) }),
+  updateBankAccount: (id, data) => request(`/bank-accounts/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  getBankTransactions: (params = {}) => { const qs = new URLSearchParams(params).toString(); return request(`/bank-transactions${qs ? '?' + qs : ''}`); },
+  createBankTransaction: (data) => request('/bank-transactions', { method: 'POST', body: JSON.stringify(data) }),
+  importBankTransactions: (data) => request('/bank-transactions/import', { method: 'POST', body: JSON.stringify(data) }),
+  autoMatchTransactions: () => request('/bank-transactions/auto-match', { method: 'POST' }),
+  matchTransaction: (id, invoice_id) => request(`/bank-transactions/${id}/match`, { method: 'PATCH', body: JSON.stringify({ invoice_id }) }),
+  deleteBankTransaction: (id) => request(`/bank-transactions/${id}`, { method: 'DELETE' }),
+
+  // Cash register (Pokladna)
+  getCashRegisters: () => request('/cash-registers'),
+  createCashRegister: (data) => request('/cash-registers', { method: 'POST', body: JSON.stringify(data) }),
+  updateCashRegister: (id, data) => request(`/cash-registers/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  getCashDocuments: (params = {}) => { const qs = new URLSearchParams(params).toString(); return request(`/cash-documents${qs ? '?' + qs : ''}`); },
+  createCashDocument: (data) => request('/cash-documents', { method: 'POST', body: JSON.stringify(data) }),
+  updateCashDocument: (id, data) => request(`/cash-documents/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteCashDocument: (id) => request(`/cash-documents/${id}`, { method: 'DELETE' }),
+  getCashRegisterReport: (id, params = {}) => { const qs = new URLSearchParams(params).toString(); return request(`/cash-registers/${id}/report${qs ? '?' + qs : ''}`); },
+
+  // Products (Produkty/Služby)
+  getProducts: (params = {}) => { const qs = new URLSearchParams(params).toString(); return request(`/products${qs ? '?' + qs : ''}`); },
+  getProduct: (id) => request(`/products/${id}`),
+  createProduct: (data) => request('/products', { method: 'POST', body: JSON.stringify(data) }),
+  updateProduct: (id, data) => request(`/products/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteProduct: (id) => request(`/products/${id}`, { method: 'DELETE' }),
+  getStockMovements: (params = {}) => { const qs = new URLSearchParams(params).toString(); return request(`/stock-movements${qs ? '?' + qs : ''}`); },
+  createStockMovement: (data) => request('/stock-movements', { method: 'POST', body: JSON.stringify(data) }),
+  getStockReport: () => request('/stock/report'),
+
+  // Orders (Objednávky)
+  getOrders: (params = {}) => { const qs = new URLSearchParams(params).toString(); return request(`/orders${qs ? '?' + qs : ''}`); },
+  getOrder: (id) => request(`/orders/${id}`),
+  createOrder: (data) => request('/orders', { method: 'POST', body: JSON.stringify(data) }),
+  updateOrder: (id, data) => request(`/orders/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  updateOrderStatus: (id, status) => request(`/orders/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+  convertOrderToInvoice: (id) => request(`/orders/${id}/to-invoice`, { method: 'POST' }),
+  deleteOrder: (id) => request(`/orders/${id}`, { method: 'DELETE' }),
 };

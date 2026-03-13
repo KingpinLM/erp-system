@@ -109,6 +109,10 @@ export default function Users() {
                       <div className="btn-group">
                         <Link to={`/users/${u.id}`} className="btn btn-outline btn-sm">Detail</Link>
                         <button className="btn btn-outline btn-sm" onClick={() => openEdit(u)}>Upravit</button>
+                        <button className="btn btn-danger btn-sm" onClick={async () => {
+                          if (!confirm(`Smazat uživatele ${u.username}?`)) return;
+                          try { await api.deleteUser(u.id); loadData(); } catch (e) { setError(e.message); }
+                        }}>Smazat</button>
                       </div>
                     </td>
                   </tr>

@@ -20,6 +20,7 @@ export default function InvoiceForm() {
 
   const [clients, setClients] = useState([]);
   const [currencies, setCurrencies] = useState([]);
+  const [products, setProducts] = useState([]);
   const [defaultDueDays, setDefaultDueDays] = useState(14);
   const [vatPayer, setVatPayer] = useState(false);
   const [hasBankDetails, setHasBankDetails] = useState(true);
@@ -33,6 +34,7 @@ export default function InvoiceForm() {
 
   useEffect(() => {
     const promises = [api.getClients(), api.getCurrencies(), api.getCompany()];
+    api.getProducts().then(p => setProducts(p)).catch(() => {});
     if (isEdit) {
       promises.push(api.getInvoice(id));
     } else {
@@ -254,7 +256,23 @@ export default function InvoiceForm() {
               <tbody>
                 {form.items.map((item, idx) => (
                   <tr key={idx}>
-                    <td><input className="form-input" value={item.description} onChange={e => updateItem(idx, 'description', e.target.value)} placeholder="Popis položky" /></td>
+                    <td>
+                      {products.length > 0 && (
+                        <select className="form-input" style={{ marginBottom: 4, fontSize: 11 }} value="" onChange={e => {
+                          const p = products.find(pr => pr.id == e.target.value);
+                          if (p) {
+                            updateItem(idx, 'description', p.name);
+                            updateItem(idx, 'unit', p.unit);
+                            updateItem(idx, 'unit_price', p.unit_price);
+                            if (vatPayer) updateItem(idx, 'tax_rate', p.vat_rate);
+                          }
+                        }}>
+                          <option value="">Z ceníku...</option>
+                          {products.map(p => <option key={p.id} value={p.id}>{p.name} ({p.unit_price} Kč)</option>)}
+                        </select>
+                      )}
+                      <input className="form-input" value={item.description} onChange={e => updateItem(idx, 'description', e.target.value)} placeholder="Popis položky" />
+                    </td>
                     <td><input className="form-input" type="number" step="0.01" value={item.quantity} onChange={e => updateItem(idx, 'quantity', parseFloat(e.target.value) || 0)} /></td>
                     <td><input className="form-input" value={item.unit} onChange={e => updateItem(idx, 'unit', e.target.value)} /></td>
                     <td><input className="form-input" type="number" step="0.01" value={item.unit_price} onChange={e => updateItem(idx, 'unit_price', parseFloat(e.target.value) || 0)} /></td>

@@ -126,11 +126,20 @@ export default function InvoiceDetail() {
     setInvoice(prev => ({ ...prev, status, paid_date: paid_date || prev.paid_date }));
   };
 
-  const downloadPDF = () => {
-    const content = invoiceRef.current;
-    const win = window.open('', '_blank');
-    win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${invoice.invoice_number}</title><style>${CSS}</style></head><body>${content.innerHTML}<script>window.onload=function(){window.print();}<\/script></body></html>`);
-    win.document.close();
+  const downloadPDF = async () => {
+    try {
+      const blob = await api.downloadInvoicePDF(id);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `${invoice.invoice_number}.pdf`;
+      a.click(); URL.revokeObjectURL(url);
+    } catch {
+      // Fallback to print
+      const content = invoiceRef.current;
+      const win = window.open('', '_blank');
+      win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${invoice.invoice_number}</title><style>${CSS}</style></head><body>${content.innerHTML}<script>window.onload=function(){window.print();}<\/script></body></html>`);
+      win.document.close();
+    }
   };
 
   if (loading) return <div className="loading">Načítání...</div>;
@@ -162,9 +171,17 @@ export default function InvoiceDetail() {
         <div className="btn-group" style={{ flexWrap: 'wrap' }}>
           <button className="btn btn-primary" onClick={downloadPDF}>PDF</button>
           <a href={`/api/invoices/${id}/isdoc`} className="btn btn-outline" download>ISDOC</a>
-          {can('admin', 'accountant') && (
+          {can('admin', 'accountant') && <>
             <Link to={`/invoices/${id}/edit`} className="btn btn-outline">Upravit</Link>
-          )}
+            <button className="btn btn-outline" onClick={async () => {
+              try { await api.sendInvoiceEmail(id, {}); alert('Email odeslán'); } catch (e) { alert(e.message); }
+            }}>Odeslat emailem</button>
+            {(invoice.status === 'overdue' || invoice.status === 'sent') && (
+              <button className="btn btn-outline" style={{ color: '#ef4444' }} onClick={async () => {
+                try { await api.sendInvoiceReminder(id); alert('Upomínka odeslána'); } catch (e) { alert(e.message); }
+              }}>Upomínka</button>
+            )}
+          </>}
           {can('admin', 'accountant') && (
             <button className="btn btn-outline" onClick={async () => { const r = await api.duplicateInvoice(id); navigate(`/invoices/${r.id}`); }}>Duplikovat</button>
           )}

@@ -182,6 +182,192 @@ db.exec(`
   );
 `);
 
+// ─── ACCOUNTING (podvojné účetnictví) ────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS chart_of_accounts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tenant_id INTEGER NOT NULL REFERENCES tenants(id),
+    account_number TEXT NOT NULL,
+    name TEXT NOT NULL,
+    type TEXT NOT NULL CHECK(type IN ('asset','liability','equity','revenue','expense')),
+    parent_id INTEGER REFERENCES chart_of_accounts(id),
+    is_group INTEGER DEFAULT 0,
+    active INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(tenant_id, account_number)
+  );
+
+  CREATE TABLE IF NOT EXISTS accounting_periods (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tenant_id INTEGER NOT NULL REFERENCES tenants(id),
+    year INTEGER NOT NULL,
+    month INTEGER NOT NULL,
+    is_closed INTEGER DEFAULT 0,
+    closed_at TEXT,
+    closed_by INTEGER REFERENCES users(id),
+    UNIQUE(tenant_id, year, month)
+  );
+
+  CREATE TABLE IF NOT EXISTS journal_entries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tenant_id INTEGER NOT NULL REFERENCES tenants(id),
+    entry_number TEXT NOT NULL,
+    date TEXT NOT NULL,
+    description TEXT NOT NULL,
+    document_type TEXT,
+    document_id INTEGER,
+    status TEXT DEFAULT 'draft' CHECK(status IN ('draft','posted','cancelled')),
+    created_by INTEGER REFERENCES users(id),
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(tenant_id, entry_number)
+  );
+
+  CREATE TABLE IF NOT EXISTS journal_lines (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    journal_entry_id INTEGER NOT NULL REFERENCES journal_entries(id) ON DELETE CASCADE,
+    account_id INTEGER NOT NULL REFERENCES chart_of_accounts(id),
+    debit REAL DEFAULT 0,
+    credit REAL DEFAULT 0,
+    description TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS vat_records (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tenant_id INTEGER NOT NULL REFERENCES tenants(id),
+    invoice_id INTEGER REFERENCES invoices(id),
+    type TEXT NOT NULL CHECK(type IN ('output','input')),
+    tax_base REAL NOT NULL DEFAULT 0,
+    tax_amount REAL NOT NULL DEFAULT 0,
+    vat_rate REAL NOT NULL DEFAULT 21,
+    date TEXT NOT NULL,
+    section TEXT DEFAULT 'A1',
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS bank_accounts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tenant_id INTEGER NOT NULL REFERENCES tenants(id),
+    name TEXT NOT NULL,
+    account_number TEXT,
+    iban TEXT,
+    currency TEXT DEFAULT 'CZK',
+    initial_balance REAL DEFAULT 0,
+    active INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS bank_transactions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tenant_id INTEGER NOT NULL REFERENCES tenants(id),
+    bank_account_id INTEGER REFERENCES bank_accounts(id),
+    date TEXT NOT NULL,
+    amount REAL NOT NULL,
+    currency TEXT DEFAULT 'CZK',
+    counterparty_name TEXT,
+    counterparty_account TEXT,
+    variable_symbol TEXT,
+    constant_symbol TEXT,
+    specific_symbol TEXT,
+    description TEXT,
+    matched_invoice_id INTEGER REFERENCES invoices(id),
+    status TEXT DEFAULT 'unmatched' CHECK(status IN ('unmatched','matched','ignored')),
+    imported_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS cash_registers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tenant_id INTEGER NOT NULL REFERENCES tenants(id),
+    name TEXT NOT NULL,
+    currency TEXT DEFAULT 'CZK',
+    initial_balance REAL DEFAULT 0,
+    active INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS cash_documents (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tenant_id INTEGER NOT NULL REFERENCES tenants(id),
+    register_id INTEGER NOT NULL REFERENCES cash_registers(id),
+    document_number TEXT NOT NULL,
+    type TEXT NOT NULL CHECK(type IN ('income','expense')),
+    amount REAL NOT NULL,
+    date TEXT NOT NULL,
+    description TEXT,
+    category TEXT,
+    invoice_id INTEGER REFERENCES invoices(id),
+    created_by INTEGER REFERENCES users(id),
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(tenant_id, document_number)
+  );
+
+  CREATE TABLE IF NOT EXISTS products (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tenant_id INTEGER NOT NULL REFERENCES tenants(id),
+    name TEXT NOT NULL,
+    sku TEXT,
+    description TEXT,
+    unit TEXT DEFAULT 'ks',
+    unit_price REAL DEFAULT 0,
+    purchase_price REAL DEFAULT 0,
+    vat_rate REAL DEFAULT 21,
+    type TEXT DEFAULT 'service' CHECK(type IN ('product','service')),
+    stock_quantity REAL DEFAULT 0,
+    min_stock REAL DEFAULT 0,
+    active INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(tenant_id, sku)
+  );
+
+  CREATE TABLE IF NOT EXISTS stock_movements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tenant_id INTEGER NOT NULL REFERENCES tenants(id),
+    product_id INTEGER NOT NULL REFERENCES products(id),
+    type TEXT NOT NULL CHECK(type IN ('in','out','adjustment')),
+    quantity REAL NOT NULL,
+    unit_price REAL DEFAULT 0,
+    date TEXT NOT NULL,
+    document_type TEXT,
+    document_id INTEGER,
+    note TEXT,
+    created_by INTEGER REFERENCES users(id),
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS orders (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tenant_id INTEGER NOT NULL REFERENCES tenants(id),
+    order_number TEXT NOT NULL,
+    type TEXT NOT NULL DEFAULT 'received' CHECK(type IN ('received','issued')),
+    client_id INTEGER REFERENCES clients(id),
+    date TEXT NOT NULL,
+    due_date TEXT,
+    status TEXT DEFAULT 'draft' CHECK(status IN ('draft','confirmed','in_progress','completed','cancelled','invoiced')),
+    currency TEXT DEFAULT 'CZK',
+    subtotal REAL DEFAULT 0,
+    tax_amount REAL DEFAULT 0,
+    total REAL DEFAULT 0,
+    note TEXT,
+    invoice_id INTEGER REFERENCES invoices(id),
+    created_by INTEGER REFERENCES users(id),
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(tenant_id, order_number)
+  );
+
+  CREATE TABLE IF NOT EXISTS order_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+    product_id INTEGER REFERENCES products(id),
+    description TEXT NOT NULL,
+    quantity REAL DEFAULT 1,
+    unit TEXT DEFAULT 'ks',
+    unit_price REAL DEFAULT 0,
+    tax_rate REAL DEFAULT 21,
+    total REAL DEFAULT 0
+  );
+`);
+
 // ─── MIGRATIONS ──────────────────────────────────────────
 const safeAlter = (sql) => { try { db.exec(sql); } catch (e) { /* already exists */ } };
 
@@ -225,6 +411,13 @@ safeAlter('ALTER TABLE invoices ADD COLUMN related_invoice_id INTEGER REFERENCES
 safeAlter('ALTER TABLE invoices ADD COLUMN paid_amount REAL DEFAULT 0');
 safeAlter('ALTER TABLE company ADD COLUMN logo TEXT'); // base64 logo
 safeAlter('ALTER TABLE company ADD COLUMN reminder_days TEXT'); // JSON array e.g. [3,7,14]
+
+safeAlter('ALTER TABLE company ADD COLUMN order_prefix TEXT DEFAULT \'OBJ\'');
+safeAlter('ALTER TABLE company ADD COLUMN order_counter INTEGER DEFAULT 1');
+safeAlter('ALTER TABLE company ADD COLUMN cash_prefix TEXT DEFAULT \'PPD\'');
+safeAlter('ALTER TABLE company ADD COLUMN cash_counter INTEGER DEFAULT 1');
+safeAlter('ALTER TABLE company ADD COLUMN journal_prefix TEXT DEFAULT \'UD\'');
+safeAlter('ALTER TABLE company ADD COLUMN journal_counter INTEGER DEFAULT 1');
 
 // Migrate full_name → first_name + last_name
 try {

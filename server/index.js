@@ -11,6 +11,7 @@ const QRCode = require('qrcode');
 const db = require('./database');
 const bcrypt = require('bcryptjs');
 const { generateToken, generateSuperadminToken, authenticate, authorize, tenantScope, requireSuperadmin } = require('./auth');
+const { generateInvoicePDF } = require('./pdf-generator');
 
 const uploadDir = path.join(__dirname, '..', 'uploads');
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
@@ -54,6 +55,12 @@ async function updateRates() {
 updateRates();
 setInterval(updateRates, 6 * 60 * 60 * 1000);
 
+const accountingRoutes = require('./routes-accounting');
+const bankRoutes = require('./routes-bank');
+const cashRoutes = require('./routes-cash');
+const productRoutes = require('./routes-products');
+const orderRoutes = require('./routes-orders');
+const notificationRoutes = require('./routes-notifications');
 const getLoginPage = require('./login-page');
 
 const cookieParser = require('cookie-parser');
@@ -88,6 +95,14 @@ app.use(express.static(path.join(__dirname, '..', 'client', 'dist'), {
 
 // Shorthand: authenticated + tenant-scoped
 const tenanted = [authenticate, tenantScope];
+
+// Mount new route modules
+app.use(accountingRoutes);
+app.use(bankRoutes);
+app.use(cashRoutes);
+app.use(productRoutes);
+app.use(orderRoutes);
+app.use(notificationRoutes);
 
 // ─── SUPERADMIN AUTH ────────────────────────────────────────
 app.post('/api/superadmin/login', (req, res) => {
@@ -750,6 +765,12 @@ app.put('/api/users/:id', ...tenanted, authorize('admin'), (req, res) => {
   res.json({ ok: true });
 });
 
+app.delete('/api/users/:id', ...tenanted, authorize('admin'), (req, res) => {
+  if (req.params.id == req.user.id) return res.status(400).json({ error: 'Nemůžete smazat sami sebe' });
+  db.prepare('DELETE FROM users WHERE id = ? AND tenant_id = ?').run(req.params.id, req.tenant_id);
+  res.json({ ok: true });
+});
+
 app.put('/api/users/:id/signature', ...tenanted, authorize('admin'), (req, res) => {
   const { signature } = req.body;
   db.prepare("UPDATE users SET signature = ?, updated_at = datetime('now') WHERE id = ? AND tenant_id = ?").run(signature || null, req.params.id, req.tenant_id);
@@ -1173,6 +1194,24 @@ ${items.map((it, i) => `    <InvoiceLine>
 </Invoice>`;
   res.set({ 'Content-Type': 'application/xml; charset=utf-8', 'Content-Disposition': `attachment; filename=${invoice.invoice_number}.isdoc` });
   res.send(xml);
+});
+
+// ─── PDF EXPORT ─────────────────────────────────────────────
+app.get('/api/invoices/:id/pdf', ...tenanted, async (req, res) => {
+  try {
+    const invoice = db.prepare(`SELECT i.*, c.name as client_name, c.ico as client_ico, c.dic as client_dic,
+      c.address as client_address, c.city as client_city, c.zip as client_zip, c.email as client_email
+      FROM invoices i LEFT JOIN clients c ON i.client_id = c.id WHERE i.id = ? AND i.tenant_id = ?`).get(req.params.id, req.tenant_id);
+    if (!invoice) return res.status(404).json({ error: 'Faktura nenalezena' });
+    const company = db.prepare('SELECT * FROM company WHERE tenant_id = ?').get(req.tenant_id);
+    const items = db.prepare('SELECT * FROM invoice_items WHERE invoice_id = ?').all(req.params.id);
+    const pdfBuffer = await generateInvoicePDF(invoice, company, items);
+    res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename=${invoice.invoice_number}.pdf` });
+    res.send(pdfBuffer);
+  } catch (e) {
+    console.error('PDF generation error:', e);
+    res.status(500).json({ error: 'Chyba při generování PDF' });
+  }
 });
 
 // ─── DB BACKUP ──────────────────────────────────────────────
