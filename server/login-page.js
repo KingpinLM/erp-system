@@ -20,24 +20,24 @@ module.exports = function getLoginPage(error) {
       position: absolute; border-radius: 50%; filter: blur(120px);
     }
     .blob-1 {
-      width: 400px; height: 400px; background: rgba(13,148,136,0.2);
+      width: 450px; height: 450px; background: rgba(13,148,136,0.3);
       left: -5%; top: -10%;
-      animation: b1 20s ease-in-out infinite;
+      animation: b1 14s ease-in-out infinite;
     }
     .blob-2 {
-      width: 350px; height: 350px; background: rgba(8,145,178,0.18);
+      width: 380px; height: 380px; background: rgba(8,145,178,0.28);
       right: -5%; top: 10%;
-      animation: b2 26s ease-in-out infinite;
+      animation: b2 18s ease-in-out infinite;
     }
     .blob-3 {
-      width: 380px; height: 380px; background: rgba(99,80,180,0.15);
+      width: 400px; height: 400px; background: rgba(99,80,180,0.22);
       left: 25%; bottom: -15%;
-      animation: b3 22s ease-in-out infinite;
+      animation: b3 16s ease-in-out infinite;
     }
     .blob-4 {
-      width: 300px; height: 300px; background: rgba(45,180,170,0.16);
+      width: 320px; height: 320px; background: rgba(45,180,170,0.25);
       right: 10%; bottom: 0%;
-      animation: b4 28s ease-in-out infinite;
+      animation: b4 20s ease-in-out infinite;
     }
     @keyframes b1 {
       0%, 100% { transform: translate(0, 0); }
