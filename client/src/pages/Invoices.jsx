@@ -149,7 +149,7 @@ export default function Invoices() {
                       <div className="btn-group">
                         <Link to={`/invoices/${inv.id}`} className="btn btn-outline btn-sm">Detail</Link>
                         {can('admin', 'accountant') && <Link to={`/invoices/${inv.id}/edit`} className="btn btn-outline btn-sm">Upravit</Link>}
-                        {can('admin') && <button className="btn btn-danger btn-sm" onClick={() => handleDelete(inv.id)}>Smazat</button>}
+                        {can('admin', 'manager') && <button className="btn btn-danger btn-sm" onClick={() => handleDelete(inv.id)}>Smazat</button>}
                       </div>
                     </td>
                   </tr>

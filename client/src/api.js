@@ -129,6 +129,13 @@ export const api = {
   approveUser: (id, role) => request(`/users/${id}/approve`, { method: 'POST', body: JSON.stringify({ role }) }),
   rejectUser: (id) => request(`/users/${id}/reject`, { method: 'POST' }),
 
+  // Roles & Permissions
+  getRoles: () => request('/roles'),
+  createRole: (data) => request('/roles', { method: 'POST', body: JSON.stringify(data) }),
+  updateRole: (id, data) => request(`/roles/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteRole: (id) => request(`/roles/${id}`, { method: 'DELETE' }),
+  updateUserRole: (id, role) => request(`/users/${id}/role`, { method: 'PATCH', body: JSON.stringify({ role }) }),
+
   // Company
   getCompany: () => request('/company'),
   updateCompany: (data) => request('/company', { method: 'PUT', body: JSON.stringify(data) }),
@@ -209,12 +216,4 @@ export const api = {
   createStockMovement: (data) => request('/stock-movements', { method: 'POST', body: JSON.stringify(data) }),
   getStockReport: () => request('/stock/report'),
 
-  // Orders (Objednávky)
-  getOrders: (params = {}) => { const qs = new URLSearchParams(params).toString(); return request(`/orders${qs ? '?' + qs : ''}`); },
-  getOrder: (id) => request(`/orders/${id}`),
-  createOrder: (data) => request('/orders', { method: 'POST', body: JSON.stringify(data) }),
-  updateOrder: (id, data) => request(`/orders/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  updateOrderStatus: (id, status) => request(`/orders/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
-  convertOrderToInvoice: (id) => request(`/orders/${id}/to-invoice`, { method: 'POST' }),
-  deleteOrder: (id) => request(`/orders/${id}`, { method: 'DELETE' }),
 };

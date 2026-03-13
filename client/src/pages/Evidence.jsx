@@ -10,6 +10,9 @@ export default function Evidence() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('expense');
   const [categoryFilter, setCategoryFilter] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [periodPreset, setPeriodPreset] = useState('');
   const [sortBy, setSortBy] = useState('date');
   const [sortDir, setSortDir] = useState('desc');
   const [showModal, setShowModal] = useState(false);
@@ -24,15 +27,42 @@ export default function Evidence() {
   const fileRef = useRef();
   const { can } = useAuth();
 
+  const applyPeriodPreset = (preset) => {
+    setPeriodPreset(preset);
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = now.getMonth();
+    switch (preset) {
+      case 'today':
+        { const d = now.toISOString().slice(0, 10); setDateFrom(d); setDateTo(d); break; }
+      case 'week':
+        { const start = new Date(now); start.setDate(now.getDate() - now.getDay() + 1); setDateFrom(start.toISOString().slice(0, 10)); setDateTo(now.toISOString().slice(0, 10)); break; }
+      case 'month':
+        setDateFrom(`${y}-${String(m + 1).padStart(2, '0')}-01`); setDateTo(now.toISOString().slice(0, 10)); break;
+      case 'quarter':
+        { const qm = Math.floor(m / 3) * 3; setDateFrom(`${y}-${String(qm + 1).padStart(2, '0')}-01`); setDateTo(now.toISOString().slice(0, 10)); break; }
+      case 'year':
+        setDateFrom(`${y}-01-01`); setDateTo(`${y}-12-31`); break;
+      case 'last_month':
+        { const lm = m === 0 ? 11 : m - 1; const ly = m === 0 ? y - 1 : y; const lastDay = new Date(ly, lm + 1, 0).getDate(); setDateFrom(`${ly}-${String(lm + 1).padStart(2, '0')}-01`); setDateTo(`${ly}-${String(lm + 1).padStart(2, '0')}-${lastDay}`); break; }
+      case 'last_quarter':
+        { const cq = Math.floor(m / 3); const pq = cq === 0 ? 3 : cq - 1; const pqy = cq === 0 ? y - 1 : y; const pqStart = pq * 3; const pqEnd = new Date(pqy, pqStart + 3, 0).getDate(); setDateFrom(`${pqy}-${String(pqStart + 1).padStart(2, '0')}-01`); setDateTo(`${pqy}-${String(pqStart + 3).padStart(2, '0')}-${pqEnd}`); break; }
+      default:
+        setDateFrom(''); setDateTo(''); break;
+    }
+  };
+
   const load = () => {
     setLoading(true);
     const params = { type: tab };
     if (categoryFilter) params.category = categoryFilter;
+    if (dateFrom) params.from = dateFrom;
+    if (dateTo) params.to = dateTo;
     api.getEvidence(params).then(setRecords).finally(() => setLoading(false));
     api.getCategories().then(setCategories).catch(() => {});
   };
 
-  useEffect(load, [tab, categoryFilter]);
+  useEffect(load, [tab, categoryFilter, dateFrom, dateTo]);
 
   const loadCategoryRules = () => {
     api.getCategoryRules().then(setCategoryRules).catch(() => {});
@@ -248,7 +278,47 @@ export default function Evidence() {
             </div>
           </div>
 
-          <div className="filters" style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          {/* Period filter */}
+          <div className="card" style={{ marginTop: '1rem', padding: '0.75rem 1rem' }}>
+            <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap', marginBottom: dateFrom || dateTo ? '0.75rem' : 0 }}>
+              {[
+                { key: '', label: 'Vše' },
+                { key: 'today', label: 'Dnes' },
+                { key: 'week', label: 'Tento týden' },
+                { key: 'month', label: 'Tento měsíc' },
+                { key: 'last_month', label: 'Minulý měsíc' },
+                { key: 'quarter', label: 'Toto čtvrtletí' },
+                { key: 'last_quarter', label: 'Minulé čtvrtletí' },
+                { key: 'year', label: 'Tento rok' },
+                { key: 'custom', label: 'Vlastní' },
+              ].map(p => (
+                <button key={p.key} className={`btn btn-sm ${periodPreset === p.key || (p.key === '' && !periodPreset) ? 'btn-primary' : 'btn-outline'}`}
+                  onClick={() => { if (p.key === 'custom') { setPeriodPreset('custom'); } else { applyPeriodPreset(p.key); } }}
+                  style={{ transition: 'all 0.15s ease' }}
+                >{p.label}</button>
+              ))}
+            </div>
+            {(periodPreset === 'custom' || dateFrom || dateTo) && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--gray-500)', textTransform: 'uppercase' }}>Od</label>
+                  <input type="date" className="form-input" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setPeriodPreset('custom'); }}
+                    style={{ width: 'auto', fontSize: '0.8rem', padding: '0.35rem 0.5rem' }} />
+                </div>
+                <span style={{ color: 'var(--gray-300)', fontSize: '1rem' }}>—</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--gray-500)', textTransform: 'uppercase' }}>Do</label>
+                  <input type="date" className="form-input" value={dateTo} onChange={e => { setDateTo(e.target.value); setPeriodPreset('custom'); }}
+                    style={{ width: 'auto', fontSize: '0.8rem', padding: '0.35rem 0.5rem' }} />
+                </div>
+                {(dateFrom || dateTo) && (
+                  <button className="btn btn-outline btn-sm" onClick={() => applyPeriodPreset('')} style={{ fontSize: '0.75rem' }}>Zrušit filtr</button>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="filters" style={{ marginTop: '0.75rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
             <select className="form-select" value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)}>
               <option value="">Všechny kategorie</option>
               {categories.map(c => <option key={c} value={c}>{c}</option>)}

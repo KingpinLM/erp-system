@@ -368,6 +368,20 @@ db.exec(`
   );
 `);
 
+// ─── CUSTOM ROLES ────────────────────────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS custom_roles (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tenant_id INTEGER NOT NULL REFERENCES tenants(id),
+    name TEXT NOT NULL,
+    description TEXT,
+    permissions TEXT DEFAULT '[]',
+    base_role TEXT DEFAULT 'viewer' CHECK(base_role IN ('admin','accountant','manager','viewer')),
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(tenant_id, name)
+  );
+`);
+
 // ─── MIGRATIONS ──────────────────────────────────────────
 const safeAlter = (sql) => { try { db.exec(sql); } catch (e) { /* already exists */ } };
 
@@ -439,6 +453,16 @@ try {
       db.prepare("UPDATE company SET invoice_counter = ? WHERE tenant_id = ?").run(maxNum + 1, t.id);
     }
   });
+} catch (e) { /* ok */ }
+
+// Set a dummy logo for companies without one
+try {
+  const companies = db.prepare("SELECT id FROM company WHERE logo IS NULL OR logo = ''").all();
+  if (companies.length > 0) {
+    // Simple dummy SVG logo as base64
+    const dummyLogo = 'data:image/svg+xml;base64,' + Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="180" height="60" viewBox="0 0 180 60"><rect width="180" height="60" rx="8" fill="#6366f1"/><text x="90" y="36" text-anchor="middle" fill="white" font-family="Arial,sans-serif" font-weight="bold" font-size="22">RFI ERP</text></svg>').toString('base64');
+    db.prepare("UPDATE company SET logo = ? WHERE logo IS NULL OR logo = ''").run(dummyLogo);
+  }
 } catch (e) { /* ok */ }
 
 module.exports = db;

@@ -392,6 +392,99 @@ tr { transition: background 0.1s ease; }
 .mb-1 { margin-bottom: 1rem; }
 .flex-between { display: flex; justify-content: space-between; align-items: center; }
 
+/* ─── GLOBAL ANIMATIONS ───────────────────────────── */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(16px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-fade-in-up { animation: fadeInUp 0.35s ease-out both; }
+.animate-fade-in { animation: fadeIn 0.3s ease-out both; }
+.animate-scale-in { animation: scaleIn 0.25s ease-out both; }
+
+/* Staggered animation delays */
+.stagger-1 { animation-delay: 0.05s; }
+.stagger-2 { animation-delay: 0.1s; }
+.stagger-3 { animation-delay: 0.15s; }
+.stagger-4 { animation-delay: 0.2s; }
+
+/* Page content animation */
+.content > div { animation: fadeInUp 0.3s ease-out; }
+
+/* Card hover enhancements */
+.card { transition: box-shadow 0.2s ease, transform 0.2s ease; }
+.card:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
+
+/* KPI card enhanced hover */
+.kpi-card { transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); }
+.kpi-card:hover { box-shadow: var(--shadow-lg); transform: translateY(-3px); }
+
+/* Table row hover animation */
+tr { transition: all 0.15s ease; }
+tr:hover td { background: var(--primary-50); }
+
+/* Badge hover effect */
+.badge { transition: all 0.15s ease; }
+.badge:hover { transform: scale(1.05); }
+
+/* Button press effect */
+.btn { transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1); }
+.btn:active { transform: translateY(0) scale(0.97); }
+
+/* Form input focus animation */
+.form-input:focus, .form-select:focus, .form-textarea:focus {
+  outline: none; border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+  transform: translateY(-1px);
+}
+
+/* Modal animation */
+.modal-overlay { animation: fadeIn 0.2s ease-out; }
+.modal { animation: scaleIn 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); }
+
+/* Sidebar link hover enhancement */
+.sidebar-link { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
+.sidebar-link:hover { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.9); transform: translateX(4px); }
+.sidebar-link.active { transform: translateX(0); }
+
+/* Page title animation */
+.page-title { animation: fadeInUp 0.4s ease-out; }
+
+/* Link hover effects */
+a { transition: color 0.15s ease, opacity 0.15s ease; }
+a:hover { opacity: 0.85; }
+
+/* Filter bar animation */
+.filters { animation: fadeInUp 0.3s ease-out 0.1s both; }
+
+/* Logo upload area hover */
+.logo-upload-area { transition: all 0.25s ease; border: 2px dashed var(--gray-300); border-radius: var(--radius); padding: 1.5rem; text-align: center; cursor: pointer; }
+.logo-upload-area:hover { border-color: var(--primary); background: var(--primary-50); transform: scale(1.01); }
+
+/* Role card styles */
+.role-card { background: white; border-radius: var(--radius-lg); padding: 1.25rem; border: 1px solid var(--gray-200); transition: all 0.25s ease; }
+.role-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); border-color: var(--primary-light); }
+
+/* Permission toggle */
+.perm-toggle { display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.75rem; border-radius: 8px; transition: all 0.15s ease; cursor: pointer; }
+.perm-toggle:hover { background: var(--gray-50); }
+
 /* ─── SIGNATURE PAD ────────────────────────────── */
 .signature-pad-container { margin-bottom: 1rem; }
 .signature-canvas {
@@ -745,3 +838,8 @@ tr { transition: background 0.1s ease; }
 [data-theme="dark"] .login-card { background: rgba(30,41,59,0.95); }
 [data-theme="dark"] .modal-close { background: rgba(255,255,255,0.06); }
 [data-theme="dark"] .modal-close:hover { background: rgba(255,255,255,0.1); }
+[data-theme="dark"] .role-card { background: #1e293b; border-color: #334155; }
+[data-theme="dark"] .role-card:hover { border-color: var(--primary-light); }
+[data-theme="dark"] .perm-toggle:hover { background: rgba(255,255,255,0.04); }
+[data-theme="dark"] .logo-upload-area { border-color: #475569; }
+[data-theme="dark"] .logo-upload-area:hover { border-color: var(--primary); background: rgba(99, 102, 241, 0.08); }

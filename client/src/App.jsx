@@ -22,7 +22,6 @@ import RecurringInvoices from './pages/RecurringInvoices';
 import Accounting from './pages/Accounting';
 import VatReport from './pages/VatReport';
 import Bank from './pages/Bank';
-import Orders from './pages/Orders';
 import './styles.css';
 
 export const AuthContext = createContext(null);
@@ -122,7 +121,6 @@ function Sidebar({ open, onClose }) {
   const links = [
     { to: '/', label: 'Dashboard', icon: 'dashboard' },
     { to: '/invoices', label: 'Faktury', icon: 'invoice' },
-    { to: '/orders', label: 'Objednávky', icon: 'orders' },
     { to: '/clients', label: 'Klienti', icon: 'clients' },
     { to: '/evidence', label: 'Evidence', icon: 'evidence' },
     { to: '/bank', label: 'Banka', icon: 'bank' },
@@ -299,7 +297,6 @@ export default function App() {
                   <Route path="/evidence" element={<Evidence />} />
                   <Route path="/clients" element={<Clients />} />
                   <Route path="/clients/:id" element={<ClientDetail />} />
-                  <Route path="/orders" element={<Orders />} />
                   <Route path="/bank" element={<Bank />} />
                   <Route path="/accounting" element={<Accounting />} />
                   <Route path="/vat" element={<VatReport />} />

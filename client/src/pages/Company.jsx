@@ -237,24 +237,66 @@ export default function Company() {
 
       <div className="card" style={{ marginTop: '1.5rem' }}>
         <div className="card-title" style={{ marginBottom: '1rem' }}>Logo společnosti</div>
-        {form.logo && (
-          <div style={{ marginBottom: '1rem' }}>
-            <img src={form.logo} alt="Logo" style={{ maxWidth: 200, maxHeight: 80, objectFit: 'contain' }} />
-            <button className="btn btn-outline btn-sm" style={{ marginLeft: '0.5rem' }} onClick={async () => { await api.updateCompany({ ...form, logo: null }); setForm(f => ({ ...f, logo: null })); }}>Odstranit</button>
+        <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          <div style={{
+            width: 200, height: 100, borderRadius: 'var(--radius)', border: '2px solid var(--gray-200)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+            background: form.logo ? 'white' : 'var(--gray-50)', transition: 'all 0.2s ease'
+          }}>
+            {form.logo ? (
+              <img src={form.logo} alt="Logo" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+            ) : (
+              <div style={{ textAlign: 'center', color: 'var(--gray-400)' }}>
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+                <div style={{ fontSize: '0.7rem', marginTop: 4 }}>Bez loga</div>
+              </div>
+            )}
           </div>
-        )}
-        <input type="file" accept="image/*" onChange={(e) => {
-          const file = e.target.files[0]; if (!file) return;
-          const reader = new FileReader();
-          reader.onload = async (ev) => {
-            const logo = ev.target.result;
-            setForm(f => ({ ...f, logo }));
-            await api.updateCompany({ ...form, logo });
-            setSaved(true); setTimeout(() => setSaved(false), 3000);
-          };
-          reader.readAsDataURL(file);
-        }} />
-        <small style={{ color: 'var(--gray-500)', fontSize: '0.75rem', display: 'block', marginTop: '0.5rem' }}>PNG nebo JPG, max 200px šířka. Zobrazí se na fakturách.</small>
+          <div style={{ flex: 1, minWidth: 200 }}>
+            <div
+              className="logo-upload-area"
+              onClick={() => document.getElementById('logo-upload-input').click()}
+              onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.background = 'var(--primary-50)'; }}
+              onDragLeave={(e) => { e.currentTarget.style.borderColor = ''; e.currentTarget.style.background = ''; }}
+              onDrop={(e) => {
+                e.preventDefault();
+                e.currentTarget.style.borderColor = ''; e.currentTarget.style.background = '';
+                const file = e.dataTransfer.files[0]; if (!file) return;
+                const reader = new FileReader();
+                reader.onload = async (ev) => {
+                  const logo = ev.target.result;
+                  setForm(f => ({ ...f, logo }));
+                  await api.updateCompany({ ...form, logo });
+                  setSaved(true); setTimeout(() => setSaved(false), 3000);
+                };
+                reader.readAsDataURL(file);
+              }}
+            >
+              <input id="logo-upload-input" type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => {
+                const file = e.target.files[0]; if (!file) return;
+                const reader = new FileReader();
+                reader.onload = async (ev) => {
+                  const logo = ev.target.result;
+                  setForm(f => ({ ...f, logo }));
+                  await api.updateCompany({ ...form, logo });
+                  setSaved(true); setTimeout(() => setSaved(false), 3000);
+                };
+                reader.readAsDataURL(file);
+              }} />
+              <div style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              </div>
+              <div style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--gray-700)' }}>Nahrát logo</div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--gray-500)', marginTop: 2 }}>Přetáhněte soubor nebo klikněte</div>
+            </div>
+            {form.logo && (
+              <button className="btn btn-outline btn-sm" style={{ marginTop: '0.75rem' }} onClick={async () => { await api.updateCompany({ ...form, logo: null }); setForm(f => ({ ...f, logo: null })); }}>
+                Odstranit logo
+              </button>
+            )}
+            <small style={{ color: 'var(--gray-500)', fontSize: '0.75rem', display: 'block', marginTop: '0.5rem' }}>PNG nebo JPG, max 200px šířka. Zobrazí se na fakturách.</small>
+          </div>
+        </div>
       </div>
 
       <div className="card" style={{ marginTop: '1.5rem' }}>

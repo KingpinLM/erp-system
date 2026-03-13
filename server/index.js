@@ -59,7 +59,6 @@ const accountingRoutes = require('./routes-accounting');
 const bankRoutes = require('./routes-bank');
 const cashRoutes = require('./routes-cash');
 const productRoutes = require('./routes-products');
-const orderRoutes = require('./routes-orders');
 const notificationRoutes = require('./routes-notifications');
 const getLoginPage = require('./login-page');
 
@@ -101,7 +100,6 @@ app.use(accountingRoutes);
 app.use(bankRoutes);
 app.use(cashRoutes);
 app.use(productRoutes);
-app.use(orderRoutes);
 app.use(notificationRoutes);
 
 // ─── SUPERADMIN AUTH ────────────────────────────────────────
@@ -319,6 +317,53 @@ app.post('/api/users/:id/approve', ...tenanted, authorize('admin'), (req, res) =
 
 app.post('/api/users/:id/reject', ...tenanted, authorize('admin'), (req, res) => {
   db.prepare("DELETE FROM users WHERE id = ? AND status = 'pending' AND tenant_id = ?").run(req.params.id, req.tenant_id);
+  res.json({ ok: true });
+});
+
+// ─── ROLES & PERMISSIONS (admin only) ──────────────────────
+// Get all custom roles for tenant
+app.get('/api/roles', ...tenanted, authorize('admin'), (req, res) => {
+  const roles = db.prepare('SELECT * FROM custom_roles WHERE tenant_id = ? ORDER BY name').all(req.tenant_id);
+  res.json(roles.map(r => ({ ...r, permissions: JSON.parse(r.permissions || '[]') })));
+});
+
+// Create custom role
+app.post('/api/roles', ...tenanted, authorize('admin'), (req, res) => {
+  const { name, description, permissions, base_role } = req.body;
+  if (!name) return res.status(400).json({ error: 'Název role je povinný' });
+  const existing = db.prepare('SELECT id FROM custom_roles WHERE tenant_id = ? AND name = ?').get(req.tenant_id, name);
+  if (existing) return res.status(400).json({ error: 'Role s tímto názvem již existuje' });
+  const result = db.prepare('INSERT INTO custom_roles (tenant_id, name, description, permissions, base_role) VALUES (?,?,?,?,?)').run(
+    req.tenant_id, name, description || '', JSON.stringify(permissions || []), base_role || 'viewer'
+  );
+  res.json({ id: result.lastInsertRowid, name, description, permissions: permissions || [], base_role: base_role || 'viewer' });
+});
+
+// Update custom role
+app.put('/api/roles/:id', ...tenanted, authorize('admin'), (req, res) => {
+  const { name, description, permissions, base_role } = req.body;
+  db.prepare('UPDATE custom_roles SET name=?, description=?, permissions=?, base_role=? WHERE id=? AND tenant_id=?').run(
+    name, description || '', JSON.stringify(permissions || []), base_role || 'viewer', req.params.id, req.tenant_id
+  );
+  res.json({ ok: true });
+});
+
+// Delete custom role
+app.delete('/api/roles/:id', ...tenanted, authorize('admin'), (req, res) => {
+  db.prepare('DELETE FROM custom_roles WHERE id = ? AND tenant_id = ?').run(req.params.id, req.tenant_id);
+  res.json({ ok: true });
+});
+
+// Update user role (admin assigning permissions)
+app.patch('/api/users/:id/role', ...tenanted, authorize('admin'), (req, res) => {
+  const { role } = req.body;
+  if (!['admin', 'accountant', 'manager', 'viewer'].includes(role)) {
+    return res.status(400).json({ error: 'Neplatná role' });
+  }
+  db.prepare("UPDATE users SET role = ?, updated_at = datetime('now') WHERE id = ? AND tenant_id = ?").run(role, req.params.id, req.tenant_id);
+  db.prepare("INSERT INTO audit_log (tenant_id, user_id, action, entity, entity_id, details) VALUES (?,?,'role_change','user',?,?)").run(
+    req.tenant_id, req.user.id, req.params.id, `Role změněna na ${role}`
+  );
   res.json({ ok: true });
 });
 
@@ -692,18 +737,21 @@ app.patch('/api/invoices/:id/status', ...tenanted, authorize('admin', 'accountan
   res.json({ ok: true });
 });
 
-app.delete('/api/invoices/:id', ...tenanted, authorize('admin'), (req, res) => {
+app.delete('/api/invoices/:id', ...tenanted, authorize('admin', 'manager'), (req, res) => {
   db.prepare('DELETE FROM invoices WHERE id = ? AND tenant_id = ?').run(req.params.id, req.tenant_id);
+  db.prepare("INSERT INTO audit_log (tenant_id, user_id, action, entity, entity_id, details) VALUES (?, ?, 'delete', 'invoice', ?, 'Faktura smazána')").run(req.tenant_id, req.user.id, req.params.id);
   res.json({ ok: true });
 });
 
 // ─── EVIDENCE ────────────────────────────────────────────────
 app.get('/api/evidence', ...tenanted, (req, res) => {
-  const { type, category } = req.query;
+  const { type, category, from, to } = req.query;
   let sql = 'SELECT e.*, u.full_name as created_by_name FROM evidence e LEFT JOIN users u ON e.created_by = u.id WHERE e.tenant_id = ?';
   const params = [req.tenant_id];
   if (type) { sql += ' AND e.type = ?'; params.push(type); }
   if (category) { sql += ' AND e.category = ?'; params.push(category); }
+  if (from) { sql += ' AND e.date >= ?'; params.push(from); }
+  if (to) { sql += ' AND e.date <= ?'; params.push(to); }
   sql += ' ORDER BY e.date DESC';
   res.json(db.prepare(sql).all(...params));
 });
