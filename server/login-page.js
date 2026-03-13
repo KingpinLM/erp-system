@@ -223,11 +223,12 @@ module.exports = function getLoginPage(error) {
       var ctx = canvas.getContext('2d');
       var time = 0;
       var blobs = [
-        { x: 0.2, y: 0.3, r: 0.35, color: [13, 148, 136], speed: 0.0004, phase: 0 },
-        { x: 0.8, y: 0.2, r: 0.3, color: [8, 145, 178], speed: 0.0003, phase: 2 },
-        { x: 0.5, y: 0.8, r: 0.32, color: [15, 118, 110], speed: 0.00035, phase: 4 },
-        { x: 0.3, y: 0.7, r: 0.28, color: [45, 212, 191], speed: 0.00025, phase: 1 },
-        { x: 0.7, y: 0.6, r: 0.25, color: [124, 58, 237], speed: 0.00045, phase: 3 }
+        { x: 0.2, y: 0.3, r: 0.38, color: [13, 148, 136], sx: 0.002, sy: 0.0015, ax: 0.18, ay: 0.14, phase: 0 },
+        { x: 0.8, y: 0.2, r: 0.32, color: [8, 145, 178], sx: 0.0015, sy: 0.0018, ax: 0.15, ay: 0.12, phase: 2 },
+        { x: 0.5, y: 0.8, r: 0.35, color: [15, 118, 110], sx: 0.0018, sy: 0.0012, ax: 0.16, ay: 0.18, phase: 4 },
+        { x: 0.3, y: 0.65, r: 0.3, color: [45, 212, 191], sx: 0.0012, sy: 0.002, ax: 0.2, ay: 0.15, phase: 1 },
+        { x: 0.7, y: 0.5, r: 0.28, color: [124, 58, 237], sx: 0.0022, sy: 0.0014, ax: 0.14, ay: 0.2, phase: 3 },
+        { x: 0.15, y: 0.6, r: 0.22, color: [6, 182, 212], sx: 0.0019, sy: 0.0016, ax: 0.17, ay: 0.13, phase: 5 }
       ];
 
       function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
@@ -239,14 +240,17 @@ module.exports = function getLoginPage(error) {
         var w = canvas.width, h = canvas.height;
         ctx.fillStyle = '#0a0f1e';
         ctx.fillRect(0, 0, w, h);
+
         for (var i = 0; i < blobs.length; i++) {
           var b = blobs[i];
-          var cx = w * (b.x + 0.12 * Math.sin(time * b.speed + b.phase));
-          var cy = h * (b.y + 0.10 * Math.cos(time * b.speed * 1.3 + b.phase));
-          var r = Math.min(w, h) * b.r;
+          // Organic multi-wave motion
+          var cx = w * (b.x + b.ax * Math.sin(time * b.sx + b.phase) + 0.05 * Math.sin(time * b.sx * 2.7 + b.phase * 1.5));
+          var cy = h * (b.y + b.ay * Math.cos(time * b.sy + b.phase * 0.8) + 0.04 * Math.cos(time * b.sy * 3.1 + b.phase * 2));
+          // Pulsing radius
+          var r = Math.min(w, h) * (b.r + 0.03 * Math.sin(time * 0.003 + b.phase));
           var g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-          g.addColorStop(0, 'rgba(' + b.color[0] + ',' + b.color[1] + ',' + b.color[2] + ',0.18)');
-          g.addColorStop(0.5, 'rgba(' + b.color[0] + ',' + b.color[1] + ',' + b.color[2] + ',0.06)');
+          g.addColorStop(0, 'rgba(' + b.color[0] + ',' + b.color[1] + ',' + b.color[2] + ',0.22)');
+          g.addColorStop(0.4, 'rgba(' + b.color[0] + ',' + b.color[1] + ',' + b.color[2] + ',0.08)');
           g.addColorStop(1, 'rgba(' + b.color[0] + ',' + b.color[1] + ',' + b.color[2] + ',0)');
           ctx.fillStyle = g;
           ctx.fillRect(0, 0, w, h);
