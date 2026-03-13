@@ -15,16 +15,40 @@ module.exports = function getLoginPage(error) {
     body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; display: flex; align-items: center; justify-content: center; overflow: hidden; background: #0a0f1e; -webkit-font-smoothing: antialiased; }
     /* CSS animated orbs as visible layer behind glass */
     .orb {
-      position: fixed; border-radius: 50%; filter: blur(80px); opacity: 0.5; z-index: 0; pointer-events: none;
+      position: fixed; border-radius: 50%; filter: blur(80px); opacity: 0.55; z-index: 0; pointer-events: none;
     }
-    .orb-1 { width: 500px; height: 500px; background: #0d9488; top: -10%; left: -5%; animation: orbFloat1 8s ease-in-out infinite alternate; }
-    .orb-2 { width: 400px; height: 400px; background: #0891b2; top: 10%; right: -10%; animation: orbFloat2 10s ease-in-out infinite alternate; }
-    .orb-3 { width: 450px; height: 450px; background: #7c3aed; bottom: -15%; left: 30%; animation: orbFloat3 12s ease-in-out infinite alternate; }
-    .orb-4 { width: 350px; height: 350px; background: #2dd4bf; bottom: 10%; right: 10%; animation: orbFloat4 9s ease-in-out infinite alternate; }
-    @keyframes orbFloat1 { from { transform: translate(0, 0) scale(1); } to { transform: translate(80px, 60px) scale(1.15); } }
-    @keyframes orbFloat2 { from { transform: translate(0, 0) scale(1); } to { transform: translate(-60px, 80px) scale(1.1); } }
-    @keyframes orbFloat3 { from { transform: translate(0, 0) scale(1); } to { transform: translate(50px, -70px) scale(1.2); } }
-    @keyframes orbFloat4 { from { transform: translate(0, 0) scale(1); } to { transform: translate(-70px, -50px) scale(1.1); } }
+    .orb-1 { width: 500px; height: 500px; background: #0d9488; top: -10%; left: -5%; animation: orbFloat1 14s ease-in-out infinite; }
+    .orb-2 { width: 400px; height: 400px; background: #0891b2; top: 10%; right: -10%; animation: orbFloat2 18s ease-in-out infinite; }
+    .orb-3 { width: 450px; height: 450px; background: #7c3aed; bottom: -15%; left: 30%; animation: orbFloat3 20s ease-in-out infinite; }
+    .orb-4 { width: 350px; height: 350px; background: #2dd4bf; bottom: 10%; right: 10%; animation: orbFloat4 16s ease-in-out infinite; }
+    @keyframes orbFloat1 {
+      0%   { transform: translate(0, 0) scale(1); }
+      25%  { transform: translate(160px, 80px) scale(1.15); }
+      50%  { transform: translate(100px, 200px) scale(0.95); }
+      75%  { transform: translate(-60px, 120px) scale(1.1); }
+      100% { transform: translate(0, 0) scale(1); }
+    }
+    @keyframes orbFloat2 {
+      0%   { transform: translate(0, 0) scale(1); }
+      25%  { transform: translate(-140px, 100px) scale(1.1); }
+      50%  { transform: translate(-80px, -120px) scale(1.2); }
+      75%  { transform: translate(60px, -60px) scale(0.9); }
+      100% { transform: translate(0, 0) scale(1); }
+    }
+    @keyframes orbFloat3 {
+      0%   { transform: translate(0, 0) scale(1); }
+      25%  { transform: translate(120px, -100px) scale(1.2); }
+      50%  { transform: translate(-100px, -60px) scale(1.05); }
+      75%  { transform: translate(-160px, 80px) scale(1.15); }
+      100% { transform: translate(0, 0) scale(1); }
+    }
+    @keyframes orbFloat4 {
+      0%   { transform: translate(0, 0) scale(1); }
+      25%  { transform: translate(-100px, -140px) scale(1.15); }
+      50%  { transform: translate(80px, -80px) scale(0.95); }
+      75%  { transform: translate(140px, 60px) scale(1.1); }
+      100% { transform: translate(0, 0) scale(1); }
+    }
 
     .login-container {
       position: relative; z-index: 1;
