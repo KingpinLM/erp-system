@@ -66,16 +66,98 @@ const cookieParser = require('cookie-parser');
 
 const app = express();
 app.disable('etag');
-app.use(cors());
+app.disable('x-powered-by');
+
+// ─── CORS — restrict origins ─────────────────────────────
+app.use(cors({
+  origin: (origin, cb) => {
+    // Allow same-origin requests (no Origin header)
+    if (!origin) return cb(null, true);
+    // Allow localhost for development
+    if (origin.match(/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/)) return cb(null, true);
+    // Allow configured origins via CORS_ORIGIN env var
+    const allowed = process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : [];
+    if (allowed.includes(origin)) return cb(null, true);
+    cb(null, false);
+  },
+  credentials: true,
+}));
+
 app.use(cookieParser());
+
+// ─── SECURITY HEADERS ────────────────────────────────────
 app.use((req, res, next) => {
   res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   res.set('Pragma', 'no-cache');
   res.set('Expires', '0');
   res.set('Surrogate-Control', 'no-store');
+  res.set('X-Content-Type-Options', 'nosniff');
+  res.set('X-Frame-Options', 'DENY');
+  res.set('X-XSS-Protection', '1; mode=block');
+  res.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  if (req.secure || req.headers['x-forwarded-proto'] === 'https') {
+    res.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  }
   next();
 });
+
 app.use(express.json({ limit: '5mb' }));
+
+// ─── RATE LIMITING (in-memory, per IP) ───────────────────
+const loginAttempts = new Map();
+function rateLimit(windowMs, maxAttempts) {
+  return (req, res, next) => {
+    const ip = req.ip || req.connection.remoteAddress;
+    const now = Date.now();
+    const entry = loginAttempts.get(ip);
+    if (entry) {
+      // Clean expired entries
+      entry.timestamps = entry.timestamps.filter(t => now - t < windowMs);
+      if (entry.timestamps.length >= maxAttempts) {
+        return res.status(429).json({ error: 'Příliš mnoho pokusů. Zkuste to znovu za chvíli.' });
+      }
+      entry.timestamps.push(now);
+    } else {
+      loginAttempts.set(ip, { timestamps: [now] });
+    }
+    next();
+  };
+}
+// Clean up old entries every 10 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, entry] of loginAttempts) {
+    entry.timestamps = entry.timestamps.filter(t => now - t < 15 * 60 * 1000);
+    if (entry.timestamps.length === 0) loginAttempts.delete(ip);
+  }
+}, 10 * 60 * 1000);
+
+// ─── INPUT SANITIZATION ──────────────────────────────────
+function sanitize(str) {
+  if (typeof str !== 'string') return str;
+  return str.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#x27;');
+}
+function sanitizeObject(obj) {
+  if (!obj || typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) return obj.map(sanitizeObject);
+  const clean = {};
+  for (const [key, val] of Object.entries(obj)) {
+    if (typeof val === 'string') clean[key] = sanitize(val);
+    else if (typeof val === 'object' && val !== null) clean[key] = sanitizeObject(val);
+    else clean[key] = val;
+  }
+  return clean;
+}
+// Sanitize all incoming JSON bodies (except password fields)
+app.use((req, res, next) => {
+  if (req.body && typeof req.body === 'object') {
+    const pw = req.body.password; // Preserve password as-is
+    req.body = sanitizeObject(req.body);
+    if (pw !== undefined) req.body.password = pw;
+  }
+  next();
+});
 
 // Server-side login page (NO React, NO JS bundles, pure HTML form)
 app.get('/login', (req, res) => {
@@ -103,7 +185,7 @@ app.use(productRoutes);
 app.use(notificationRoutes);
 
 // ─── SUPERADMIN AUTH ────────────────────────────────────────
-app.post('/api/superadmin/login', (req, res) => {
+app.post('/api/superadmin/login', rateLimit(15 * 60 * 1000, 10), (req, res) => {
   const { username, password } = req.body;
   const sa = db.prepare('SELECT * FROM superadmins WHERE username = ?').get(username);
   if (!sa || !bcrypt.compareSync(password, sa.password)) {
@@ -184,7 +266,7 @@ app.delete('/api/superadmin/tenants/:id', authenticate, requireSuperadmin, (req,
 });
 
 // ─── FORM-BASED LOGIN (no fetch, no JS - direct form POST + redirect) ──
-app.post('/api/auth/form-login', express.urlencoded({ extended: false }), (req, res) => {
+app.post('/api/auth/form-login', rateLimit(15 * 60 * 1000, 10), express.urlencoded({ extended: false }), (req, res) => {
   const { username, password } = req.body;
   const user = db.prepare('SELECT * FROM users WHERE username = ? AND active = 1').get(username);
   if (!user || !bcrypt.compareSync(password, user.password)) {
@@ -196,7 +278,7 @@ app.post('/api/auth/form-login', express.urlencoded({ extended: false }), (req, 
 });
 
 // ─── AUTH (login without tenant slug — globally unique usernames) ──
-app.post('/api/auth/login', (req, res) => {
+app.post('/api/auth/login', rateLimit(15 * 60 * 1000, 10), (req, res) => {
   const { username, password } = req.body;
   const user = db.prepare('SELECT * FROM users WHERE username = ? AND active = 1').get(username);
   if (!user || !bcrypt.compareSync(password, user.password)) {
@@ -1417,6 +1499,17 @@ app.get('*', (req, res) => {
   }
 
   res.type('html').send(html);
+});
+
+// ─── GLOBAL ERROR HANDLER — no stack traces in production ─────
+app.use((err, req, res, _next) => {
+  // Log full error server-side for debugging
+  console.error(`[${new Date().toISOString()}] ${req.method} ${req.path}:`, err.message);
+  // Return generic error to client — no stack traces
+  if (err.type === 'entity.parse.failed') {
+    return res.status(400).json({ error: 'Neplatný formát požadavku' });
+  }
+  res.status(err.status || 500).json({ error: 'Interní chyba serveru' });
 });
 
 const PORT = process.env.PORT || 3001;

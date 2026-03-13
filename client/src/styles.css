@@ -164,13 +164,28 @@
   .content { padding: 1rem; }
   .kpi-grid { grid-template-columns: 1fr 1fr !important; }
   .charts-grid { grid-template-columns: 1fr !important; }
-  .table-responsive { overflow-x: auto; }
+  .table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   .form-row { flex-direction: column !important; }
   .inv-parties { grid-template-columns: 1fr !important; }
   .inv-meta { grid-template-columns: 1fr 1fr !important; }
+  /* Touch-friendly targets — minimum 44px tap targets */
+  .btn, .form-input, .form-select, .form-textarea { min-height: 44px; }
+  .btn-sm { min-height: 38px; }
+  /* Hide non-essential columns on mobile */
+  .hide-mobile { display: none !important; }
+  /* Stack button groups */
+  .btn-group { flex-wrap: wrap; }
+  .page-header { flex-direction: column; align-items: flex-start !important; gap: 0.75rem; }
+  .page-title { font-size: 1.25rem; }
+  .modal { width: 95vw; max-height: 90vh; margin: 5vh auto; }
 }
 @media (max-width: 480px) {
   .kpi-grid { grid-template-columns: 1fr !important; }
+  .inv-meta { grid-template-columns: 1fr !important; }
+  /* Larger touch targets on small phones */
+  .btn, .form-input, .form-select, .form-textarea { min-height: 48px; font-size: 16px; }
+  .content { padding: 0.75rem; }
+  table th, table td { padding: 0.5rem 0.4rem; font-size: 0.78rem; }
 }
 
 /* ─── CARDS ─────────────────────────────────────── */

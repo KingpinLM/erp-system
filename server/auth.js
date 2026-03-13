@@ -1,6 +1,8 @@
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 
-const SECRET = process.env.JWT_SECRET || 'erp-system-secret-key-2026';
+// Generate a random secret if none provided via environment
+const SECRET = process.env.JWT_SECRET || crypto.randomBytes(64).toString('hex');
 
 function generateToken(user) {
   return jwt.sign(
