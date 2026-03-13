@@ -13,7 +13,18 @@ module.exports = function getLoginPage(error) {
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; display: flex; align-items: center; justify-content: center; overflow: hidden; background: #0a0f1e; -webkit-font-smoothing: antialiased; }
-    canvas { position: fixed; inset: 0; z-index: 0; }
+    /* CSS animated orbs as visible layer behind glass */
+    .orb {
+      position: fixed; border-radius: 50%; filter: blur(80px); opacity: 0.5; z-index: 0; pointer-events: none;
+    }
+    .orb-1 { width: 500px; height: 500px; background: #0d9488; top: -10%; left: -5%; animation: orbFloat1 8s ease-in-out infinite alternate; }
+    .orb-2 { width: 400px; height: 400px; background: #0891b2; top: 10%; right: -10%; animation: orbFloat2 10s ease-in-out infinite alternate; }
+    .orb-3 { width: 450px; height: 450px; background: #7c3aed; bottom: -15%; left: 30%; animation: orbFloat3 12s ease-in-out infinite alternate; }
+    .orb-4 { width: 350px; height: 350px; background: #2dd4bf; bottom: 10%; right: 10%; animation: orbFloat4 9s ease-in-out infinite alternate; }
+    @keyframes orbFloat1 { from { transform: translate(0, 0) scale(1); } to { transform: translate(80px, 60px) scale(1.15); } }
+    @keyframes orbFloat2 { from { transform: translate(0, 0) scale(1); } to { transform: translate(-60px, 80px) scale(1.1); } }
+    @keyframes orbFloat3 { from { transform: translate(0, 0) scale(1); } to { transform: translate(50px, -70px) scale(1.2); } }
+    @keyframes orbFloat4 { from { transform: translate(0, 0) scale(1); } to { transform: translate(-70px, -50px) scale(1.1); } }
 
     .login-container {
       position: relative; z-index: 1;
@@ -128,7 +139,10 @@ module.exports = function getLoginPage(error) {
   </style>
 </head>
 <body>
-  <canvas id="bg"></canvas>
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+  <div class="orb orb-4"></div>
 
   <div class="login-container">
     <div class="brand">
@@ -217,49 +231,6 @@ module.exports = function getLoginPage(error) {
     </div>
   </div>
 
-  <script>
-    (function() {
-      var canvas = document.getElementById('bg');
-      var ctx = canvas.getContext('2d');
-      var time = 0;
-      var blobs = [
-        { x: 0.2, y: 0.3, r: 0.38, color: [13, 148, 136], sx: 0.002, sy: 0.0015, ax: 0.18, ay: 0.14, phase: 0 },
-        { x: 0.8, y: 0.2, r: 0.32, color: [8, 145, 178], sx: 0.0015, sy: 0.0018, ax: 0.15, ay: 0.12, phase: 2 },
-        { x: 0.5, y: 0.8, r: 0.35, color: [15, 118, 110], sx: 0.0018, sy: 0.0012, ax: 0.16, ay: 0.18, phase: 4 },
-        { x: 0.3, y: 0.65, r: 0.3, color: [45, 212, 191], sx: 0.0012, sy: 0.002, ax: 0.2, ay: 0.15, phase: 1 },
-        { x: 0.7, y: 0.5, r: 0.28, color: [124, 58, 237], sx: 0.0022, sy: 0.0014, ax: 0.14, ay: 0.2, phase: 3 },
-        { x: 0.15, y: 0.6, r: 0.22, color: [6, 182, 212], sx: 0.0019, sy: 0.0016, ax: 0.17, ay: 0.13, phase: 5 }
-      ];
-
-      function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
-      resize();
-      window.addEventListener('resize', resize);
-
-      function animate() {
-        time++;
-        var w = canvas.width, h = canvas.height;
-        ctx.fillStyle = '#0a0f1e';
-        ctx.fillRect(0, 0, w, h);
-
-        for (var i = 0; i < blobs.length; i++) {
-          var b = blobs[i];
-          // Organic multi-wave motion
-          var cx = w * (b.x + b.ax * Math.sin(time * b.sx + b.phase) + 0.05 * Math.sin(time * b.sx * 2.7 + b.phase * 1.5));
-          var cy = h * (b.y + b.ay * Math.cos(time * b.sy + b.phase * 0.8) + 0.04 * Math.cos(time * b.sy * 3.1 + b.phase * 2));
-          // Pulsing radius
-          var r = Math.min(w, h) * (b.r + 0.03 * Math.sin(time * 0.003 + b.phase));
-          var g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-          g.addColorStop(0, 'rgba(' + b.color[0] + ',' + b.color[1] + ',' + b.color[2] + ',0.22)');
-          g.addColorStop(0.4, 'rgba(' + b.color[0] + ',' + b.color[1] + ',' + b.color[2] + ',0.08)');
-          g.addColorStop(1, 'rgba(' + b.color[0] + ',' + b.color[1] + ',' + b.color[2] + ',0)');
-          ctx.fillStyle = g;
-          ctx.fillRect(0, 0, w, h);
-        }
-        requestAnimationFrame(animate);
-      }
-      animate();
-    })();
-  </script>
 </body>
 </html>`;
 };
