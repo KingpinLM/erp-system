@@ -27,399 +27,237 @@ const roleDefaults = {
   viewer: ['reports.view'],
 };
 
-/* ═══ GroupsTab — fully dynamic inline editing ═══ */
-function GroupsTab({ groups, users, loadGroups, allPermissions, permissionGroups, groupColors, error, setError }) {
-  const [expandedId, setExpandedId] = useState(null);
-  const [editName, setEditName] = useState({});
-  const [editDesc, setEditDesc] = useState({});
-  const [saving, setSaving] = useState(null);
-  const [memberGroupId, setMemberGroupId] = useState(null);
-  const [memberIds, setMemberIds] = useState([]);
-  const [newGroupOpen, setNewGroupOpen] = useState(false);
-  const [newForm, setNewForm] = useState({ name: '', description: '', color: '#0d9488', permissions: [] });
+/* ═══ Single group card — always shows everything, fully editable ═══ */
+function GroupCard({ group, users, loadGroups, allPermissions, permissionGroups, groupColors }) {
+  const [name, setName] = useState(group.name);
+  const [desc, setDesc] = useState(group.description || '');
+  const [saving, setSaving] = useState(false);
+  const [showMembers, setShowMembers] = useState(false);
+  const [memberIds, setMemberIds] = useState((group.members || []).map(m => m.user_id));
+  const rl = { admin: 'Admin', accountant: 'Účetní', manager: 'Manažer', viewer: 'Náhled' };
 
-  const roleLabelsLocal = { admin: 'Administrátor', accountant: 'Účetní', manager: 'Manažer', viewer: 'Náhled' };
+  // Sync when parent data changes
+  useEffect(() => {
+    setName(group.name);
+    setDesc(group.description || '');
+    setMemberIds((group.members || []).map(m => m.user_id));
+  }, [group]);
 
-  const toggleExpand = (id) => {
-    if (expandedId === id) {
-      setExpandedId(null);
-    } else {
-      const g = groups.find(g => g.id === id);
-      setExpandedId(id);
-      setEditName(n => ({ ...n, [id]: g.name }));
-      setEditDesc(n => ({ ...n, [id]: g.description || '' }));
+  const perms = group.permissions || [];
+
+  const save = async (data) => {
+    setSaving(true);
+    try {
+      await api.updateUserGroup(group.id, { name: data.name ?? name, description: data.desc ?? desc, permissions: data.permissions ?? perms, color: data.color ?? group.color });
+      await loadGroups();
+    } catch (e) { alert(e.message); }
+    setSaving(false);
+  };
+
+  const togglePerm = (key) => {
+    const next = perms.includes(key) ? perms.filter(p => p !== key) : [...perms, key];
+    save({ permissions: next });
+  };
+
+  const saveName = () => {
+    if (name && (name !== group.name || desc !== (group.description || ''))) {
+      save({ name, desc });
     }
   };
 
-  const togglePerm = async (group, permKey) => {
-    const perms = group.permissions || [];
-    const newPerms = perms.includes(permKey) ? perms.filter(p => p !== permKey) : [...perms, permKey];
-    setSaving(group.id);
-    try {
-      await api.updateUserGroup(group.id, { ...group, permissions: newPerms });
-      loadGroups();
-    } catch (e) { setError(e.message); }
-    finally { setSaving(null); }
-  };
-
-  const saveNameDesc = async (group) => {
-    const name = editName[group.id];
-    const desc = editDesc[group.id];
-    if (!name || name === group.name && desc === (group.description || '')) return;
-    setSaving(group.id);
-    try {
-      await api.updateUserGroup(group.id, { ...group, name, description: desc });
-      loadGroups();
-    } catch (e) { setError(e.message); }
-    finally { setSaving(null); }
-  };
-
-  const changeColor = async (group, color) => {
-    setSaving(group.id);
-    try {
-      await api.updateUserGroup(group.id, { ...group, color });
-      loadGroups();
-    } catch (e) { setError(e.message); }
-    finally { setSaving(null); }
-  };
-
-  const deleteGroup = async (group) => {
-    if (!confirm(`Smazat skupinu „${group.name}"?`)) return;
-    try {
-      await api.deleteUserGroup(group.id);
-      if (expandedId === group.id) setExpandedId(null);
-      loadGroups();
-    } catch (e) { setError(e.message); }
-  };
-
-  const openMembers = (group) => {
-    setMemberGroupId(group.id);
-    setMemberIds((group.members || []).map(m => m.user_id));
-  };
-
   const saveMembers = async () => {
+    setSaving(true);
     try {
-      await api.setGroupMembers(memberGroupId, memberIds);
-      setMemberGroupId(null);
-      loadGroups();
-    } catch (e) { setError(e.message); }
+      await api.setGroupMembers(group.id, memberIds);
+      setShowMembers(false);
+      await loadGroups();
+    } catch (e) { alert(e.message); }
+    setSaving(false);
   };
 
-  const createGroup = async (e) => {
-    e.preventDefault();
-    try {
-      await api.createUserGroup(newForm);
-      setNewGroupOpen(false);
-      setNewForm({ name: '', description: '', color: '#0d9488', permissions: [] });
+  const del = async () => {
+    if (confirm(`Smazat skupinu „${group.name}"?`)) {
+      await api.deleteUserGroup(group.id);
       loadGroups();
-    } catch (e) { setError(e.message); }
-  };
-
-  const selectAll = async (group) => {
-    setSaving(group.id);
-    try {
-      await api.updateUserGroup(group.id, { ...group, permissions: allPermissions.map(p => p.key) });
-      loadGroups();
-    } catch (e) { setError(e.message); }
-    finally { setSaving(null); }
-  };
-
-  const clearAll = async (group) => {
-    setSaving(group.id);
-    try {
-      await api.updateUserGroup(group.id, { ...group, permissions: [] });
-      loadGroups();
-    } catch (e) { setError(e.message); }
-    finally { setSaving(null); }
+    }
   };
 
   return (
-    <>
-      <div className="card">
-        <div className="card-header" style={{ marginBottom: '0.75rem' }}>
-          <div className="card-title">Skupiny uživatelů</div>
+    <div className="card" style={{ borderLeft: `4px solid ${group.color || 'var(--primary)'}`, padding: '1.25rem' }}>
+      {/* Row 1: Name + Description + Color + Delete */}
+      <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-end', marginBottom: '1rem', flexWrap: 'wrap' }}>
+        <div style={{ flex: '1 1 140px' }}>
+          <label className="form-label">Název skupiny</label>
+          <input className="form-input" value={name} onChange={e => setName(e.target.value)}
+            onBlur={saveName} onKeyDown={e => e.key === 'Enter' && saveName()}
+            style={{ fontWeight: 600 }} />
         </div>
-        <p style={{ fontSize: '0.82rem', color: 'var(--gray-500)', marginBottom: '1.25rem' }}>
-          Klikněte na skupinu pro úpravu názvu, oprávnění nebo členů. Změny se ukládají okamžitě.
-        </p>
-
-        {groups.length === 0 && !newGroupOpen && (
-          <div className="empty-state" style={{ padding: '2rem' }}>
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--gray-400)" strokeWidth="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-            <div style={{ fontWeight: 600, color: 'var(--gray-700)', marginTop: '0.5rem' }}>Zatím žádné skupiny</div>
-            <div style={{ fontSize: '0.85rem', color: 'var(--gray-500)', marginBottom: '1rem' }}>Vytvořte skupinu pro sdílení oprávnění.</div>
-          </div>
-        )}
-
-        {/* Group list — each expandable */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          {groups.map(group => {
-            const expanded = expandedId === group.id;
-            const isSaving = saving === group.id;
-            const perms = group.permissions || [];
-            return (
-              <div key={group.id} style={{
-                border: `1px solid ${expanded ? (group.color || 'var(--primary)') : 'var(--gray-200)'}`,
-                borderRadius: 'var(--radius-lg)', overflow: 'hidden',
-                borderLeft: `4px solid ${group.color || 'var(--primary)'}`,
-                transition: 'all 0.2s',
-                background: expanded ? 'var(--gray-50)' : 'white',
-              }}>
-                {/* Header row — always visible */}
-                <div
-                  onClick={() => toggleExpand(group.id)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.85rem 1rem',
-                    cursor: 'pointer', userSelect: 'none',
-                  }}
-                >
-                  <div style={{ width: 10, height: 10, borderRadius: '50%', background: group.color || 'var(--primary)', flexShrink: 0 }} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--gray-900)' }}>{group.name}</div>
-                    {group.description && <div style={{ fontSize: '0.75rem', color: 'var(--gray-500)', marginTop: 1 }}>{group.description}</div>}
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
-                    <span style={{ fontSize: '0.7rem', color: 'var(--gray-400)' }}>{(group.members || []).length} členů</span>
-                    <span style={{ fontSize: '0.7rem', color: 'var(--gray-400)' }}>{perms.length}/{allPermissions.length} oprávnění</span>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--gray-400)" strokeWidth="2" strokeLinecap="round"
-                      style={{ transform: expanded ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.2s' }}>
-                      <polyline points="6 9 12 15 18 9"/>
-                    </svg>
-                  </div>
-                </div>
-
-                {/* Expanded panel */}
-                {expanded && (
-                  <div style={{ padding: '0 1rem 1rem', borderTop: '1px solid var(--gray-200)' }}>
-                    {/* Name & Description inline edit */}
-                    <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.75rem', marginBottom: '0.75rem' }}>
-                      <div style={{ flex: 1 }}>
-                        <label style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Název</label>
-                        <input className="form-input" value={editName[group.id] ?? group.name}
-                          onChange={e => setEditName(n => ({ ...n, [group.id]: e.target.value }))}
-                          onBlur={() => saveNameDesc(group)}
-                          onKeyDown={e => e.key === 'Enter' && saveNameDesc(group)}
-                          style={{ fontSize: '0.85rem', padding: '0.4rem 0.6rem' }}
-                        />
-                      </div>
-                      <div style={{ flex: 2 }}>
-                        <label style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Popis</label>
-                        <input className="form-input" value={editDesc[group.id] ?? group.description ?? ''}
-                          onChange={e => setEditDesc(n => ({ ...n, [group.id]: e.target.value }))}
-                          onBlur={() => saveNameDesc(group)}
-                          onKeyDown={e => e.key === 'Enter' && saveNameDesc(group)}
-                          placeholder="Volitelný popis"
-                          style={{ fontSize: '0.85rem', padding: '0.4rem 0.6rem' }}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Color picker */}
-                    <div style={{ marginBottom: '0.75rem' }}>
-                      <label style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.3rem', display: 'block' }}>Barva</label>
-                      <div style={{ display: 'flex', gap: '0.35rem' }}>
-                        {groupColors.map(c => (
-                          <div key={c} onClick={() => changeColor(group, c)}
-                            style={{
-                              width: 24, height: 24, borderRadius: 6, background: c, cursor: 'pointer',
-                              border: (group.color || '#0d9488') === c ? '2px solid var(--gray-900)' : '2px solid transparent',
-                              transition: 'all 0.15s',
-                            }}
-                          />
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Permissions — inline checkboxes */}
-                    <div style={{ marginBottom: '0.75rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                        <label style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                          Oprávnění {isSaving && <span style={{ color: 'var(--primary)', fontStyle: 'italic', textTransform: 'none' }}> ukládám...</span>}
-                        </label>
-                        <div style={{ display: 'flex', gap: '0.35rem' }}>
-                          <button type="button" className="btn btn-outline btn-sm" style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem' }} onClick={() => selectAll(group)}>Vše</button>
-                          <button type="button" className="btn btn-outline btn-sm" style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem' }} onClick={() => clearAll(group)}>Nic</button>
-                        </div>
-                      </div>
-                      {permissionGroups.map(pg => (
-                        <div key={pg} style={{ marginBottom: '0.5rem' }}>
-                          <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--gray-400)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.3rem' }}>{pg}</div>
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem' }}>
-                            {allPermissions.filter(p => p.group === pg).map(perm => {
-                              const active = perms.includes(perm.key);
-                              return (
-                                <label key={perm.key} style={{
-                                  display: 'flex', alignItems: 'center', gap: '0.35rem',
-                                  padding: '0.3rem 0.55rem', borderRadius: 6, cursor: 'pointer',
-                                  background: active ? `${group.color || 'var(--primary)'}12` : 'white',
-                                  border: `1px solid ${active ? (group.color || 'var(--primary)') : 'var(--gray-200)'}`,
-                                  transition: 'all 0.12s',
-                                }}>
-                                  <input type="checkbox" checked={active}
-                                    onChange={() => togglePerm(group, perm.key)}
-                                    style={{ width: 15, height: 15, accentColor: group.color || 'var(--primary)', cursor: 'pointer' }}
-                                  />
-                                  <span style={{ fontSize: '0.78rem', fontWeight: active ? 600 : 400, color: active ? 'var(--gray-800)' : 'var(--gray-500)' }}>
-                                    {perm.label}
-                                  </span>
-                                </label>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Members preview */}
-                    <div style={{ marginBottom: '0.75rem' }}>
-                      <label style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.3rem', display: 'block' }}>
-                        Členové ({(group.members || []).length})
-                      </label>
-                      <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap', marginBottom: '0.4rem' }}>
-                        {(group.members || []).length === 0 && (
-                          <span style={{ fontSize: '0.8rem', color: 'var(--gray-400)', fontStyle: 'italic' }}>Žádní členové</span>
-                        )}
-                        {(group.members || []).map(m => (
-                          <span key={m.user_id} style={{
-                            fontSize: '0.72rem', padding: '0.2rem 0.5rem', borderRadius: 6,
-                            background: 'var(--gray-100)', color: 'var(--gray-700)', fontWeight: 500
-                          }}>{m.full_name || m.username}</span>
-                        ))}
-                      </div>
-                      <button className="btn btn-outline btn-sm" style={{ fontSize: '0.75rem' }} onClick={(e) => { e.stopPropagation(); openMembers(group); }}>
-                        Upravit členy
-                      </button>
-                    </div>
-
-                    {/* Delete */}
-                    <div style={{ borderTop: '1px solid var(--gray-200)', paddingTop: '0.65rem', display: 'flex', justifyContent: 'flex-end' }}>
-                      <button className="btn btn-danger btn-sm" onClick={() => deleteGroup(group)}>
-                        Smazat skupinu
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
+        <div style={{ flex: '2 1 200px' }}>
+          <label className="form-label">Popis</label>
+          <input className="form-input" value={desc} onChange={e => setDesc(e.target.value)}
+            onBlur={saveName} onKeyDown={e => e.key === 'Enter' && saveName()}
+            placeholder="Volitelný popis skupiny" />
         </div>
-
-        {/* Inline new group form */}
-        {newGroupOpen && (
-          <form onSubmit={createGroup} style={{
-            border: '1px dashed var(--primary)', borderRadius: 'var(--radius-lg)',
-            padding: '1rem', marginTop: '0.75rem', background: 'var(--primary-50)',
-          }}>
-            <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--gray-900)', marginBottom: '0.75rem' }}>Nová skupina</div>
-            <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '0.75rem' }}>
-              <div style={{ flex: 1 }}>
-                <label className="form-label">Název *</label>
-                <input className="form-input" value={newForm.name} onChange={e => setNewForm(f => ({ ...f, name: e.target.value }))} required placeholder="např. Fakturanti" style={{ fontSize: '0.85rem' }} />
-              </div>
-              <div style={{ flex: 2 }}>
-                <label className="form-label">Popis</label>
-                <input className="form-input" value={newForm.description} onChange={e => setNewForm(f => ({ ...f, description: e.target.value }))} placeholder="Volitelný popis" style={{ fontSize: '0.85rem' }} />
-              </div>
-            </div>
-            <div style={{ marginBottom: '0.75rem' }}>
-              <label className="form-label">Barva</label>
-              <div style={{ display: 'flex', gap: '0.35rem' }}>
-                {groupColors.map(c => (
-                  <div key={c} onClick={() => setNewForm(f => ({ ...f, color: c }))}
-                    style={{
-                      width: 24, height: 24, borderRadius: 6, background: c, cursor: 'pointer',
-                      border: newForm.color === c ? '2px solid var(--gray-900)' : '2px solid transparent',
-                    }}
-                  />
-                ))}
-              </div>
-            </div>
-            <div style={{ marginBottom: '0.75rem' }}>
-              <label className="form-label">Oprávnění</label>
-              {permissionGroups.map(pg => (
-                <div key={pg} style={{ marginBottom: '0.4rem' }}>
-                  <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--gray-400)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.25rem' }}>{pg}</div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem' }}>
-                    {allPermissions.filter(p => p.group === pg).map(perm => {
-                      const active = newForm.permissions.includes(perm.key);
-                      return (
-                        <label key={perm.key} style={{
-                          display: 'flex', alignItems: 'center', gap: '0.35rem',
-                          padding: '0.3rem 0.55rem', borderRadius: 6, cursor: 'pointer',
-                          background: active ? `${newForm.color}12` : 'white',
-                          border: `1px solid ${active ? newForm.color : 'var(--gray-200)'}`,
-                        }}>
-                          <input type="checkbox" checked={active}
-                            onChange={() => setNewForm(f => ({ ...f, permissions: active ? f.permissions.filter(p => p !== perm.key) : [...f.permissions, perm.key] }))}
-                            style={{ width: 15, height: 15, accentColor: newForm.color, cursor: 'pointer' }}
-                          />
-                          <span style={{ fontSize: '0.78rem', fontWeight: active ? 600 : 400, color: active ? 'var(--gray-800)' : 'var(--gray-500)' }}>
-                            {perm.label}
-                          </span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="btn-group">
-              <button type="submit" className="btn btn-primary">Vytvořit</button>
-              <button type="button" className="btn btn-outline" onClick={() => setNewGroupOpen(false)}>Zrušit</button>
-            </div>
-          </form>
-        )}
-
-        {!newGroupOpen && (
-          <button className="btn btn-outline" onClick={() => setNewGroupOpen(true)} style={{ marginTop: '0.75rem', width: '100%', justifyContent: 'center' }}>
-            + Nová skupina
-          </button>
-        )}
+        <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center', paddingBottom: '0.1rem' }}>
+          {groupColors.map(c => (
+            <div key={c} onClick={() => save({ color: c })}
+              style={{
+                width: 22, height: 22, borderRadius: 6, background: c, cursor: 'pointer',
+                outline: (group.color || '#0d9488') === c ? '2px solid var(--gray-800)' : 'none',
+                outlineOffset: 1,
+              }} />
+          ))}
+        </div>
+        <button className="btn btn-danger btn-sm" onClick={del} title="Smazat skupinu" style={{ marginLeft: 'auto', flexShrink: 0 }}>
+          Smazat
+        </button>
       </div>
 
-      {/* Members modal */}
-      {memberGroupId && (() => {
-        const group = groups.find(g => g.id === memberGroupId);
-        if (!group) return null;
-        return (
-          <div className="modal-overlay" onClick={() => setMemberGroupId(null)}>
-            <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 500 }}>
-              <div className="modal-header">
-                <h3 className="modal-title">Členové: {group.name}</h3>
-                <button className="modal-close" onClick={() => setMemberGroupId(null)}>&times;</button>
-              </div>
-              <p style={{ fontSize: '0.82rem', color: 'var(--gray-500)', marginBottom: '1rem' }}>
-                Vyberte uživatele pro tuto skupinu. Oprávnění skupiny se přidají k jejich stávajícím.
-              </p>
-              <div style={{ maxHeight: 400, overflowY: 'auto' }}>
-                {users.map(u => (
-                  <label key={u.id} style={{
-                    display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.5rem 0.75rem',
-                    borderRadius: 8, cursor: 'pointer', marginBottom: '0.25rem',
-                    background: memberIds.includes(u.id) ? `${group.color || 'var(--primary)'}10` : 'transparent',
-                    border: `1px solid ${memberIds.includes(u.id) ? (group.color || 'var(--primary)') + '40' : 'transparent'}`,
-                    transition: 'all 0.15s',
+      {/* Row 2: Permission checkboxes — always visible */}
+      <div style={{ marginBottom: '1rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+          <span className="form-label" style={{ margin: 0 }}>
+            Oprávnění ({perms.length}/{allPermissions.length})
+            {saving && <span style={{ color: 'var(--primary)', fontWeight: 400, fontStyle: 'italic', marginLeft: 6 }}>ukládám...</span>}
+          </span>
+          <div style={{ display: 'flex', gap: '0.35rem' }}>
+            <button type="button" className="btn btn-outline btn-sm" style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem' }}
+              onClick={() => save({ permissions: allPermissions.map(p => p.key) })}>Vše</button>
+            <button type="button" className="btn btn-outline btn-sm" style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem' }}
+              onClick={() => save({ permissions: [] })}>Nic</button>
+          </div>
+        </div>
+        {permissionGroups.map(pg => (
+          <div key={pg} style={{ marginBottom: '0.6rem' }}>
+            <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--gray-400)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.3rem' }}>{pg}</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
+              {allPermissions.filter(p => p.group === pg).map(perm => {
+                const on = perms.includes(perm.key);
+                return (
+                  <label key={perm.key} style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
+                    padding: '0.35rem 0.6rem', borderRadius: 6, cursor: 'pointer',
+                    background: on ? 'var(--success-light)' : 'white',
+                    border: `1px solid ${on ? 'var(--success)' : 'var(--gray-200)'}`,
+                    transition: 'all 0.1s',
                   }}>
-                    <input type="checkbox" checked={memberIds.includes(u.id)}
-                      onChange={() => setMemberIds(ids => ids.includes(u.id) ? ids.filter(id => id !== u.id) : [...ids, u.id])}
-                      style={{ width: 18, height: 18, accentColor: group.color || 'var(--primary)' }}
-                    />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--gray-900)' }}>{u.full_name}</div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--gray-500)' }}>{u.username} · {roleLabelsLocal[u.role]}</div>
-                    </div>
+                    <input type="checkbox" checked={on} onChange={() => togglePerm(perm.key)}
+                      style={{ width: 16, height: 16, accentColor: 'var(--success)', cursor: 'pointer' }} />
+                    <span style={{ fontSize: '0.8rem', fontWeight: on ? 600 : 400, color: on ? 'var(--success-dark)' : 'var(--gray-500)' }}>
+                      {perm.label}
+                    </span>
                   </label>
-                ))}
-              </div>
-              <div className="btn-group" style={{ marginTop: '1rem' }}>
-                <button className="btn btn-primary" onClick={saveMembers}>Uložit ({memberIds.length} vybraných)</button>
-                <button className="btn btn-outline" onClick={() => setMemberGroupId(null)}>Zrušit</button>
-              </div>
+                );
+              })}
             </div>
           </div>
-        );
-      })()}
-    </>
+        ))}
+      </div>
+
+      {/* Row 3: Members */}
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+          <span className="form-label" style={{ margin: 0 }}>Členové ({(group.members || []).length})</span>
+          <button className="btn btn-outline btn-sm" onClick={() => setShowMembers(!showMembers)}>
+            {showMembers ? 'Zavřít' : 'Upravit členy'}
+          </button>
+        </div>
+        {(group.members || []).length > 0 && !showMembers && (
+          <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap' }}>
+            {(group.members || []).map(m => (
+              <span key={m.user_id} style={{
+                fontSize: '0.75rem', padding: '0.2rem 0.55rem', borderRadius: 6,
+                background: 'var(--gray-100)', color: 'var(--gray-700)', fontWeight: 500,
+              }}>{m.full_name || m.username}</span>
+            ))}
+          </div>
+        )}
+        {(group.members || []).length === 0 && !showMembers && (
+          <div style={{ fontSize: '0.82rem', color: 'var(--gray-400)', fontStyle: 'italic' }}>Žádní členové — klikněte „Upravit členy"</div>
+        )}
+        {showMembers && (
+          <div style={{ border: '1px solid var(--gray-200)', borderRadius: 'var(--radius)', padding: '0.5rem', marginTop: '0.25rem', maxHeight: 300, overflowY: 'auto' }}>
+            {users.map(u => (
+              <label key={u.id} style={{
+                display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.4rem 0.5rem',
+                borderRadius: 6, cursor: 'pointer',
+                background: memberIds.includes(u.id) ? 'var(--primary-50)' : 'transparent',
+              }}>
+                <input type="checkbox" checked={memberIds.includes(u.id)}
+                  onChange={() => setMemberIds(ids => ids.includes(u.id) ? ids.filter(x => x !== u.id) : [...ids, u.id])}
+                  style={{ width: 16, height: 16, accentColor: group.color || 'var(--primary)', cursor: 'pointer' }} />
+                <span style={{ fontSize: '0.82rem', fontWeight: 500, color: 'var(--gray-800)' }}>{u.full_name}</span>
+                <span style={{ fontSize: '0.72rem', color: 'var(--gray-400)' }}>{rl[u.role]}</span>
+              </label>
+            ))}
+            <div style={{ marginTop: '0.5rem', display: 'flex', gap: '0.35rem' }}>
+              <button className="btn btn-primary btn-sm" onClick={saveMembers}>Uložit členy</button>
+              <button className="btn btn-outline btn-sm" onClick={() => { setShowMembers(false); setMemberIds((group.members || []).map(m => m.user_id)); }}>Zrušit</button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ═══ GroupsTab — renders all group cards ═══ */
+function GroupsTab({ groups, users, loadGroups, allPermissions, permissionGroups, groupColors }) {
+  const [creating, setCreating] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [err, setErr] = useState('');
+
+  const createGroup = async () => {
+    if (!newName.trim()) return;
+    setErr('');
+    try {
+      await api.createUserGroup({ name: newName.trim(), description: '', permissions: [], color: '#0d9488' });
+      setNewName('');
+      setCreating(false);
+      loadGroups();
+    } catch (e) { setErr(e.message); }
+  };
+
+  return (
+    <div>
+      <p style={{ fontSize: '0.82rem', color: 'var(--gray-500)', marginBottom: '1rem' }}>
+        Každá skupina má vlastní sadu oprávnění. Upravujte název, oprávnění i členy přímo na kartě.
+      </p>
+
+      {groups.length === 0 && !creating && (
+        <div className="card" style={{ textAlign: 'center', padding: '2.5rem' }}>
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--gray-300)" strokeWidth="1.5" style={{ marginBottom: '0.5rem' }}>
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+          <div style={{ fontWeight: 600, color: 'var(--gray-600)' }}>Zatím žádné skupiny</div>
+          <div style={{ fontSize: '0.82rem', color: 'var(--gray-400)', marginBottom: '1rem' }}>Vytvořte první skupinu pro sdílení oprávnění.</div>
+        </div>
+      )}
+
+      {groups.map(g => (
+        <GroupCard key={g.id} group={g} users={users} loadGroups={loadGroups}
+          allPermissions={allPermissions} permissionGroups={permissionGroups} groupColors={groupColors} />
+      ))}
+
+      {creating ? (
+        <div className="card" style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-end', padding: '1rem' }}>
+          <div style={{ flex: 1 }}>
+            <label className="form-label">Název nové skupiny</label>
+            <input className="form-input" value={newName} onChange={e => setNewName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && createGroup()}
+              autoFocus placeholder="např. Fakturanti, Správci banky" />
+            {err && <div className="form-error">{err}</div>}
+          </div>
+          <button className="btn btn-primary" onClick={createGroup}>Vytvořit</button>
+          <button className="btn btn-outline" onClick={() => { setCreating(false); setNewName(''); setErr(''); }}>Zrušit</button>
+        </div>
+      ) : (
+        <button className="btn btn-primary" onClick={() => setCreating(true)} style={{ marginTop: '0.75rem' }}>
+          + Nová skupina
+        </button>
+      )}
+    </div>
   );
 }
 
