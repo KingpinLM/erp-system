@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area, LineChart, Line } from 'recharts';
 import { api } from '../api';
@@ -153,13 +153,13 @@ export default function Dashboard() {
       <span>Načítání...</span>
     </div>
   );
-  if (!data) return <div className="dash-empty-hero"><span className="dash-empty-icon">{Icons.alert}</span><span>Nelze načíst data</span></div>;
+  if (!data || data.error || !data.kpis) return <div className="dash-empty-hero"><span className="dash-empty-icon">{Icons.alert}</span><span>{data?.error || 'Nelze načíst data'}</span></div>;
 
   const { kpis, revenueByMonth, expensesByCategory, invoicesByStatus, recentInvoices, topClients, topSuppliers, currencyBreakdown, monthlyIssued, monthlyExpenses, pendingItems, chartYear } = data;
 
   const statusLabels = { draft: 'Koncept', sent: 'Odesláno', paid: 'Zaplaceno', overdue: 'Po splatnosti', cancelled: 'Zrušeno' };
   const statusColors = { draft: '#94a3b8', sent: '#2563eb', paid: '#059669', overdue: '#dc2626', cancelled: '#d97706' };
-  const pieData = invoicesByStatus.map(s => ({ name: statusLabels[s.status] || s.status, value: s.count, color: statusColors[s.status] || '#999' }));
+  const pieData = (invoicesByStatus || []).map(s => ({ name: statusLabels[s.status] || s.status, value: s.count, color: statusColors[s.status] || '#999' }));
 
   const monthlyData = MONTHS.map((name, i) => {
     const monthKey = String(i + 1).padStart(2, '0');
@@ -172,18 +172,18 @@ export default function Dashboard() {
   const profitMargin = kpis.totalRevenue > 0 ? ((kpis.profit / kpis.totalRevenue) * 100).toFixed(1) : 0;
 
   // Cash flow running total (Rillion-inspired)
-  const cashFlowData = useMemo(() => {
+  const cashFlowData = (() => {
     let cumulative = 0;
     return monthlyData.map(d => {
       cumulative += (d.issued - d.expenses);
       return { name: d.name, cashflow: cumulative, income: d.issued, expenses: d.expenses };
     });
-  }, [monthlyData]);
+  })();
 
   // Payment analytics (Rillion-inspired) - computed from invoice data
-  const paidInvoices = invoicesByStatus.find(s => s.status === 'paid');
-  const overdueInvoices = invoicesByStatus.find(s => s.status === 'overdue');
-  const totalInvoices = invoicesByStatus.reduce((sum, s) => sum + s.count, 0);
+  const paidInvoices = (invoicesByStatus || []).find(s => s.status === 'paid');
+  const overdueInvoices = (invoicesByStatus || []).find(s => s.status === 'overdue');
+  const totalInvoices = (invoicesByStatus || []).reduce((sum, s) => sum + s.count, 0);
   const paidRate = totalInvoices > 0 ? ((paidInvoices?.count || 0) / totalInvoices * 100).toFixed(0) : 0;
   const overdueRate = totalInvoices > 0 ? ((overdueInvoices?.count || 0) / totalInvoices * 100).toFixed(0) : 0;
 
