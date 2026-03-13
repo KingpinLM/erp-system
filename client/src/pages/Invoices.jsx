@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api';
 import { useAuth } from '../App';
@@ -11,6 +11,8 @@ export default function Invoices() {
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({ status: '', currency: '' });
+  const [sortBy, setSortBy] = useState('created_at');
+  const [sortDir, setSortDir] = useState('desc');
   const { can } = useAuth();
 
   const load = () => {
@@ -22,6 +24,35 @@ export default function Invoices() {
   };
 
   useEffect(load, [filters]);
+
+  const sorted = useMemo(() => {
+    const arr = [...invoices];
+    arr.sort((a, b) => {
+      let va, vb;
+      if (sortBy === 'invoice_number') { va = a.invoice_number || ''; vb = b.invoice_number || ''; }
+      else if (sortBy === 'client_name') { va = (a.client_name || '').toLowerCase(); vb = (b.client_name || '').toLowerCase(); }
+      else if (sortBy === 'issue_date') { va = a.issue_date || ''; vb = b.issue_date || ''; }
+      else if (sortBy === 'due_date') { va = a.due_date || ''; vb = b.due_date || ''; }
+      else if (sortBy === 'total') { va = a.total || 0; vb = b.total || 0; }
+      else if (sortBy === 'total_czk') { va = a.total_czk || 0; vb = b.total_czk || 0; }
+      else if (sortBy === 'status') { va = a.status || ''; vb = b.status || ''; }
+      else { va = a.created_at || ''; vb = b.created_at || ''; }
+      if (va < vb) return sortDir === 'asc' ? -1 : 1;
+      if (va > vb) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+    return arr;
+  }, [invoices, sortBy, sortDir]);
+
+  const toggleSort = (col) => {
+    if (sortBy === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortBy(col); setSortDir('desc'); }
+  };
+
+  const SortIcon = ({ col }) => {
+    if (sortBy !== col) return <span style={{ opacity: 0.3 }}> ↕</span>;
+    return <span> {sortDir === 'asc' ? '↑' : '↓'}</span>;
+  };
 
   const handleDelete = async (id) => {
     if (!confirm('Opravdu smazat tuto fakturu?')) return;
@@ -38,7 +69,7 @@ export default function Invoices() {
         )}
       </div>
 
-      <div className="filters">
+      <div className="filters" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
         <select className="form-select" value={filters.status} onChange={e => setFilters(f => ({ ...f, status: e.target.value }))}>
           <option value="">Všechny stavy</option>
           <option value="draft">Koncept</option>
@@ -54,21 +85,39 @@ export default function Invoices() {
           <option value="USD">USD</option>
           <option value="GBP">GBP</option>
         </select>
+        <select className="form-select" value={sortBy} onChange={e => setSortBy(e.target.value)}>
+          <option value="created_at">Řadit dle vytvoření</option>
+          <option value="issue_date">Řadit dle vystavení</option>
+          <option value="due_date">Řadit dle splatnosti</option>
+          <option value="total">Řadit dle částky</option>
+          <option value="total_czk">Řadit dle CZK</option>
+          <option value="client_name">Řadit dle klienta</option>
+          <option value="status">Řadit dle stavu</option>
+        </select>
+        <button className="btn btn-outline btn-sm" onClick={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')}>
+          {sortDir === 'desc' ? '↓ Sestupně' : '↑ Vzestupně'}
+        </button>
       </div>
 
       <div className="card">
-        {loading ? <div className="loading">Načítání...</div> : invoices.length === 0 ? <div className="empty-state">Žádné faktury</div> : (
+        {loading ? <div className="loading">Načítání...</div> : sorted.length === 0 ? <div className="empty-state">Žádné faktury</div> : (
           <div className="table-responsive">
             <table>
               <thead>
                 <tr>
-                  <th>Číslo</th><th>Klient</th><th>Datum vystavení</th>
-                  <th>Splatnost</th><th className="text-right">Částka</th><th>Měna</th>
-                  <th className="text-right">CZK</th><th>Stav</th><th>Akce</th>
+                  <th style={{ cursor: 'pointer' }} onClick={() => toggleSort('invoice_number')}>Číslo<SortIcon col="invoice_number" /></th>
+                  <th style={{ cursor: 'pointer' }} onClick={() => toggleSort('client_name')}>Klient<SortIcon col="client_name" /></th>
+                  <th style={{ cursor: 'pointer' }} onClick={() => toggleSort('issue_date')}>Datum vystavení<SortIcon col="issue_date" /></th>
+                  <th style={{ cursor: 'pointer' }} onClick={() => toggleSort('due_date')}>Splatnost<SortIcon col="due_date" /></th>
+                  <th className="text-right" style={{ cursor: 'pointer' }} onClick={() => toggleSort('total')}>Částka<SortIcon col="total" /></th>
+                  <th>Měna</th>
+                  <th className="text-right" style={{ cursor: 'pointer' }} onClick={() => toggleSort('total_czk')}>CZK<SortIcon col="total_czk" /></th>
+                  <th style={{ cursor: 'pointer' }} onClick={() => toggleSort('status')}>Stav<SortIcon col="status" /></th>
+                  <th>Akce</th>
                 </tr>
               </thead>
               <tbody>
-                {invoices.map(inv => (
+                {sorted.map(inv => (
                   <tr key={inv.id}>
                     <td><Link to={`/invoices/${inv.id}`} style={{ color: 'var(--primary)', fontWeight: 600 }}>{inv.invoice_number}</Link></td>
                     <td>{inv.client_name}</td>
@@ -81,12 +130,8 @@ export default function Invoices() {
                     <td>
                       <div className="btn-group">
                         <Link to={`/invoices/${inv.id}`} className="btn btn-outline btn-sm">Detail</Link>
-                        {can('admin', 'accountant') && (
-                          <Link to={`/invoices/${inv.id}/edit`} className="btn btn-outline btn-sm">Upravit</Link>
-                        )}
-                        {can('admin') && (
-                          <button className="btn btn-danger btn-sm" onClick={() => handleDelete(inv.id)}>Smazat</button>
-                        )}
+                        {can('admin', 'accountant') && <Link to={`/invoices/${inv.id}/edit`} className="btn btn-outline btn-sm">Upravit</Link>}
+                        {can('admin') && <button className="btn btn-danger btn-sm" onClick={() => handleDelete(inv.id)}>Smazat</button>}
                       </div>
                     </td>
                   </tr>

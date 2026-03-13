@@ -41,7 +41,10 @@ export const api = {
   joinTenant: (invite_code) => request('/onboarding/join-tenant', { method: 'POST', body: JSON.stringify({ invite_code }) }),
 
   // Dashboard
-  dashboard: () => request('/dashboard'),
+  dashboard: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return request(`/dashboard${qs ? '?' + qs : ''}`);
+  },
 
   // Currencies
   getCurrencies: () => request('/currencies'),

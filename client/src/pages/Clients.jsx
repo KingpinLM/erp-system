@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api';
 import { useAuth } from '../App';
@@ -9,10 +9,39 @@ export default function Clients() {
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({ name: '', ico: '', dic: '', email: '', phone: '', address: '', city: '', zip: '', country: 'CZ' });
+  const [sortBy, setSortBy] = useState('name');
+  const [sortDir, setSortDir] = useState('asc');
   const { can } = useAuth();
 
   const load = () => { setLoading(true); api.getClients().then(setClients).finally(() => setLoading(false)); };
   useEffect(load, []);
+
+  const sorted = useMemo(() => {
+    const arr = [...clients];
+    arr.sort((a, b) => {
+      let va, vb;
+      if (sortBy === 'name') { va = (a.name || '').toLowerCase(); vb = (b.name || '').toLowerCase(); }
+      else if (sortBy === 'ico') { va = a.ico || ''; vb = b.ico || ''; }
+      else if (sortBy === 'email') { va = (a.email || '').toLowerCase(); vb = (b.email || '').toLowerCase(); }
+      else if (sortBy === 'city') { va = (a.city || '').toLowerCase(); vb = (b.city || '').toLowerCase(); }
+      else if (sortBy === 'country') { va = a.country || ''; vb = b.country || ''; }
+      else { va = a.created_at || ''; vb = b.created_at || ''; }
+      if (va < vb) return sortDir === 'asc' ? -1 : 1;
+      if (va > vb) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+    return arr;
+  }, [clients, sortBy, sortDir]);
+
+  const toggleSort = (col) => {
+    if (sortBy === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortBy(col); setSortDir('asc'); }
+  };
+
+  const SortIcon = ({ col }) => {
+    if (sortBy !== col) return <span style={{ opacity: 0.3 }}> ↕</span>;
+    return <span> {sortDir === 'asc' ? '↑' : '↓'}</span>;
+  };
 
   const openNew = () => { setEditing(null); setForm({ name: '', ico: '', dic: '', email: '', phone: '', address: '', city: '', zip: '', country: 'CZ' }); setShowModal(true); };
   const openEdit = (c) => { setEditing(c); setForm({ name: c.name, ico: c.ico || '', dic: c.dic || '', email: c.email || '', phone: c.phone || '', address: c.address || '', city: c.city || '', zip: c.zip || '', country: c.country || 'CZ' }); setShowModal(true); };
@@ -36,13 +65,37 @@ export default function Clients() {
         <h1 className="page-title">Klienti</h1>
         {can('admin', 'accountant', 'manager') && <button className="btn btn-primary" onClick={openNew}>+ Nový klient</button>}
       </div>
+
+      <div className="filters" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+        <select className="form-select" value={sortBy} onChange={e => setSortBy(e.target.value)}>
+          <option value="name">Řadit dle názvu</option>
+          <option value="ico">Řadit dle IČO</option>
+          <option value="email">Řadit dle emailu</option>
+          <option value="city">Řadit dle města</option>
+          <option value="country">Řadit dle země</option>
+          <option value="created_at">Řadit dle vytvoření</option>
+        </select>
+        <button className="btn btn-outline btn-sm" onClick={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')}>
+          {sortDir === 'desc' ? '↓ Sestupně' : '↑ Vzestupně'}
+        </button>
+      </div>
+
       <div className="card">
-        {loading ? <div className="loading">Načítání...</div> : clients.length === 0 ? <div className="empty-state">Žádní klienti</div> : (
+        {loading ? <div className="loading">Načítání...</div> : sorted.length === 0 ? <div className="empty-state">Žádní klienti</div> : (
           <div className="table-responsive">
             <table>
-              <thead><tr><th>Název</th><th>IČO</th><th>DIČ</th><th>Email</th><th>Telefon</th><th>Město</th><th>Země</th><th>Akce</th></tr></thead>
+              <thead><tr>
+                <th style={{ cursor: 'pointer' }} onClick={() => toggleSort('name')}>Název<SortIcon col="name" /></th>
+                <th style={{ cursor: 'pointer' }} onClick={() => toggleSort('ico')}>IČO<SortIcon col="ico" /></th>
+                <th>DIČ</th>
+                <th style={{ cursor: 'pointer' }} onClick={() => toggleSort('email')}>Email<SortIcon col="email" /></th>
+                <th>Telefon</th>
+                <th style={{ cursor: 'pointer' }} onClick={() => toggleSort('city')}>Město<SortIcon col="city" /></th>
+                <th style={{ cursor: 'pointer' }} onClick={() => toggleSort('country')}>Země<SortIcon col="country" /></th>
+                <th>Akce</th>
+              </tr></thead>
               <tbody>
-                {clients.map(c => (
+                {sorted.map(c => (
                   <tr key={c.id}>
                     <td><Link to={`/clients/${c.id}`} style={{ color: 'var(--primary)', fontWeight: 600, textDecoration: 'none' }}>{c.name}</Link></td>
                     <td>{c.ico || '—'}</td>

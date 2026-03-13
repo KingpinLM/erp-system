@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import { api } from '../api';
@@ -6,27 +6,72 @@ import { useAuth } from '../App';
 
 const fmt = (n) => new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: 'CZK', maximumFractionDigits: 0 }).format(n);
 const fmtDate = (d) => { if (!d) return '—'; const p = d.slice(0,10).split('-'); return p.length === 3 ? `${p[2]}.${p[1]}.${p[0]}` : d; };
-const COLORS = ['#4361ee', '#2ec4b6', '#ff9f1c', '#e63946', '#9333ea', '#64748b'];
+const COLORS = ['#4361ee', '#2ec4b6', '#ff9f1c', '#e63946', '#9333ea', '#64748b', '#06b6d4', '#f97316', '#84cc16', '#ec4899'];
 const MONTHS = ['Leden','Únor','Březen','Duben','Květen','Červen','Červenec','Srpen','Září','Říjen','Listopad','Prosinec'];
+
+function getDateRange(period) {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = now.getMonth();
+  switch (period) {
+    case 'year': return { from: `${y}-01-01`, to: `${y}-12-31` };
+    case 'last_year': return { from: `${y-1}-01-01`, to: `${y-1}-12-31` };
+    case 'q1': return { from: `${y}-01-01`, to: `${y}-03-31` };
+    case 'q2': return { from: `${y}-04-01`, to: `${y}-06-30` };
+    case 'q3': return { from: `${y}-07-01`, to: `${y}-09-30` };
+    case 'q4': return { from: `${y}-10-01`, to: `${y}-12-31` };
+    case 'h1': return { from: `${y}-01-01`, to: `${y}-06-30` };
+    case 'h2': return { from: `${y}-07-01`, to: `${y}-12-31` };
+    case 'month': {
+      const ms = String(m + 1).padStart(2, '0');
+      const lastDay = new Date(y, m + 1, 0).getDate();
+      return { from: `${y}-${ms}-01`, to: `${y}-${ms}-${lastDay}` };
+    }
+    case 'last_month': {
+      const d = new Date(y, m - 1, 1);
+      const ms = String(d.getMonth() + 1).padStart(2, '0');
+      const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+      return { from: `${d.getFullYear()}-${ms}-01`, to: `${d.getFullYear()}-${ms}-${lastDay}` };
+    }
+    default: return {};
+  }
+}
 
 export default function Dashboard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('overview');
+  const [period, setPeriod] = useState('all');
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
   const { can } = useAuth();
 
-  useEffect(() => { api.dashboard().then(setData).finally(() => setLoading(false)); }, []);
+  const loadData = () => {
+    setLoading(true);
+    let params = {};
+    if (period === 'custom') {
+      if (customFrom) params.from = customFrom;
+      if (customTo) params.to = customTo;
+    } else if (period !== 'all') {
+      const range = getDateRange(period);
+      params = range;
+    }
+    api.dashboard(params).then(setData).finally(() => setLoading(false));
+  };
+
+  useEffect(loadData, [period, customFrom, customTo]);
 
   if (loading) return <div className="loading">Načítání dashboardu...</div>;
   if (!data) return <div className="empty-state">Nelze načíst data</div>;
 
-  const { kpis, revenueByMonth, expensesByCategory, invoicesByStatus, recentInvoices, topClients, currencyBreakdown, monthlyIssued, monthlyExpenses, pendingItems } = data;
+  const { kpis, revenueByMonth, expensesByCategory, invoicesByStatus, recentInvoices, topClients, topSuppliers, currencyBreakdown, monthlyIssued, monthlyExpenses, pendingItems, chartYear } = data;
 
   const statusLabels = { draft: 'Koncept', sent: 'Odesláno', paid: 'Zaplaceno', overdue: 'Po splatnosti', cancelled: 'Zrušeno' };
   const statusColors = { draft: '#94a3b8', sent: '#3b82f6', paid: '#10b981', overdue: '#ef4444', cancelled: '#f59e0b' };
   const pieData = invoicesByStatus.map(s => ({ name: statusLabels[s.status] || s.status, value: s.count, color: statusColors[s.status] || '#999' }));
 
-  // Build monthly chart data (12 months)
+  const supplierPieData = (topSuppliers || []).map((s, i) => ({ name: s.name, value: s.total, color: COLORS[i % COLORS.length] }));
+
   const monthlyData = MONTHS.map((name, i) => {
     const monthKey = String(i + 1).padStart(2, '0');
     const issued = monthlyIssued?.find(m => m.month === monthKey);
@@ -36,76 +81,81 @@ export default function Dashboard() {
 
   const pendingCount = (pendingItems || []).length + (kpis.pendingUsers || 0);
 
+  const periodLabel = period === 'all' ? '' : period === 'custom' ? `${customFrom || '...'} – ${customTo || '...'}` :
+    { year: `Rok ${new Date().getFullYear()}`, last_year: `Rok ${new Date().getFullYear()-1}`, q1: 'Q1', q2: 'Q2', q3: 'Q3', q4: 'Q4', h1: '1. pololetí', h2: '2. pololetí', month: 'Tento měsíc', last_month: 'Minulý měsíc' }[period] || '';
+
   return (
     <div>
       <div className="page-header">
         <h1 className="page-title">Dashboard</h1>
+        {periodLabel && <span style={{ fontSize: '0.85rem', color: 'var(--gray-500)', marginLeft: 8 }}>{periodLabel}</span>}
       </div>
+
+      {/* Time period filter */}
+      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+        {[
+          ['all', 'Vše'],
+          ['month', 'Měsíc'],
+          ['last_month', 'Min. měsíc'],
+          ['q1', 'Q1'], ['q2', 'Q2'], ['q3', 'Q3'], ['q4', 'Q4'],
+          ['h1', '1. pol.'], ['h2', '2. pol.'],
+          ['year', String(new Date().getFullYear())],
+          ['last_year', String(new Date().getFullYear() - 1)],
+          ['custom', 'Vlastní'],
+        ].map(([key, label]) => (
+          <button key={key} className={`btn btn-sm ${period === key ? 'btn-primary' : 'btn-outline'}`} onClick={() => setPeriod(key)}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {period === 'custom' && (
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', alignItems: 'center' }}>
+          <label style={{ fontSize: '0.85rem' }}>Od:</label>
+          <input type="date" className="form-input" style={{ width: 'auto' }} value={customFrom} onChange={e => setCustomFrom(e.target.value)} />
+          <label style={{ fontSize: '0.85rem' }}>Do:</label>
+          <input type="date" className="form-input" style={{ width: 'auto' }} value={customTo} onChange={e => setCustomTo(e.target.value)} />
+        </div>
+      )}
 
       {/* Tabs */}
       <div style={{ display: 'flex', borderBottom: '2px solid var(--gray-200)', marginBottom: '1.5rem' }}>
-        <button
-          onClick={() => setTab('overview')}
-          style={{
-            padding: '0.75rem 2rem', fontWeight: 600, fontSize: '1rem', border: 'none', cursor: 'pointer',
-            background: 'none', color: tab === 'overview' ? 'var(--primary)' : 'var(--gray-500)',
-            borderBottom: tab === 'overview' ? '3px solid var(--primary)' : '3px solid transparent',
-            marginBottom: -2
-          }}
-        >Přehled</button>
-        <button
-          onClick={() => setTab('pending')}
-          style={{
-            padding: '0.75rem 2rem', fontWeight: 600, fontSize: '1rem', border: 'none', cursor: 'pointer',
-            background: 'none', color: tab === 'pending' ? 'var(--primary)' : 'var(--gray-500)',
-            borderBottom: tab === 'pending' ? '3px solid var(--primary)' : '3px solid transparent',
-            marginBottom: -2, display: 'flex', alignItems: 'center', gap: '0.5rem'
-          }}
-        >
+        <button onClick={() => setTab('overview')} style={{
+          padding: '0.75rem 2rem', fontWeight: 600, fontSize: '1rem', border: 'none', cursor: 'pointer',
+          background: 'none', color: tab === 'overview' ? 'var(--primary)' : 'var(--gray-500)',
+          borderBottom: tab === 'overview' ? '3px solid var(--primary)' : '3px solid transparent', marginBottom: -2
+        }}>Přehled</button>
+        <button onClick={() => setTab('pending')} style={{
+          padding: '0.75rem 2rem', fontWeight: 600, fontSize: '1rem', border: 'none', cursor: 'pointer',
+          background: 'none', color: tab === 'pending' ? 'var(--primary)' : 'var(--gray-500)',
+          borderBottom: tab === 'pending' ? '3px solid var(--primary)' : '3px solid transparent',
+          marginBottom: -2, display: 'flex', alignItems: 'center', gap: '0.5rem'
+        }}>
           K vyřízení
-          {pendingCount > 0 && (
-            <span style={{ background: 'var(--danger)', color: '#fff', borderRadius: '50%', width: 24, height: 24, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 700 }}>{pendingCount}</span>
-          )}
+          {pendingCount > 0 && <span style={{ background: 'var(--danger)', color: '#fff', borderRadius: '50%', width: 24, height: 24, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 700 }}>{pendingCount}</span>}
         </button>
-        <button
-          onClick={() => setTab('reports')}
-          style={{
-            padding: '0.75rem 2rem', fontWeight: 600, fontSize: '1rem', border: 'none', cursor: 'pointer',
-            background: 'none', color: tab === 'reports' ? 'var(--primary)' : 'var(--gray-500)',
-            borderBottom: tab === 'reports' ? '3px solid var(--primary)' : '3px solid transparent',
-            marginBottom: -2
-          }}
-        >Reporty</button>
+        <button onClick={() => setTab('reports')} style={{
+          padding: '0.75rem 2rem', fontWeight: 600, fontSize: '1rem', border: 'none', cursor: 'pointer',
+          background: 'none', color: tab === 'reports' ? 'var(--primary)' : 'var(--gray-500)',
+          borderBottom: tab === 'reports' ? '3px solid var(--primary)' : '3px solid transparent', marginBottom: -2
+        }}>Reporty</button>
       </div>
 
       {tab === 'overview' && (
         <>
           <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
-            <div className="kpi-card">
-              <div className="kpi-label">Celkové příjmy</div>
-              <div className="kpi-value success">{fmt(kpis.totalRevenue)}</div>
-            </div>
-            <div className="kpi-card">
-              <div className="kpi-label">Celkové výdaje</div>
-              <div className="kpi-value danger">{fmt(kpis.totalExpenses)}</div>
-            </div>
-            <div className="kpi-card">
-              <div className="kpi-label">Zisk</div>
-              <div className="kpi-value primary">{fmt(kpis.profit)}</div>
-            </div>
-            <div className="kpi-card">
-              <div className="kpi-label">Klienti</div>
-              <div className="kpi-value primary">{kpis.totalClients}</div>
-            </div>
+            <div className="kpi-card"><div className="kpi-label">Celkové příjmy</div><div className="kpi-value success">{fmt(kpis.totalRevenue)}</div></div>
+            <div className="kpi-card"><div className="kpi-label">Celkové výdaje</div><div className="kpi-value danger">{fmt(kpis.totalExpenses)}</div></div>
+            <div className="kpi-card"><div className="kpi-label">Zisk</div><div className="kpi-value primary">{fmt(kpis.profit)}</div></div>
+            <div className="kpi-card"><div className="kpi-label">Klienti</div><div className="kpi-value primary">{kpis.totalClients}</div></div>
           </div>
 
           {/* Monthly chart */}
           <div className="card" style={{ marginTop: '1.5rem' }}>
-            <div className="card-title" style={{ marginBottom: '1rem' }}>Přehled prodejních a nákupních dokladů</div>
+            <div className="card-title" style={{ marginBottom: '1rem' }}>Přehled prodejních a nákupních dokladů {chartYear && `(${chartYear})`}</div>
             <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '1rem', fontSize: '0.85rem' }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 12, height: 12, borderRadius: 2, background: '#4361ee', display: 'inline-block' }}></span> Prodejní faktury</span>
               <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 12, height: 12, borderRadius: 2, background: '#e63946', display: 'inline-block' }}></span> Nákupní/výdaje</span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 12, height: 12, borderRadius: 2, background: '#2ec4b6', display: 'inline-block' }}></span> Rozdíl</span>
             </div>
             <ResponsiveContainer width="100%" height={320}>
               <BarChart data={monthlyData} barGap={2}>
@@ -119,7 +169,7 @@ export default function Dashboard() {
             </ResponsiveContainer>
           </div>
 
-          {/* Recent invoices + Top clients */}
+          {/* Recent invoices + Invoice status pie + Supplier pie */}
           <div className="charts-grid" style={{ marginTop: '1.5rem' }}>
             <div className="card">
               <div className="card-header">
@@ -162,6 +212,52 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
+
+          {/* Supplier pie chart */}
+          {supplierPieData.length > 0 && (
+            <div className="charts-grid" style={{ marginTop: '1.5rem' }}>
+              <div className="card">
+                <div className="card-title">Největší dodavatelé (CZK)</div>
+                <ResponsiveContainer width="100%" height={280}>
+                  <PieChart>
+                    <Pie data={supplierPieData} cx="50%" cy="50%" outerRadius={90} innerRadius={45} dataKey="value" label={({ name, value }) => `${name.length > 15 ? name.slice(0, 15) + '...' : name}`}>
+                      {supplierPieData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+                    </Pie>
+                    <Tooltip formatter={v => fmt(v)} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', justifyContent: 'center', marginTop: '0.5rem' }}>
+                  {supplierPieData.map(p => (
+                    <span key={p.name} style={{ fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: p.color, display: 'inline-block' }}></span>{p.name}: {fmt(p.value)}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <div className="card">
+                <div className="card-title">Top klienti (příjmy)</div>
+                {topClients.length === 0 ? <div className="empty-state">Žádná data</div> : (
+                  <>
+                    <ResponsiveContainer width="100%" height={280}>
+                      <PieChart>
+                        <Pie data={topClients.map((c, i) => ({ name: c.name, value: c.total, color: COLORS[i % COLORS.length] }))} cx="50%" cy="50%" outerRadius={90} innerRadius={45} dataKey="value" label={({ name }) => name.length > 15 ? name.slice(0, 15) + '...' : name}>
+                          {topClients.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                        </Pie>
+                        <Tooltip formatter={v => fmt(v)} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', justifyContent: 'center', marginTop: '0.5rem' }}>
+                      {topClients.map((c, i) => (
+                        <span key={c.name} style={{ fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <span style={{ width: 8, height: 8, borderRadius: '50%', background: COLORS[i % COLORS.length], display: 'inline-block' }}></span>{c.name}: {fmt(c.total)}
+                        </span>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
         </>
       )}
 
@@ -250,7 +346,7 @@ export default function Dashboard() {
         <div>
           <div className="charts-grid">
             <div className="card">
-              <div className="card-title">Příjmy dle měsíce (CZK)</div>
+              <div className="card-title">Příjmy dle měsíce (CZK) {chartYear && `- ${chartYear}`}</div>
               <ResponsiveContainer width="100%" height={250}>
                 <LineChart data={monthlyData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />

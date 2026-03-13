@@ -346,8 +346,22 @@ app.get('/api/users/:id/signature', ...tenanted, (req, res) => {
 // ─── DASHBOARD ───────────────────────────────────────────────
 app.get('/api/dashboard', ...tenanted, (req, res) => {
   const tid = req.tenant_id;
-  const totalRevenue = db.prepare("SELECT COALESCE(SUM(total_czk),0) as val FROM invoices WHERE type='issued' AND status='paid' AND tenant_id=?").get(tid).val;
-  const totalExpenses = db.prepare("SELECT COALESCE(SUM(total_czk),0) as val FROM invoices WHERE type='received' AND status='paid' AND tenant_id=?").get(tid).val;
+  const { from, to } = req.query;
+  const dateFilter = (col) => {
+    if (from && to) return ` AND ${col} >= ? AND ${col} <= ?`;
+    if (from) return ` AND ${col} >= ?`;
+    if (to) return ` AND ${col} <= ?`;
+    return '';
+  };
+  const dateParams = () => {
+    const p = [];
+    if (from) p.push(from);
+    if (to) p.push(to);
+    return p;
+  };
+
+  const totalRevenue = db.prepare(`SELECT COALESCE(SUM(total_czk),0) as val FROM invoices WHERE type='issued' AND status='paid' AND tenant_id=?${dateFilter('paid_date')}`).get(tid, ...dateParams()).val;
+  const totalExpenses = db.prepare(`SELECT COALESCE(SUM(total_czk),0) as val FROM invoices WHERE type='received' AND status='paid' AND tenant_id=?${dateFilter('paid_date')}`).get(tid, ...dateParams()).val;
   const unpaidInvoices = db.prepare("SELECT COUNT(*) as val FROM invoices WHERE type='issued' AND status IN ('sent','overdue') AND tenant_id=?").get(tid).val;
   const overdueInvoices = db.prepare("SELECT COUNT(*) as val FROM invoices WHERE status='overdue' AND tenant_id=?").get(tid).val;
   const totalClients = db.prepare("SELECT COUNT(*) as val FROM clients WHERE tenant_id=?").get(tid).val;
@@ -355,18 +369,18 @@ app.get('/api/dashboard', ...tenanted, (req, res) => {
 
   const revenueByMonth = db.prepare(`
     SELECT strftime('%Y-%m', paid_date) as month, SUM(total_czk) as total
-    FROM invoices WHERE type='issued' AND status='paid' AND paid_date IS NOT NULL AND tenant_id=?
+    FROM invoices WHERE type='issued' AND status='paid' AND paid_date IS NOT NULL AND tenant_id=?${dateFilter('paid_date')}
     GROUP BY month ORDER BY month
-  `).all(tid);
+  `).all(tid, ...dateParams());
 
   const expensesByCategory = db.prepare(`
-    SELECT category, SUM(amount) as total FROM evidence WHERE type='expense' AND tenant_id=?
+    SELECT category, SUM(amount) as total FROM evidence WHERE type='expense' AND tenant_id=?${dateFilter('date')}
     GROUP BY category ORDER BY total DESC
-  `).all(tid);
+  `).all(tid, ...dateParams());
 
   const invoicesByStatus = db.prepare(`
-    SELECT status, COUNT(*) as count FROM invoices WHERE tenant_id=? GROUP BY status
-  `).all(tid);
+    SELECT status, COUNT(*) as count FROM invoices WHERE tenant_id=?${dateFilter('issue_date')} GROUP BY status
+  `).all(tid, ...dateParams());
 
   const recentInvoices = db.prepare(`
     SELECT i.*, c.name as client_name FROM invoices i
@@ -377,27 +391,36 @@ app.get('/api/dashboard', ...tenanted, (req, res) => {
   const topClients = db.prepare(`
     SELECT c.name, SUM(i.total_czk) as total FROM invoices i
     JOIN clients c ON i.client_id = c.id
-    WHERE i.type='issued' AND i.status='paid' AND i.tenant_id=?
+    WHERE i.type='issued' AND i.status='paid' AND i.tenant_id=?${dateFilter('i.paid_date')}
     GROUP BY c.id ORDER BY total DESC LIMIT 5
-  `).all(tid);
+  `).all(tid, ...dateParams());
+
+  // Top suppliers (received invoices)
+  const topSuppliers = db.prepare(`
+    SELECT c.name, SUM(i.total_czk) as total FROM invoices i
+    JOIN clients c ON i.client_id = c.id
+    WHERE i.type='received' AND i.tenant_id=?${dateFilter('i.issue_date')}
+    GROUP BY c.id ORDER BY total DESC LIMIT 10
+  `).all(tid, ...dateParams());
 
   const currencyBreakdown = db.prepare(`
     SELECT currency, COUNT(*) as count, SUM(total) as total FROM invoices
-    WHERE type='issued' AND tenant_id=? GROUP BY currency
-  `).all(tid);
+    WHERE type='issued' AND tenant_id=?${dateFilter('issue_date')} GROUP BY currency
+  `).all(tid, ...dateParams());
 
-  const currentYear = new Date().getFullYear();
+  // Determine year for monthly chart from date range or current year
+  const chartYear = from ? from.slice(0, 4) : String(new Date().getFullYear());
   const monthlyIssued = db.prepare(`
     SELECT strftime('%m', issue_date) as month, SUM(total_czk) as total, SUM(tax_amount) as tax
     FROM invoices WHERE type='issued' AND strftime('%Y', issue_date) = ? AND tenant_id=?
     GROUP BY month ORDER BY month
-  `).all(String(currentYear), tid);
+  `).all(chartYear, tid);
 
   const monthlyExpenses = db.prepare(`
     SELECT strftime('%m', date) as month, SUM(amount) as total
     FROM evidence WHERE type='expense' AND strftime('%Y', date) = ? AND tenant_id=?
     GROUP BY month ORDER BY month
-  `).all(String(currentYear), tid);
+  `).all(chartYear, tid);
 
   const pendingItems = [];
   const overdueList = db.prepare(`
@@ -425,8 +448,8 @@ app.get('/api/dashboard', ...tenanted, (req, res) => {
 
   res.json({
     kpis: { totalRevenue, totalExpenses, profit: totalRevenue - totalExpenses, unpaidInvoices, overdueInvoices, totalClients, draftInvoices, pendingUsers },
-    revenueByMonth, expensesByCategory, invoicesByStatus, recentInvoices, topClients, currencyBreakdown,
-    monthlyIssued, monthlyExpenses, pendingItems
+    revenueByMonth, expensesByCategory, invoicesByStatus, recentInvoices, topClients, topSuppliers, currencyBreakdown,
+    monthlyIssued, monthlyExpenses, pendingItems, chartYear
   });
 });
 

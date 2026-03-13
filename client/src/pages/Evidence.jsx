@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { api } from '../api';
 import { useAuth } from '../App';
 
@@ -10,6 +10,8 @@ export default function Evidence() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('expense');
   const [categoryFilter, setCategoryFilter] = useState('');
+  const [sortBy, setSortBy] = useState('date');
+  const [sortDir, setSortDir] = useState('desc');
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({ type: 'expense', title: '', description: '', amount: '', currency: 'CZK', date: new Date().toISOString().slice(0, 10), category: '' });
@@ -36,6 +38,33 @@ export default function Evidence() {
     api.getCategoryRules().then(setCategoryRules).catch(() => {});
   };
 
+  const sorted = useMemo(() => {
+    const arr = [...records];
+    arr.sort((a, b) => {
+      let va, vb;
+      if (sortBy === 'date') { va = a.date || ''; vb = b.date || ''; }
+      else if (sortBy === 'amount') { va = a.amount || 0; vb = b.amount || 0; }
+      else if (sortBy === 'title') { va = (a.title || '').toLowerCase(); vb = (b.title || '').toLowerCase(); }
+      else if (sortBy === 'category') { va = (a.category || '').toLowerCase(); vb = (b.category || '').toLowerCase(); }
+      else if (sortBy === 'created_at') { va = a.created_at || ''; vb = b.created_at || ''; }
+      else { va = a.date || ''; vb = b.date || ''; }
+      if (va < vb) return sortDir === 'asc' ? -1 : 1;
+      if (va > vb) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+    return arr;
+  }, [records, sortBy, sortDir]);
+
+  const toggleSort = (col) => {
+    if (sortBy === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortBy(col); setSortDir('desc'); }
+  };
+
+  const SortIcon = ({ col }) => {
+    if (sortBy !== col) return <span style={{ opacity: 0.3 }}> ↕</span>;
+    return <span> {sortDir === 'asc' ? '↑' : '↓'}</span>;
+  };
+
   const openNew = () => {
     setEditing(null);
     setForm({ type: tab, title: '', description: '', amount: '', currency: 'CZK', date: new Date().toISOString().slice(0, 10), category: '' });
@@ -51,11 +80,8 @@ export default function Evidence() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     const data = { ...form, amount: form.amount ? parseFloat(form.amount) : null };
-    if (editing) {
-      await api.updateEvidence(editing.id, data);
-    } else {
-      await api.createEvidence(data);
-    }
+    if (editing) await api.updateEvidence(editing.id, data);
+    else await api.createEvidence(data);
     setShowModal(false);
     load();
   };
@@ -91,15 +117,9 @@ export default function Evidence() {
 
   const saveUploadedExpense = async (item) => {
     await api.createEvidence({
-      type: 'expense',
-      title: item.title,
-      description: '',
-      amount: item.amount,
-      currency: 'CZK',
-      date: item.date,
-      category: item.category || '',
-      file_path: item.file_path,
-      original_filename: item.original_filename
+      type: 'expense', title: item.title, description: '', amount: item.amount,
+      currency: 'CZK', date: item.date, category: item.category || '',
+      file_path: item.file_path, original_filename: item.original_filename
     });
     setUploadResults(prev => prev.filter(r => r !== item));
     load();
@@ -160,8 +180,7 @@ export default function Evidence() {
       ) : (
         <>
           {tab === 'expense' && can('admin', 'accountant', 'manager') && (
-            <div
-              className="card"
+            <div className="card"
               onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
               onDragLeave={() => setDragOver(false)}
               onDrop={handleDrop}
@@ -172,11 +191,8 @@ export default function Evidence() {
               }}
               onClick={() => fileRef.current?.click()}
             >
-              <input ref={fileRef} type="file" accept=".pdf,.zip" multiple style={{ display: 'none' }}
-                onChange={(e) => handleUpload(e.target.files)} />
-              {uploading ? (
-                <div className="loading">Zpracovávám soubory...</div>
-              ) : (
+              <input ref={fileRef} type="file" accept=".pdf,.zip" multiple style={{ display: 'none' }} onChange={(e) => handleUpload(e.target.files)} />
+              {uploading ? <div className="loading">Zpracovávám soubory...</div> : (
                 <>
                   <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>📄</div>
                   <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>Přetáhněte PDF nebo ZIP soubory sem</div>
@@ -194,35 +210,19 @@ export default function Evidence() {
                   <div className="form-row">
                     <div className="form-group" style={{ flex: 2 }}>
                       <label className="form-label">Název</label>
-                      <input className="form-input" value={item.title} onChange={e => {
-                        const updated = [...uploadResults];
-                        updated[idx] = { ...updated[idx], title: e.target.value };
-                        setUploadResults(updated);
-                      }} />
+                      <input className="form-input" value={item.title} onChange={e => { const u = [...uploadResults]; u[idx] = { ...u[idx], title: e.target.value }; setUploadResults(u); }} />
                     </div>
                     <div className="form-group">
                       <label className="form-label">Částka</label>
-                      <input className="form-input" type="number" step="0.01" value={item.amount || ''} onChange={e => {
-                        const updated = [...uploadResults];
-                        updated[idx] = { ...updated[idx], amount: parseFloat(e.target.value) || null };
-                        setUploadResults(updated);
-                      }} />
+                      <input className="form-input" type="number" step="0.01" value={item.amount || ''} onChange={e => { const u = [...uploadResults]; u[idx] = { ...u[idx], amount: parseFloat(e.target.value) || null }; setUploadResults(u); }} />
                     </div>
                     <div className="form-group">
                       <label className="form-label">Datum</label>
-                      <input className="form-input" type="date" value={item.date} onChange={e => {
-                        const updated = [...uploadResults];
-                        updated[idx] = { ...updated[idx], date: e.target.value };
-                        setUploadResults(updated);
-                      }} />
+                      <input className="form-input" type="date" value={item.date} onChange={e => { const u = [...uploadResults]; u[idx] = { ...u[idx], date: e.target.value }; setUploadResults(u); }} />
                     </div>
                     <div className="form-group">
                       <label className="form-label">Kategorie</label>
-                      <input className="form-input" value={item.category || ''} onChange={e => {
-                        const updated = [...uploadResults];
-                        updated[idx] = { ...updated[idx], category: e.target.value };
-                        setUploadResults(updated);
-                      }} list="cat-list" />
+                      <input className="form-input" value={item.category || ''} onChange={e => { const u = [...uploadResults]; u[idx] = { ...u[idx], category: e.target.value }; setUploadResults(u); }} list="cat-list" />
                     </div>
                   </div>
                   {item.original_filename && <div style={{ fontSize: '0.75rem', color: 'var(--gray-500)', marginBottom: '0.5rem' }}>Soubor: {item.original_filename}</div>}
@@ -232,9 +232,7 @@ export default function Evidence() {
                   </div>
                 </div>
               ))}
-              <datalist id="cat-list">
-                {categories.map(c => <option key={c} value={c} />)}
-              </datalist>
+              <datalist id="cat-list">{categories.map(c => <option key={c} value={c} />)}</datalist>
             </div>
           )}
 
@@ -249,20 +247,36 @@ export default function Evidence() {
             </div>
           </div>
 
-          <div className="filters" style={{ marginTop: '1rem' }}>
+          <div className="filters" style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
             <select className="form-select" value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)}>
               <option value="">Všechny kategorie</option>
               {categories.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
+            <select className="form-select" value={sortBy} onChange={e => setSortBy(e.target.value)}>
+              <option value="date">Řadit dle data</option>
+              <option value="created_at">Řadit dle vytvoření</option>
+              <option value="amount">Řadit dle částky</option>
+              <option value="title">Řadit dle názvu</option>
+              <option value="category">Řadit dle kategorie</option>
+            </select>
+            <button className="btn btn-outline btn-sm" onClick={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')}>
+              {sortDir === 'desc' ? '↓ Sestupně' : '↑ Vzestupně'}
+            </button>
           </div>
 
           <div className="card">
-            {loading ? <div className="loading">Načítání...</div> : records.length === 0 ? <div className="empty-state">Žádné záznamy</div> : (
+            {loading ? <div className="loading">Načítání...</div> : sorted.length === 0 ? <div className="empty-state">Žádné záznamy</div> : (
               <div className="table-responsive">
                 <table>
-                  <thead><tr><th>Název</th><th>Kategorie</th><th>Datum</th><th className="text-right">Částka</th><th>Měna</th><th>Vytvořil</th><th>Akce</th></tr></thead>
+                  <thead><tr>
+                    <th style={{ cursor: 'pointer' }} onClick={() => toggleSort('title')}>Název<SortIcon col="title" /></th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => toggleSort('category')}>Kategorie<SortIcon col="category" /></th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => toggleSort('date')}>Datum<SortIcon col="date" /></th>
+                    <th className="text-right" style={{ cursor: 'pointer' }} onClick={() => toggleSort('amount')}>Částka<SortIcon col="amount" /></th>
+                    <th>Měna</th><th>Vytvořil</th><th>Akce</th>
+                  </tr></thead>
                   <tbody>
-                    {records.map(r => (
+                    {sorted.map(r => (
                       <tr key={r.id}>
                         <td><strong>{r.title}</strong>{r.description && <div className="text-muted" style={{ fontSize: '0.8rem' }}>{r.description}</div>}</td>
                         <td>{r.category ? <span className="badge">{r.category}</span> : '—'}</td>
@@ -321,9 +335,7 @@ export default function Evidence() {
               <div className="form-group">
                 <label className="form-label">Kategorie</label>
                 <input className="form-input" value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} placeholder="např. Služby, Materiál, Nájemné..." list="modal-cat-list" />
-                <datalist id="modal-cat-list">
-                  {categories.map(c => <option key={c} value={c} />)}
-                </datalist>
+                <datalist id="modal-cat-list">{categories.map(c => <option key={c} value={c} />)}</datalist>
               </div>
               <div className="btn-group" style={{ marginTop: '0.5rem' }}>
                 <button type="submit" className="btn btn-primary">{editing ? 'Uložit' : 'Vytvořit'}</button>
