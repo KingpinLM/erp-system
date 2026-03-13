@@ -124,16 +124,36 @@ export default function Dashboard() {
     { key: 'reports', label: 'Reporty', icon: '📈' },
   ];
 
-  const periods = [
-    ['all', 'Vše'],
-    ['month', 'Měsíc'],
-    ['last_month', 'Min. měsíc'],
-    ['q1', 'Q1'], ['q2', 'Q2'], ['q3', 'Q3'], ['q4', 'Q4'],
-    ['h1', '1. pol.'], ['h2', '2. pol.'],
-    ['year', String(new Date().getFullYear())],
-    ['last_year', String(new Date().getFullYear() - 1)],
-    ['custom', 'Vlastní'],
+  // Period category logic
+  const periodCategory = (() => {
+    if (period === 'all') return 'all';
+    if (['month', 'last_month'].includes(period)) return 'month';
+    if (['q1', 'q2', 'q3', 'q4'].includes(period)) return 'quarter';
+    if (['h1', 'h2'].includes(period)) return 'half';
+    if (['year', 'last_year'].includes(period)) return 'year';
+    if (period === 'custom') return 'custom';
+    return 'all';
+  })();
+
+  const handleCategoryChange = (cat) => {
+    if (cat === 'all') setPeriod('all');
+    else if (cat === 'month') setPeriod('month');
+    else if (cat === 'quarter') setPeriod('q1');
+    else if (cat === 'half') setPeriod('h1');
+    else if (cat === 'year') setPeriod('year');
+    else if (cat === 'custom') setPeriod('custom');
+  };
+
+  const categories = [
+    { key: 'all', label: 'Vše' },
+    { key: 'month', label: 'Měsíc' },
+    { key: 'quarter', label: 'Kvartál' },
+    { key: 'half', label: 'Pololetí' },
+    { key: 'year', label: 'Rok' },
+    { key: 'custom', label: 'Vlastní' },
   ];
+
+  const currentYear = new Date().getFullYear();
 
   return (
     <div className="dash">
@@ -149,18 +169,52 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Period selector */}
-      <div className="dash-period-bar">
+      {/* Period selector - compact segmented control */}
+      <div className="dash-period-bar" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
         <div className="dash-period-pills">
-          {periods.map(([key, label]) => (
-            <button key={key} className={`dash-period-pill ${period === key ? 'active' : ''}`} onClick={() => setPeriod(key)}>
-              {label}
+          {categories.map(c => (
+            <button key={c.key} className={`dash-period-pill ${periodCategory === c.key ? 'active' : ''}`} onClick={() => handleCategoryChange(c.key)}>
+              {c.label}
             </button>
           ))}
         </div>
+
+        {/* Sub-selector for month */}
+        {periodCategory === 'month' && (
+          <div className="dash-period-pills" style={{ borderLeft: '1px solid var(--gray-200)', paddingLeft: '0.75rem' }}>
+            <button className={`dash-period-pill ${period === 'month' ? 'active' : ''}`} onClick={() => setPeriod('month')}>Tento</button>
+            <button className={`dash-period-pill ${period === 'last_month' ? 'active' : ''}`} onClick={() => setPeriod('last_month')}>Minulý</button>
+          </div>
+        )}
+
+        {/* Sub-selector for quarter */}
+        {periodCategory === 'quarter' && (
+          <div className="dash-period-pills" style={{ borderLeft: '1px solid var(--gray-200)', paddingLeft: '0.75rem' }}>
+            {['q1', 'q2', 'q3', 'q4'].map(q => (
+              <button key={q} className={`dash-period-pill ${period === q ? 'active' : ''}`} onClick={() => setPeriod(q)}>{q.toUpperCase()}</button>
+            ))}
+          </div>
+        )}
+
+        {/* Sub-selector for half */}
+        {periodCategory === 'half' && (
+          <div className="dash-period-pills" style={{ borderLeft: '1px solid var(--gray-200)', paddingLeft: '0.75rem' }}>
+            <button className={`dash-period-pill ${period === 'h1' ? 'active' : ''}`} onClick={() => setPeriod('h1')}>1. pololetí</button>
+            <button className={`dash-period-pill ${period === 'h2' ? 'active' : ''}`} onClick={() => setPeriod('h2')}>2. pololetí</button>
+          </div>
+        )}
+
+        {/* Sub-selector for year */}
+        {periodCategory === 'year' && (
+          <div className="dash-period-pills" style={{ borderLeft: '1px solid var(--gray-200)', paddingLeft: '0.75rem' }}>
+            <button className={`dash-period-pill ${period === 'year' ? 'active' : ''}`} onClick={() => setPeriod('year')}>{currentYear}</button>
+            <button className={`dash-period-pill ${period === 'last_year' ? 'active' : ''}`} onClick={() => setPeriod('last_year')}>{currentYear - 1}</button>
+          </div>
+        )}
       </div>
 
-      {period === 'custom' && (
+      {/* Custom date range */}
+      {periodCategory === 'custom' && (
         <div className="dash-custom-range">
           <div className="dash-range-field">
             <label>Od</label>
