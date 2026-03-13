@@ -30,7 +30,7 @@ async function request(path, options = {}) {
 
 export const api = {
   // Auth
-  login: (username, password) => request(`/auth/get-login?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`),
+  login: (username, password) => request('/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
   me: () => request('/auth/me'),
   register: (data) => request('/auth/register', { method: 'POST', body: JSON.stringify(data) }),
   forgotPassword: (email) => request('/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) }),

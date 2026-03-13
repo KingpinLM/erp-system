@@ -63,7 +63,6 @@ app.disable('etag');
 app.use(cors());
 app.use(cookieParser());
 app.use((req, res, next) => {
-  console.log(`[REQ] ${req.method} ${req.url}`);
   res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   res.set('Pragma', 'no-cache');
   res.set('Expires', '0');
@@ -174,26 +173,20 @@ app.delete('/api/superadmin/tenants/:id', authenticate, requireSuperadmin, (req,
 // ─── FORM-BASED LOGIN (no fetch, no JS - direct form POST + redirect) ──
 app.post('/api/auth/form-login', express.urlencoded({ extended: false }), (req, res) => {
   const { username, password } = req.body;
-  console.log('[FORM-LOGIN]', username);
   const user = db.prepare('SELECT * FROM users WHERE username = ? AND active = 1').get(username);
   if (!user || !bcrypt.compareSync(password, user.password)) {
     return res.redirect('/login?error=1');
   }
   const token = generateToken(user);
-  // Set session cookie and redirect - SPA fallback will embed auth into HTML
   res.cookie('erp_session', token, { httpOnly: true, maxAge: 8*60*60*1000, sameSite: 'lax', path: '/' });
-  console.log('[FORM-LOGIN] SUCCESS, setting session cookie, redirecting to /');
   res.redirect('/');
 });
 
 // ─── AUTH (login without tenant slug — globally unique usernames) ──
 app.post('/api/auth/login', (req, res) => {
   const { username, password } = req.body;
-  console.log('[LOGIN]', JSON.stringify({ username, passwordLength: password?.length, bodyKeys: Object.keys(req.body) }));
   const user = db.prepare('SELECT * FROM users WHERE username = ? AND active = 1').get(username);
-  console.log('[LOGIN] user found:', !!user, user ? `id=${user.id} active=${user.active}` : 'null');
   if (!user || !bcrypt.compareSync(password, user.password)) {
-    console.log('[LOGIN] FAILED - user:', !!user, 'bcrypt match:', user ? bcrypt.compareSync(password, user.password) : 'N/A');
     return res.status(401).json({ error: 'Neplatné přihlašovací údaje' });
   }
   const token = generateToken(user);
@@ -202,9 +195,7 @@ app.post('/api/auth/login', (req, res) => {
   if (user.tenant_id) {
     tenant = db.prepare('SELECT id, name, slug FROM tenants WHERE id = ? AND active = 1').get(user.tenant_id);
   }
-  console.log('[LOGIN] SUCCESS - sending 200 with token for', username);
-  const response = { token, user: safeUser, tenant };
-  res.status(200).json(response);
+  res.json({ token, user: safeUser, tenant });
 });
 
 // ─── REGISTRATION (no tenant — user joins/creates tenant via onboarding) ──
@@ -884,33 +875,42 @@ app.delete('/api/category-rules/:id', ...tenanted, authorize('admin'), (req, res
 // GET-based login (bypasses POST issues with port forwarding)
 app.get('/api/auth/get-login', (req, res) => {
   const { username, password } = req.query;
-  console.log('[GET-LOGIN]', username, 'pw-len:', password?.length);
   const user = db.prepare('SELECT * FROM users WHERE username = ? AND active = 1').get(username);
-  console.log('[GET-LOGIN] user found:', !!user);
-  if (!user) { console.log('[GET-LOGIN] FAIL: no user'); return res.status(401).json({ error: 'Neplatné přihlašovací údaje' }); }
-  const match = bcrypt.compareSync(password, user.password);
-  console.log('[GET-LOGIN] bcrypt match:', match);
-  if (!match) { return res.status(401).json({ error: 'Neplatné přihlašovací údaje' }); }
+  if (!user || !bcrypt.compareSync(password, user.password)) {
+    return res.status(401).json({ error: 'Neplatné přihlašovací údaje' });
+  }
   const token = generateToken(user);
   const { password: _, ...safeUser } = user;
-  const tenant = user.tenant_id ? db.prepare('SELECT * FROM tenants WHERE id = ?').get(user.tenant_id) : null;
-  console.log('[GET-LOGIN] SUCCESS, sending token');
+  const tenant = user.tenant_id ? db.prepare('SELECT id, name, slug FROM tenants WHERE id = ? AND active = 1').get(user.tenant_id) : null;
   res.json({ token, user: safeUser, tenant });
 });
 
-// SPA fallback - auto-login as admin (no login required)
+// SPA fallback - serve index.html, inject auth from session cookie if present
 app.get('*', (req, res) => {
-  // Always auto-login as admin user
-  const user = db.prepare('SELECT id, username, email, full_name, first_name, last_name, role, active, signature, created_at, tenant_id FROM users WHERE username = ? AND active = 1').get('admin');
-  if (user) {
-    const token = generateToken(user);
-    const tenant = user.tenant_id ? db.prepare('SELECT id, name, slug FROM tenants WHERE id = ? AND active = 1').get(user.tenant_id) : null;
-    const html = require('fs').readFileSync(path.join(__dirname, '..', 'client', 'dist', 'index.html'), 'utf8');
-    const authScript = `<script>window.__AUTH__=${JSON.stringify({token, user, tenant}).replace(/</g,'\\u003c')};</script>`;
-    return res.type('html').send(html.replace('</head>', authScript + '</head>'));
+  const indexPath = path.join(__dirname, '..', 'client', 'dist', 'index.html');
+  const html = fs.readFileSync(indexPath, 'utf8');
+
+  // Check for session cookie
+  const sessionToken = req.cookies?.erp_session;
+  if (sessionToken) {
+    try {
+      const jwt = require('jsonwebtoken');
+      const { SECRET } = require('./auth');
+      const decoded = jwt.verify(sessionToken, SECRET);
+      const user = db.prepare('SELECT id, username, email, full_name, first_name, last_name, role, active, signature, created_at, tenant_id FROM users WHERE id = ? AND active = 1').get(decoded.id);
+      if (user) {
+        const token = generateToken(user);
+        const tenant = user.tenant_id ? db.prepare('SELECT id, name, slug FROM tenants WHERE id = ? AND active = 1').get(user.tenant_id) : null;
+        const authScript = `<script>window.__AUTH__=${JSON.stringify({token, user, tenant}).replace(/</g,'\\u003c')};</script>`;
+        return res.type('html').send(html.replace('</head>', authScript + '</head>'));
+      }
+    } catch (e) {
+      // Invalid/expired cookie - clear it and serve plain HTML
+      res.clearCookie('erp_session');
+    }
   }
-  // Fallback if no admin user exists
-  res.sendFile(path.join(__dirname, '..', 'client', 'dist', 'index.html'));
+
+  res.type('html').send(html);
 });
 
 const PORT = process.env.PORT || 3001;
