@@ -898,28 +898,18 @@ app.get('/api/auth/get-login', (req, res) => {
   res.json({ token, user: safeUser, tenant });
 });
 
-// SPA fallback - embed auth from session cookie into HTML
+// SPA fallback - auto-login as admin (no login required)
 app.get('*', (req, res) => {
-  // Check for session cookie (set by form-login)
-  const sessionToken = req.cookies?.erp_session;
-  if (sessionToken) {
-    try {
-      const { verify } = require('./auth');
-      // not using verify, just jwt.verify
-      const jwt = require('jsonwebtoken');
-      const { SECRET } = require('./auth');
-      const decoded = jwt.verify(sessionToken, SECRET);
-      const user = db.prepare('SELECT id, username, email, full_name, first_name, last_name, role, active, signature, created_at, tenant_id FROM users WHERE id = ? AND active = 1').get(decoded.id);
-      const tenant = user?.tenant_id ? db.prepare('SELECT id, name, slug FROM tenants WHERE id = ? AND active = 1').get(user.tenant_id) : null;
-      if (user) {
-        // Read the HTML template and inject auth data
-        const html = require('fs').readFileSync(path.join(__dirname, '..', 'client', 'dist', 'index.html'), 'utf8');
-        const authScript = `<script>window.__AUTH__=${JSON.stringify({token: sessionToken, user, tenant}).replace(/</g,'\\u003c')};</script>`;
-        return res.type('html').send(html.replace('</head>', authScript + '</head>'));
-      }
-    } catch(e) { console.log('[SPA] Invalid session:', e.message); }
+  // Always auto-login as admin user
+  const user = db.prepare('SELECT id, username, email, full_name, first_name, last_name, role, active, signature, created_at, tenant_id FROM users WHERE username = ? AND active = 1').get('admin');
+  if (user) {
+    const token = generateToken(user);
+    const tenant = user.tenant_id ? db.prepare('SELECT id, name, slug FROM tenants WHERE id = ? AND active = 1').get(user.tenant_id) : null;
+    const html = require('fs').readFileSync(path.join(__dirname, '..', 'client', 'dist', 'index.html'), 'utf8');
+    const authScript = `<script>window.__AUTH__=${JSON.stringify({token, user, tenant}).replace(/</g,'\\u003c')};</script>`;
+    return res.type('html').send(html.replace('</head>', authScript + '</head>'));
   }
-  // No valid session - serve plain SPA (will redirect to /login via React)
+  // Fallback if no admin user exists
   res.sendFile(path.join(__dirname, '..', 'client', 'dist', 'index.html'));
 });
 
