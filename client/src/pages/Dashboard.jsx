@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area, LineChart, Line } from 'recharts';
 import { api } from '../api';
@@ -267,20 +267,23 @@ export default function Dashboard() {
   const chartDesc = periodCategory === 'quarter' ? 'Poslední 2 roky' : periodCategory === 'year' ? 'Celá historie' : (chartYear ? `Rok ${chartYear}` : 'Celé období');
 
   // Pie chart custom label renderer (Excel-style direct labels)
-  const renderPieLabel = ({ cx, cy, midAngle, outerRadius, name, value, percent }) => {
-    if (percent < 0.04) return null;
+  const renderPieLabel = (props) => {
+    const { cx, cy, midAngle, outerRadius, name, value, percent } = props;
+    if (!percent || percent < 0.04) return null;
     const RADIAN = Math.PI / 180;
-    const radius = outerRadius + 22;
-    const x = cx + radius * Math.cos(-midAngle * RADIAN);
-    const y = cy + radius * Math.sin(-midAngle * RADIAN);
-    const textAnchor = x > cx ? 'start' : 'end';
+    const r = (outerRadius || 90) + 22;
+    const x = cx + r * Math.cos(-midAngle * RADIAN);
+    const y = cy + r * Math.sin(-midAngle * RADIAN);
+    const anchor = x > cx ? 'start' : 'end';
+    const lx = cx + ((outerRadius || 90) + 4) * Math.cos(-midAngle * RADIAN);
+    const ly = cy + ((outerRadius || 90) + 4) * Math.sin(-midAngle * RADIAN);
     return (
       <g>
-        <line x1={cx + (outerRadius + 4) * Math.cos(-midAngle * RADIAN)} y1={cy + (outerRadius + 4) * Math.sin(-midAngle * RADIAN)} x2={x - (x > cx ? 4 : -4)} y2={y} stroke="#94a3b8" strokeWidth={1} />
-        <text x={x} y={y} textAnchor={textAnchor} dominantBaseline="central" style={{ fontSize: '0.72rem', fontWeight: 600, fill: '#334155' }}>
+        <line x1={lx} y1={ly} x2={x - (x > cx ? 4 : -4)} y2={y} stroke="#94a3b8" strokeWidth={1} />
+        <text x={x} y={y} textAnchor={anchor} dominantBaseline="central" fontSize={11} fontWeight={600} fill="#334155">
           {name}
         </text>
-        <text x={x} y={y + 14} textAnchor={textAnchor} dominantBaseline="central" style={{ fontSize: '0.68rem', fontWeight: 700, fill: '#64748b' }}>
+        <text x={x} y={y + 14} textAnchor={anchor} dominantBaseline="central" fontSize={10} fontWeight={700} fill="#64748b">
           {value} ({(percent * 100).toFixed(0)}%)
         </text>
       </g>
@@ -288,9 +291,9 @@ export default function Dashboard() {
   };
 
   // Handle bar click for selection
-  const handleBarClick = useCallback((data, index) => {
+  const handleBarClick = (data, index) => {
     setSelectedBar(prev => prev === index ? null : index);
-  }, []);
+  };
 
   const selectedBarData = selectedBar !== null ? chartDisplayData[selectedBar] : null;
 
@@ -460,17 +463,17 @@ export default function Dashboard() {
               </div>
             </div>
             <ResponsiveContainer width="100%" height={320}>
-              <BarChart data={chartDisplayData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }} barGap={3} onClick={(state) => { if (state && state.activeTooltipIndex !== undefined) handleBarClick(state, state.activeTooltipIndex); }}>
+              <BarChart data={chartDisplayData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }} barGap={3} onClick={(state) => { if (state && state.activeTooltipIndex != null) handleBarClick(state, state.activeTooltipIndex); }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
                 <XAxis dataKey="name" fontSize={11} tick={{ fill: '#94a3b8' }} axisLine={false} tickLine={false} />
                 <YAxis fontSize={11} tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} tick={{ fill: '#94a3b8' }} axisLine={false} tickLine={false} />
                 <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(13, 148, 136, 0.04)' }} />
-                <Bar dataKey="issued" name="Příjmy" radius={[4, 4, 0, 0]} barSize={periodCategory === 'year' ? 36 : 22} style={{ cursor: 'pointer' }}>
+                <Bar dataKey="issued" name="Příjmy" radius={[4, 4, 0, 0]} barSize={periodCategory === 'year' ? 36 : 22} cursor="pointer">
                   {chartDisplayData.map((_, i) => (
                     <Cell key={i} fill={CHART_COLORS.income} opacity={selectedBar === null || selectedBar === i ? 1 : 0.3} stroke={selectedBar === i ? '#0f766e' : 'none'} strokeWidth={selectedBar === i ? 2 : 0} />
                   ))}
                 </Bar>
-                <Bar dataKey="expenses" name="Výdaje" radius={[4, 4, 0, 0]} barSize={periodCategory === 'year' ? 36 : 22} style={{ cursor: 'pointer' }}>
+                <Bar dataKey="expenses" name="Výdaje" radius={[4, 4, 0, 0]} barSize={periodCategory === 'year' ? 36 : 22} cursor="pointer">
                   {chartDisplayData.map((_, i) => (
                     <Cell key={i} fill={CHART_COLORS.expense} opacity={selectedBar === null || selectedBar === i ? 0.75 : 0.2} stroke={selectedBar === i ? '#be123c' : 'none'} strokeWidth={selectedBar === i ? 2 : 0} />
                   ))}
@@ -547,7 +550,7 @@ export default function Dashboard() {
                       dataKey="value"
                       paddingAngle={3}
                       strokeWidth={0}
-                      label={renderPieLabel}
+                      label={pieData.length > 0 ? renderPieLabel : false}
                       labelLine={false}
                       animationBegin={0}
                       animationDuration={800}
