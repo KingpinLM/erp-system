@@ -110,20 +110,21 @@ export default function Invoices() {
 
   useEffect(() => { setPage(1); load(); }, [filters]);
 
-  const handleRowMouseEnter = useCallback((inv, e) => {
-    const rect = e.currentTarget.getBoundingClientRect();
+  const calcPreviewPos = useCallback((clientX, clientY) => {
     const previewW = 320;
     const previewH = 320;
-    const gap = 12;
-    // Horizontal: prefer right of row, fallback left, fallback clamp to viewport
-    let left = rect.right + gap;
-    if (left + previewW > window.innerWidth - 8) left = rect.left - previewW - gap;
+    const gap = 16;
+    let left = clientX + gap;
+    if (left + previewW > window.innerWidth - 8) left = clientX - previewW - gap;
     if (left < 8) left = 8;
-    // Vertical: align to row top, clamp so preview stays fully in viewport
-    let top = rect.top;
+    let top = clientY - 20;
     if (top + previewH > window.innerHeight - 8) top = window.innerHeight - previewH - 8;
     if (top < 8) top = 8;
-    setHoverPos({ top, left });
+    return { top, left };
+  }, []);
+
+  const handleRowMouseEnter = useCallback((inv, e) => {
+    setHoverPos(calcPreviewPos(e.clientX, e.clientY));
     setHoveredInv(inv.id);
 
     // Check cache first
@@ -140,7 +141,11 @@ export default function Invoices() {
         setHoverDetail(prev => detail);
       }).catch(() => {});
     }, 150);
-  }, []);
+  }, [calcPreviewPos]);
+
+  const handleRowMouseMove = useCallback((e) => {
+    setHoverPos(calcPreviewPos(e.clientX, e.clientY));
+  }, [calcPreviewPos]);
 
   const handleRowMouseLeave = useCallback(() => {
     clearTimeout(hoverTimer.current);
@@ -261,6 +266,7 @@ export default function Invoices() {
                   <tr key={inv.id}
                     style={{ background: selected.has(inv.id) ? '#eff6ff' : '' }}
                     onMouseEnter={(e) => handleRowMouseEnter(inv, e)}
+                    onMouseMove={handleRowMouseMove}
                     onMouseLeave={handleRowMouseLeave}
                   >
                     <td><input type="checkbox" checked={selected.has(inv.id)} onChange={e => { const s = new Set(selected); if (e.target.checked) s.add(inv.id); else s.delete(inv.id); setSelected(s); }} /></td>
