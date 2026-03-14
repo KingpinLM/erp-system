@@ -1566,6 +1566,36 @@ function getDynamicAnswer(q, tenantId, userId, isEn) {
     };
   }
 
+  // "Kde najdu opakované faktury?" — recurring invoices navigation (must come before general invoice handlers)
+  if (has('kde', 'where', 'najdu', 'najít') && has('opakovan', 'recurring', 'automatick', 'pravidelné', 'pravidelne')) {
+    return {
+      answer: isEn
+        ? 'Recurring invoices are in Finance → Recurring. Create an invoice template with interval (weekly/monthly/quarterly/yearly) and the system generates them automatically.'
+        : 'Opakované faktury najdete v sekci Finance → Opakované. Vytvořte šablonu faktury s intervalem (týdně/měsíčně/čtvrtletně/ročně) a systém je bude automaticky generovat.',
+      link: '/recurring'
+    };
+  }
+
+  // "Kde najdu evidenci?" — evidence navigation (must come before invoice count to avoid false KB match)
+  if (has('kde', 'where', 'najdu', 'najít') && has('evidenc', 'evidence') && !has('faktur', 'invoice')) {
+    return {
+      answer: isEn
+        ? 'Evidence is in Finance → Evidence. You can record received documents, income, expenses, assets and documents there.'
+        : 'Evidenci najdete v sekci Finance → Evidence. Můžete zde zaznamenávat přijaté doklady, příjmy, výdaje, majetek a dokumenty.',
+      link: '/evidence'
+    };
+  }
+
+  // Paid invoices summary (must come before general invoice count)
+  if (has('zaplacen', 'uhrazen', 'paid') && has('faktur', 'invoice', 'celk', 'kolik', 'how many', 'count')) {
+    const paid = db.prepare(`SELECT COUNT(*) as c, COALESCE(SUM(total_czk),0) as total FROM invoices WHERE tenant_id = ? AND status = 'paid'`).get(tenantId);
+    const fmt = (n) => Math.round(n || 0).toLocaleString('cs-CZ');
+    return {
+      answer: isEn ? `You have ${paid.c} paid invoices totaling ${fmt(paid.total)} CZK.` : `Máte ${paid.c} zaplacených faktur v celkové hodnotě ${fmt(paid.total)} Kč.`,
+      link: '/invoices'
+    };
+  }
+
   // "How many invoices?" / "Kolik mám faktur?"
   if (has('kolik', 'počet', 'count', 'how many', 'celkem') && has('faktur', 'invoice', 'faktura', 'doklad')) {
     const stats = db.prepare(`SELECT COUNT(*) as total, COALESCE(SUM(CASE WHEN status='draft' THEN 1 ELSE 0 END),0) as drafts, COALESCE(SUM(CASE WHEN status='sent' THEN 1 ELSE 0 END),0) as sent, COALESCE(SUM(CASE WHEN status='paid' THEN 1 ELSE 0 END),0) as paid, COALESCE(SUM(CASE WHEN status='overdue' THEN 1 ELSE 0 END),0) as overdue FROM invoices WHERE tenant_id = ?`).get(tenantId);
@@ -1674,7 +1704,7 @@ function getDynamicAnswer(q, tenantId, userId, isEn) {
   }
 
   // Today's date / current date
-  if (has('datum', 'dnes', 'today', 'date', 'jaký je den')) {
+  if (has('datum', 'dnes', 'today', 'jaký je den') || (q.includes('kolikátého') || q.includes('kolikateho'))) {
     const today = new Date().toLocaleDateString(isEn ? 'en-GB' : 'cs-CZ');
     return {
       answer: isEn ? `Today's date is ${today}.` : `Dnešní datum je ${today}.`,
@@ -1701,16 +1731,6 @@ function getDynamicAnswer(q, tenantId, userId, isEn) {
     return {
       answer: isEn ? `Top 5 clients by revenue:\n${list}` : `Top 5 klientů podle obratu:\n${list}`,
       link: '/clients'
-    };
-  }
-
-  // Paid invoices summary
-  if (has('zaplacen', 'uhrazen', 'paid') && has('faktur', 'invoice', 'celk', 'kolik')) {
-    const paid = db.prepare(`SELECT COUNT(*) as c, COALESCE(SUM(total_czk),0) as total FROM invoices WHERE tenant_id = ? AND status = 'paid'`).get(tenantId);
-    const fmt = (n) => Math.round(n || 0).toLocaleString('cs-CZ');
-    return {
-      answer: isEn ? `You have ${paid.c} paid invoices totaling ${fmt(paid.total)} CZK.` : `Máte ${paid.c} zaplacených faktur v celkové hodnotě ${fmt(paid.total)} Kč.`,
-      link: '/invoices'
     };
   }
 
@@ -1742,7 +1762,7 @@ function getDynamicAnswer(q, tenantId, userId, isEn) {
   }
 
   // Products/services count
-  if (has('kolik', 'počet', 'count', 'how many') && has('produkt', 'product', 'služb', 'service', 'zboží', 'polož')) {
+  if (has('kolik', 'počet', 'count', 'how many') && has('produkt', 'product', 'služb', 'služeb', 'service', 'zboží', 'polož')) {
     const cnt = db.prepare('SELECT COUNT(*) as c FROM products WHERE tenant_id = ?').get(tenantId);
     return {
       answer: isEn ? `You have ${cnt.c} products/services in your catalog.` : `V katalogu máte ${cnt.c} produktů/služeb.`,
@@ -1766,141 +1786,534 @@ function getDynamicAnswer(q, tenantId, userId, isEn) {
   return null;
 }
 
-// ─── SMART REASONING ENGINE ──────────────────────────────────
-// When keyword matching and dynamic handlers fail, try to reason about the query
-function smartReason(q, qNorm, tenantId, userId, isEn, bestMatch, bestScore) {
-  const fmt = (n) => Math.round(n || 0).toLocaleString('cs-CZ');
-  const w = qNorm.split(/\s+/).filter(s => s.length > 1);
+// ─── LOCAL AI REASONING ENGINE ──────────────────────────────
+// TF-IDF semantic matching + intent classification + entity extraction + contextual answer generation
+// A real local AI agent that reasons about queries instead of just matching keywords
 
-  // Intent detection using normalized (diacritics-free) words
-  const about = (...terms) => terms.some(t => qNorm.includes(t));
-
-  // ── "kolik" / "how many" / "count" questions — try to answer from DB ──
-  if (about('kolik', 'pocet', 'celkem', 'how many', 'count', 'total')) {
-    // Invoices
-    if (about('faktur', 'invoice', 'doklad')) {
-      const stats = db.prepare(`SELECT COUNT(*) as total, COALESCE(SUM(CASE WHEN status='draft' THEN 1 ELSE 0 END),0) as drafts, COALESCE(SUM(CASE WHEN status='sent' THEN 1 ELSE 0 END),0) as sent, COALESCE(SUM(CASE WHEN status='paid' THEN 1 ELSE 0 END),0) as paid, COALESCE(SUM(CASE WHEN status='overdue' THEN 1 ELSE 0 END),0) as overdue FROM invoices WHERE tenant_id = ?`).get(tenantId);
-      return {
-        answer: isEn
-          ? `You have ${stats.total} invoices: ${stats.drafts} drafts, ${stats.sent} sent, ${stats.paid} paid, ${stats.overdue} overdue.`
-          : `Máte celkem ${stats.total} faktur: ${stats.drafts} konceptů, ${stats.sent} odeslaných, ${stats.paid} zaplacených, ${stats.overdue} po splatnosti.`,
-        link: '/invoices'
-      };
-    }
-    // Clients
-    if (about('klient', 'client', 'zakaznik', 'odberatel', 'customer', 'kontakt')) {
-      const cnt = db.prepare('SELECT COUNT(*) as c FROM clients WHERE tenant_id = ?').get(tenantId).c;
-      return { answer: isEn ? `You have ${cnt} clients.` : `Máte ${cnt} klientů.`, link: '/clients' };
-    }
-    // Users
-    if (about('uzivatel', 'user', 'lidi', 'zamestnan', 'osob', 'people')) {
-      const cnt = db.prepare('SELECT COUNT(*) as c FROM users WHERE tenant_id = ? AND active = 1').get(tenantId).c;
-      return { answer: isEn ? `There are ${cnt} active users.` : `V systému je ${cnt} aktivních uživatelů.`, link: '/users' };
-    }
-    // Products
-    if (about('produkt', 'product', 'sluzb', 'service', 'zbozi', 'poloz')) {
-      const cnt = db.prepare('SELECT COUNT(*) as c FROM products WHERE tenant_id = ?').get(tenantId);
-      return { answer: isEn ? `You have ${cnt.c} products/services.` : `Máte ${cnt.c} produktů/služeb.`, link: '/bank' };
-    }
-    // Evidence
-    if (about('evidenc', 'doklad', 'vydaj', 'naklad', 'prijem', 'expense', 'income')) {
-      const stats = db.prepare(`SELECT COUNT(*) as c, COALESCE(SUM(amount),0) as total FROM evidence WHERE tenant_id = ?`).get(tenantId);
-      return { answer: isEn ? `You have ${stats.c} evidence records totaling ${fmt(stats.total)} CZK.` : `Máte ${stats.c} záznamů v evidenci v celkové hodnotě ${fmt(stats.total)} Kč.`, link: '/evidence' };
-    }
+class LocalAIEngine {
+  constructor() {
+    this.documents = [];
+    this.idf = {};
+    this.docVectors = [];
+    this.vocabulary = new Set();
+    this.indexTenantId = null;
+    // Czech stop words to filter during tokenization
+    this.stopWords = new Set([
+      'a','i','k','o','s','u','v','z','do','na','od','po','se','si','ze','to','je','co','za','ne',
+      'pro','pri','jak','ale','ani','ten','tam','ted','pak','jiz','jen','tak','aby','kdo','kde',
+      'mam','muj','moje','moji','sve','svuj','jsem','jsou','bude','bylo','bych','neni','nase',
+      'jako','taky','take','jeste','ktere','ktery','ktere','jejich','proto','protoze','nebo',
+      'the','a','an','is','are','was','were','be','been','has','have','had','do','does','did',
+      'in','on','at','to','for','of','with','by','from','it','this','that','my','your','our'
+    ]);
   }
 
-  // ── Pohledávky / receivables ──
-  if (about('pohledav', 'receivabl', 'dluz', 'owe')) {
-    const overdue = db.prepare(`SELECT COUNT(*) as c, COALESCE(SUM(total_czk),0) as total FROM invoices WHERE tenant_id = ? AND status IN ('sent','overdue') AND type='issued'`).get(tenantId);
-    return {
-      answer: isEn
-        ? `You have ${overdue.c} outstanding receivables totaling ${fmt(overdue.total)} CZK.`
-        : `Máte ${overdue.c} neuhrazených pohledávek v celkové hodnotě ${fmt(overdue.total)} Kč.`,
-      link: '/invoices'
-    };
+  // Tokenize text into stemmed terms (shared tokenizer for queries and documents)
+  tokenize(text) {
+    return noDiac(text).toLowerCase()
+      .split(/[\s,;.!?:()\"\'\/\-]+/)
+      .map(w => w.replace(/[^a-z0-9]/g, ''))
+      .filter(w => w.length > 1 && !this.stopWords.has(w))
+      .map(w => czStem(w));
   }
 
-  // ── "kde" / "where" / navigation intent ──
-  if (about('kde', 'where', 'najdu', 'najit', 'hledat', 'sekce', 'section')) {
-    const navMap = [
-      [['faktur', 'invoice', 'doklad'], 'Faktury najdete v sekci Finance → Faktury.', 'Invoices are in Finance → Invoices.', '/invoices'],
-      [['klient', 'client', 'zakaznik', 'odberatel', 'customer'], 'Klienty najdete v Finance → Klienti.', 'Clients are in Finance → Clients.', '/clients'],
-      [['evidenc', 'doklad', 'prijem', 'vydaj'], 'Evidenci najdete v Finance → Evidence.', 'Evidence is in Finance → Evidence.', '/evidence'],
-      [['ucetnic', 'account', 'denik', 'journal', 'kniha', 'ledger'], 'Účetnictví najdete v Účetnictví → Účetnictví.', 'Accounting is in the Accounting section.', '/accounting'],
-      [['dph', 'vat', 'dan', 'tax'], 'DPH najdete v Účetnictví → DPH.', 'VAT is in Accounting → VAT.', '/vat'],
-      [['banka', 'bank', 'transak'], 'Banku najdete v Účetnictví → Banka.', 'Bank is in Accounting → Bank.', '/bank'],
-      [['meny', 'men', 'currency', 'kurz', 'rate'], 'Měny najdete v Účetnictví → Měny.', 'Currencies are in Accounting → Currencies.', '/currencies'],
-      [['nastav', 'setting', 'firma', 'spolecnost', 'company'], 'Nastavení najdete v Správa → Společnost.', 'Settings are in Admin → Company.', '/company'],
-      [['uzivatel', 'user', 'role', 'opravnen'], 'Uživatele najdete v Správa → Uživatelé.', 'Users are in Admin → Users.', '/users'],
-      [['profil', 'profile', 'heslo', 'password'], 'Profil najdete kliknutím na své jméno v postranním panelu.', 'Profile is accessible by clicking your name in the sidebar.', '/profile'],
+  // Build TF-IDF index from knowledge base
+  buildIndex(tenantId) {
+    if (this.indexTenantId === tenantId && this.documents.length > 0) return;
+    const allKB = db.prepare('SELECT * FROM chatbot_knowledge WHERE (tenant_id = ? OR tenant_id IS NULL) AND active = 1').all(tenantId);
+    this.documents = allKB;
+    // Create document texts combining all searchable fields
+    const docTexts = allKB.map(kb =>
+      `${kb.keywords} ${kb.question_cs} ${kb.question_en || ''} ${kb.answer_cs} ${kb.answer_en || ''}`
+    );
+    const docTokenSets = docTexts.map(t => this.tokenize(t));
+    // Build vocabulary
+    this.vocabulary = new Set();
+    docTokenSets.forEach(tokens => tokens.forEach(t => this.vocabulary.add(t)));
+    // Compute IDF: log((N+1)/(df+1)) + 1 (smoothed)
+    const N = docTokenSets.length || 1;
+    this.idf = {};
+    for (const term of this.vocabulary) {
+      const df = docTokenSets.filter(tokens => tokens.includes(term)).length;
+      this.idf[term] = Math.log((N + 1) / (df + 1)) + 1;
+    }
+    // Compute TF-IDF vectors for each document
+    this.docVectors = docTokenSets.map(tokens => this._tfidf(tokens));
+    this.indexTenantId = tenantId;
+  }
+
+  // Compute TF-IDF vector from token array
+  _tfidf(tokens) {
+    const tf = {};
+    tokens.forEach(t => { tf[t] = (tf[t] || 0) + 1; });
+    const maxTf = Math.max(...Object.values(tf), 1);
+    const vec = {};
+    for (const [term, count] of Object.entries(tf)) {
+      vec[term] = (0.5 + 0.5 * count / maxTf) * (this.idf[term] || 1);
+    }
+    return vec;
+  }
+
+  // Cosine similarity between two TF-IDF vectors
+  _cosine(v1, v2) {
+    let dot = 0, m1 = 0, m2 = 0;
+    // Iterate over smaller vector for efficiency
+    const [small, big] = Object.keys(v1).length <= Object.keys(v2).length ? [v1, v2] : [v2, v1];
+    for (const t of Object.keys(small)) {
+      if (big[t]) dot += small[t] * big[t];
+    }
+    for (const v of Object.values(v1)) m1 += v * v;
+    for (const v of Object.values(v2)) m2 += v * v;
+    if (m1 === 0 || m2 === 0) return 0;
+    return dot / (Math.sqrt(m1) * Math.sqrt(m2));
+  }
+
+  // Find best KB matches using TF-IDF cosine similarity
+  semanticSearch(query, topN = 3) {
+    const qTokens = this.tokenize(query);
+    const qVec = this._tfidf(qTokens);
+    const scored = this.docVectors.map((dv, i) => ({
+      doc: this.documents[i],
+      score: this._cosine(qVec, dv)
+    }));
+    scored.sort((a, b) => b.score - a.score);
+    return scored.slice(0, topN);
+  }
+
+  // ── Intent classification ──
+  classifyIntent(qNorm) {
+    const intentDefs = [
+      { name: 'count',    patterns: ['kolik', 'pocet', 'celkem', 'how many', 'count', 'total', 'mnozstv', 'pocit'] },
+      { name: 'navigate', patterns: ['kde', 'where', 'najdu', 'najit', 'sekce', 'section', 'odkaz'] },
+      { name: 'howto',    patterns: ['jak', 'how', 'postup', 'navod', 'vytvor', 'create', 'pridat', 'add', 'nastav', 'nastavim', 'udelam'] },
+      { name: 'info',     patterns: ['co je', 'what is', 'vysvetli', 'explain', 'definic', 'vyznam', 'pojem', 'udaje', 'info'] },
+      { name: 'status',   patterns: ['stav', 'status', 'prehled', 'overview', 'summary', 'shrn', 'souhrnne'] },
+      { name: 'list',     patterns: ['vypis', 'ukaz', 'zobraz', 'list', 'show', 'kteri', 'ktere', 'jmenuj', 'vyjmenuj'] },
+      { name: 'compare',  patterns: ['rozdil', 'difference', 'porovn', 'compare', 'versus'] },
+      { name: 'problem',  patterns: ['nefunguj', 'chyba', 'error', 'problem', 'nejde', 'nemohu', 'broken', 'nemuzu'] },
+      { name: 'date',     patterns: ['datum', 'dnes', 'today', 'date'] },
+      { name: 'who',      patterns: ['kdo', 'who', 'komu', 'jmenu'] },
+      { name: 'value',    patterns: ['obrat', 'revenue', 'trzb', 'hodnot', 'suma', 'castk', 'celkov', 'cena'] },
     ];
-    for (const [terms, cs, en, lnk] of navMap) {
-      if (terms.some(t => qNorm.includes(t))) {
-        return { answer: isEn ? en : cs, link: lnk };
+    for (const { name, patterns } of intentDefs) {
+      if (patterns.some(p => qNorm.includes(p))) return name;
+    }
+    return 'general';
+  }
+
+  // ── Entity extraction ──
+  extractEntities(qNorm) {
+    const entityDefs = [
+      { name: 'invoice',    patterns: ['faktur', 'invoice', 'doklad', 'vydan', 'prijat'] },
+      { name: 'client',     patterns: ['klient', 'client', 'zakaznik', 'odberatel', 'customer', 'kontakt', 'dodavatel'] },
+      { name: 'product',    patterns: ['produkt', 'product', 'sluzb', 'zbozi', 'poloz', 'service', 'katalog'] },
+      { name: 'evidence',   patterns: ['evidenc', 'vydaj', 'naklad', 'expense', 'income'] },
+      { name: 'user',       patterns: ['uzivatel', 'user', 'role', 'opravnen', 'pristup'] },
+      { name: 'company',    patterns: ['firma', 'spolecnost', 'company', 'ico', 'dic'] },
+      { name: 'bank',       patterns: ['banka', 'bank', 'transakc', 'vypis', 'parov'] },
+      { name: 'vat',        patterns: ['dph', 'vat', 'dan', 'tax', 'sazb'] },
+      { name: 'currency',   patterns: ['mena', 'men', 'currency', 'kurz', 'rate', 'euro', 'dollar', 'koruna'] },
+      { name: 'accounting', patterns: ['ucetnic', 'account', 'denik', 'journal', 'kniha', 'ledger', 'osnov'] },
+      { name: 'payment',    patterns: ['platb', 'payment', 'uhrad', 'zaplac'] },
+      { name: 'receivable', patterns: ['pohledav', 'receivabl', 'dluz', 'owe', 'splatnost', 'overdue'] },
+      { name: 'profile',    patterns: ['profil', 'profile', 'heslo', 'password', 'podpis'] },
+      { name: 'recurring',  patterns: ['opakovane', 'recurring', 'pravideln', 'automatick', 'sablon'] },
+      { name: 'dashboard',  patterns: ['dashboard', 'nastenk', 'prehled', 'home'] },
+      { name: 'pdf',        patterns: ['pdf', 'tisk', 'print', 'stahnout'] },
+      { name: 'email',      patterns: ['email', 'odeslat', 'poslat'] },
+    ];
+    const found = [];
+    for (const { name, patterns } of entityDefs) {
+      if (patterns.some(p => qNorm.includes(p))) found.push(name);
+    }
+    return found;
+  }
+
+  // ── DB-powered reasoning: answer from live data based on intent + entities ──
+  reasonFromDB(intent, entities, qNorm, tenantId, userId, isEn) {
+    const fmt = (n) => Math.round(n || 0).toLocaleString('cs-CZ');
+    const about = (...terms) => terms.some(t => qNorm.includes(t));
+
+    // Count intent
+    if (intent === 'count' || about('kolik', 'pocet', 'celkem', 'how many', 'count', 'total')) {
+      if (entities.includes('invoice') || about('faktur', 'invoice', 'doklad')) {
+        const s = db.prepare(`SELECT COUNT(*) as total, COALESCE(SUM(CASE WHEN status='draft' THEN 1 ELSE 0 END),0) as drafts, COALESCE(SUM(CASE WHEN status='sent' THEN 1 ELSE 0 END),0) as sent, COALESCE(SUM(CASE WHEN status='paid' THEN 1 ELSE 0 END),0) as paid, COALESCE(SUM(CASE WHEN status='overdue' THEN 1 ELSE 0 END),0) as overdue FROM invoices WHERE tenant_id = ?`).get(tenantId);
+        return { answer: isEn ? `You have ${s.total} invoices: ${s.drafts} drafts, ${s.sent} sent, ${s.paid} paid, ${s.overdue} overdue.` : `Máte celkem ${s.total} faktur: ${s.drafts} konceptů, ${s.sent} odeslaných, ${s.paid} zaplacených, ${s.overdue} po splatnosti.`, link: '/invoices' };
+      }
+      if (entities.includes('client') || about('klient', 'client', 'zakaznik', 'odberatel', 'customer', 'kontakt')) {
+        const c = db.prepare('SELECT COUNT(*) as c FROM clients WHERE tenant_id = ?').get(tenantId).c;
+        return { answer: isEn ? `You have ${c} clients.` : `Máte ${c} klientů.`, link: '/clients' };
+      }
+      if (entities.includes('user') || about('uzivatel', 'user', 'lidi', 'zamestnan', 'osob', 'people')) {
+        const c = db.prepare('SELECT COUNT(*) as c FROM users WHERE tenant_id = ? AND active = 1').get(tenantId).c;
+        return { answer: isEn ? `There are ${c} active users.` : `V systému je ${c} aktivních uživatelů.`, link: '/users' };
+      }
+      if (entities.includes('product') || about('produkt', 'product', 'sluzb', 'service', 'zbozi', 'poloz')) {
+        const c = db.prepare('SELECT COUNT(*) as c FROM products WHERE tenant_id = ?').get(tenantId).c;
+        return { answer: isEn ? `You have ${c} products/services.` : `Máte ${c} produktů/služeb.`, link: '/bank' };
+      }
+      if (entities.includes('evidence') || about('evidenc', 'doklad', 'vydaj', 'naklad', 'prijem', 'expense', 'income')) {
+        const s = db.prepare('SELECT COUNT(*) as c, COALESCE(SUM(amount),0) as total FROM evidence WHERE tenant_id = ?').get(tenantId);
+        return { answer: isEn ? `You have ${s.c} evidence records totaling ${fmt(s.total)} CZK.` : `Máte ${s.c} záznamů v evidenci v celkové hodnotě ${fmt(s.total)} Kč.`, link: '/evidence' };
       }
     }
+
+    // Receivables
+    if (entities.includes('receivable') || about('pohledav', 'receivabl', 'dluz', 'owe')) {
+      const o = db.prepare(`SELECT COUNT(*) as c, COALESCE(SUM(total_czk),0) as total FROM invoices WHERE tenant_id = ? AND status IN ('sent','overdue') AND type='issued'`).get(tenantId);
+      return { answer: isEn ? `You have ${o.c} outstanding receivables totaling ${fmt(o.total)} CZK.` : `Máte ${o.c} neuhrazených pohledávek v celkové hodnotě ${fmt(o.total)} Kč.`, link: '/invoices' };
+    }
+
+    // List / show intent — show recent items
+    if (intent === 'list' || about('ukaz', 'zobraz', 'vypis', 'show', 'list')) {
+      if (entities.includes('invoice') || about('faktur', 'invoice', 'doklad')) {
+        const recent = db.prepare(`SELECT i.invoice_number, i.total, i.currency, i.status, c.name as client_name FROM invoices i LEFT JOIN clients c ON i.client_id = c.id WHERE i.tenant_id = ? ORDER BY i.created_at DESC LIMIT 5`).all(tenantId);
+        if (recent.length === 0) return { answer: isEn ? 'No invoices found.' : 'Žádné faktury nenalezeny.', link: '/invoices' };
+        const statusLabels = { draft: 'koncept', sent: 'odeslaná', paid: 'zaplacená', overdue: 'po splatnosti', cancelled: 'stornovaná' };
+        const list = recent.map(r => `• ${r.invoice_number} — ${r.client_name || '?'} — ${Math.round(r.total)} ${r.currency} (${isEn ? r.status : statusLabels[r.status] || r.status})`).join('\n');
+        return { answer: isEn ? `Recent invoices:\n${list}` : `Poslední faktury:\n${list}`, link: '/invoices' };
+      }
+      if (entities.includes('client') || about('klient', 'client', 'zakaznik')) {
+        const clients = db.prepare('SELECT name, email, phone FROM clients WHERE tenant_id = ? ORDER BY id DESC LIMIT 5').all(tenantId);
+        if (clients.length === 0) return { answer: isEn ? 'No clients found.' : 'Žádní klienti nenalezeni.', link: '/clients' };
+        const list = clients.map(c => `• ${c.name} — ${c.email || '—'}`).join('\n');
+        return { answer: isEn ? `Clients:\n${list}` : `Klienti:\n${list}`, link: '/clients' };
+      }
+      if (entities.includes('product') || about('produkt', 'product', 'sluzb')) {
+        const prods = db.prepare('SELECT name, unit_price, unit, type FROM products WHERE tenant_id = ? AND active = 1 ORDER BY id DESC LIMIT 5').all(tenantId);
+        if (prods.length === 0) return { answer: isEn ? 'No products found.' : 'Žádné produkty nenalezeny.', link: '/bank' };
+        const list = prods.map(p => `• ${p.name} — ${Math.round(p.unit_price || 0)} Kč/${p.unit || 'ks'} (${p.type === 'service' ? (isEn ? 'service' : 'služba') : (isEn ? 'product' : 'produkt')})`).join('\n');
+        return { answer: isEn ? `Products/services:\n${list}` : `Produkty/služby:\n${list}`, link: '/bank' };
+      }
+      if (entities.includes('user') || about('uzivatel', 'user')) {
+        const users = db.prepare('SELECT full_name, role, email FROM users WHERE tenant_id = ? AND active = 1').all(tenantId);
+        const list = users.map(u => `• ${u.full_name} (${u.role}) — ${u.email}`).join('\n');
+        return { answer: isEn ? `Users:\n${list}` : `Uživatelé:\n${list}`, link: '/users' };
+      }
+    }
+
+    // Navigation intent
+    if (intent === 'navigate') {
+      // Order matters: longer/more specific patterns first, short ambiguous ones (vat, men, dan) last
+      const navMap = [
+        [['uzivatel', 'user', 'role', 'opravnen'], 'Uživatele najdete v Správa → Uživatelé.', 'Users are in Admin → Users.', '/users'],
+        [['dashboard', 'nastenk', 'prehled', 'home page'], 'Dashboard najdete na hlavní stránce po přihlášení.', 'Dashboard is on the main page after login.', '/'],
+        [['faktur', 'invoice', 'doklad'], 'Faktury najdete v sekci Finance → Faktury.', 'Invoices are in Finance → Invoices.', '/invoices'],
+        [['klient', 'client', 'zakaznik', 'odberatel', 'customer'], 'Klienty najdete v Finance → Klienti.', 'Clients are in Finance → Clients.', '/clients'],
+        [['evidenc', 'prijem', 'vydaj'], 'Evidenci najdete v Finance → Evidence.', 'Evidence is in Finance → Evidence.', '/evidence'],
+        [['ucetnic', 'account', 'denik', 'journal', 'kniha', 'ledger'], 'Účetnictví najdete v Účetnictví → Účetnictví.', 'Accounting is in the Accounting section.', '/accounting'],
+        [['banka', 'bank', 'transak'], 'Banku najdete v Účetnictví → Banka.', 'Bank is in Accounting → Bank.', '/bank'],
+        [['nastav', 'setting', 'firma', 'spolecnost', 'company'], 'Nastavení najdete v Správa → Společnost.', 'Settings are in Admin → Company.', '/company'],
+        [['profil', 'profile', 'heslo', 'password'], 'Profil najdete kliknutím na své jméno v postranním panelu.', 'Profile is accessible by clicking your name in the sidebar.', '/profile'],
+        [['dph', 'vat', 'dan', 'tax'], 'DPH najdete v Účetnictví → DPH.', 'VAT is in Accounting → VAT.', '/vat'],
+        [['meny', 'currency', 'kurz', 'rate'], 'Měny najdete v Účetnictví → Měny.', 'Currencies are in Accounting → Currencies.', '/currencies'],
+      ];
+      for (const [terms, cs, en, lnk] of navMap) {
+        if (terms.some(t => qNorm.includes(t))) return { answer: isEn ? en : cs, link: lnk };
+      }
+    }
+
+    // How-to intent
+    if (intent === 'howto') {
+      if (entities.includes('invoice') || about('faktur', 'invoice')) {
+        return { answer: isEn ? 'Go to Invoices → click "+ New invoice". Select a client, add items and save.' : 'Přejděte do Faktury → klikněte "+ Nová faktura". Vyberte klienta, přidejte položky a uložte.', link: '/invoices/new' };
+      }
+      if (entities.includes('client') || about('klient', 'client', 'zakaznik', 'customer')) {
+        return { answer: isEn ? 'Go to Clients → click "+ New client". Fill in the details and save.' : 'Přejděte do Klienti → klikněte "+ Nový klient". Vyplňte údaje a uložte.', link: '/clients' };
+      }
+    }
+
+    // Company info
+    if ((about('info', 'udaje', 'data') && about('firm', 'spolecnost', 'company', 'nase', 'our')) || (intent === 'info' && entities.includes('company'))) {
+      const comp = db.prepare('SELECT * FROM company WHERE tenant_id = ?').get(tenantId);
+      if (comp) {
+        return { answer: isEn ? `Company: ${comp.name}, ID: ${comp.ico || '—'}, VAT: ${comp.dic || '—'}` : `Společnost: ${comp.name}, IČO: ${comp.ico || '—'}, DIČ: ${comp.dic || '—'}`, link: '/company' };
+      }
+    }
+
+    // Status / overview
+    if (intent === 'status') {
+      const s = db.prepare(`SELECT COUNT(*) as total, COALESCE(SUM(CASE WHEN status='paid' THEN 1 ELSE 0 END),0) as paid, COALESCE(SUM(CASE WHEN status='overdue' THEN 1 ELSE 0 END),0) as overdue, COALESCE(SUM(CASE WHEN status='sent' THEN 1 ELSE 0 END),0) as sent FROM invoices WHERE tenant_id = ?`).get(tenantId);
+      const cl = db.prepare('SELECT COUNT(*) as c FROM clients WHERE tenant_id = ?').get(tenantId).c;
+      return { answer: isEn ? `Quick overview: ${s.total} invoices (${s.paid} paid, ${s.sent} sent, ${s.overdue} overdue), ${cl} clients.` : `Rychlý přehled: ${s.total} faktur (${s.paid} zaplacených, ${s.sent} odeslaných, ${s.overdue} po splatnosti), ${cl} klientů.`, link: '/' };
+    }
+
+    // Date
+    if (intent === 'date') {
+      const today = new Date().toLocaleDateString(isEn ? 'en-GB' : 'cs-CZ');
+      return { answer: isEn ? `Today is ${today}.` : `Dnes je ${today}.`, link: null };
+    }
+
+    return null;
   }
 
-  // ── "jak" / "how" / action intent ──
-  if (about('jak', 'how', 'postup', 'navod', 'vytvor', 'create', 'pridat', 'add')) {
-    if (about('faktur', 'invoice')) {
-      return {
-        answer: isEn
-          ? 'Go to Invoices → click "+ New invoice". Select a client, add items and save.'
-          : 'Přejděte do Faktury → klikněte "+ Nová faktura". Vyberte klienta, přidejte položky a uložte.',
-        link: '/invoices/new'
-      };
+  // ── Contextual answer generation: synthesize an answer when no exact match exists ──
+  generateAnswer(query, qNorm, intent, entities, semanticResults, tenantId, isEn) {
+    const fmt = (n) => Math.round(n || 0).toLocaleString('cs-CZ');
+
+    // If we have a good semantic match (score > 0.15), use it as the knowledge source
+    // but enrich with live data and contextual reasoning
+    if (semanticResults.length > 0 && semanticResults[0].score > 0.15) {
+      const best = semanticResults[0].doc;
+      const baseAnswer = isEn ? (best.answer_en || best.answer_cs) : best.answer_cs;
+
+      // If there are multiple relevant results, combine insights
+      if (semanticResults.length > 1 && semanticResults[1].score > 0.12) {
+        const second = semanticResults[1].doc;
+        const addendum = isEn ? (second.answer_en || second.answer_cs) : second.answer_cs;
+        // Only append if from a different category/topic
+        if (best.category !== second.category || best.link !== second.link) {
+          return { answer: baseAnswer + '\n\n' + (isEn ? 'Related: ' : 'Souvisí: ') + addendum, link: best.link };
+        }
+      }
+      return { answer: baseAnswer, link: best.link };
     }
-    if (about('klient', 'client', 'zakaznik', 'customer')) {
-      return {
-        answer: isEn ? 'Go to Clients → click "+ New client". Fill in the details and save.' : 'Přejděte do Klienti → klikněte "+ Nový klient". Vyplňte údaje a uložte.',
+
+    // ── Autonomous answer generation using system knowledge ──
+    // The AI reasons about what it knows about the ERP system
+
+    // Entity-based contextual knowledge map — the AI's "understanding" of the system
+    const knowledgeMap = {
+      invoice: {
+        cs: 'Faktury jsou hlavní součástí ERP systému. Spravujte je v sekci Finance → Faktury. Můžete vytvářet, odesílat, platit a exportovat faktury.',
+        en: 'Invoices are a core part of the ERP system. Manage them in Finance → Invoices. You can create, send, pay and export invoices.',
+        link: '/invoices'
+      },
+      client: {
+        cs: 'Klienty najdete v sekci Finance → Klienti. Obsahují kontaktní údaje, historii faktur a možnost načtení dat z ARES.',
+        en: 'Clients are in Finance → Clients. They contain contact details, invoice history and ARES data lookup.',
         link: '/clients'
-      };
-    }
-  }
+      },
+      product: {
+        cs: 'Produkty a služby jsou v katalogu. Každý má název, SKU, cenu a sazbu DPH. Používají se při vytváření faktur.',
+        en: 'Products and services are in the catalog. Each has name, SKU, price and VAT rate. They are used when creating invoices.',
+        link: '/bank'
+      },
+      evidence: {
+        cs: 'Evidence slouží k záznamu příjmů, výdajů, majetku a dokumentů. Najdete ji v Finance → Evidence.',
+        en: 'Evidence records income, expenses, assets and documents. Find it in Finance → Evidence.',
+        link: '/evidence'
+      },
+      user: {
+        cs: 'Správa uživatelů je v Správa → Uživatelé. Systém má 4 role: administrátor, účetní, manažer a náhled.',
+        en: 'User management is in Admin → Users. The system has 4 roles: admin, accountant, manager and viewer.',
+        link: '/users'
+      },
+      company: {
+        cs: 'Nastavení společnosti najdete v Správa → Společnost. Nastavte IČO, DIČ, logo, bankovní spojení a vzhled faktur.',
+        en: 'Company settings are in Admin → Company. Set ID, VAT ID, logo, bank details and invoice layout.',
+        link: '/company'
+      },
+      bank: {
+        cs: 'Bankovní operace najdete v Účetnictví → Banka. Import výpisů, párování transakcí s fakturami.',
+        en: 'Banking operations are in Accounting → Bank. Import statements, match transactions with invoices.',
+        link: '/bank'
+      },
+      vat: {
+        cs: 'DPH najdete v Účetnictví → DPH. Generujte přiznání k DPH, kontrolujte vstupy a výstupy. Sazby: 0%, 12%, 21%.',
+        en: 'VAT is in Accounting → VAT. Generate VAT returns, check inputs and outputs. Rates: 0%, 12%, 21%.',
+        link: '/vat'
+      },
+      currency: {
+        cs: 'Měny najdete v Účetnictví → Měny. Kurzy se automaticky aktualizují z ČNB. Podporujeme CZK, EUR, USD, GBP, PLN.',
+        en: 'Currencies are in Accounting → Currencies. Rates auto-update from CNB. We support CZK, EUR, USD, GBP, PLN.',
+        link: '/currencies'
+      },
+      accounting: {
+        cs: 'Účetnictví zahrnuje účtovou osnovu, účetní deník a hlavní knihu. Najdete ho v sekci Účetnictví.',
+        en: 'Accounting includes chart of accounts, journal and general ledger. Find it in the Accounting section.',
+        link: '/accounting'
+      },
+      payment: {
+        cs: 'Platby zaznamenáte v detailu faktury. Systém podporuje částečné platby a automatické párování přes variabilní symbol.',
+        en: 'Record payments in invoice detail. The system supports partial payments and auto-matching via variable symbol.',
+        link: '/invoices'
+      },
+      receivable: {
+        cs: 'Pohledávky jsou neuhrazené vydané faktury. Na dashboardu vidíte přehled stárnutí pohledávek.',
+        en: 'Receivables are unpaid issued invoices. The dashboard shows an aging report.',
+        link: '/invoices'
+      },
+      profile: {
+        cs: 'Profil najdete kliknutím na své jméno v postranním panelu. Změňte heslo, jméno a elektronický podpis.',
+        en: 'Profile is accessible by clicking your name in the sidebar. Change password, name and electronic signature.',
+        link: '/profile'
+      },
+      recurring: {
+        cs: 'Opakované faktury nastavíte v Finance → Opakované. Intervaly: týdně, měsíčně, čtvrtletně, ročně.',
+        en: 'Recurring invoices are in Finance → Recurring. Intervals: weekly, monthly, quarterly, yearly.',
+        link: '/recurring'
+      },
+      dashboard: {
+        cs: 'Dashboard je hlavní stránka po přihlášení. Zobrazuje graf příjmů/výdajů, stav faktur, top klienty a stárnutí pohledávek.',
+        en: 'Dashboard is the main page after login. It shows revenue/expense charts, invoice status, top clients and aging report.',
+        link: '/'
+      },
+      pdf: {
+        cs: 'PDF faktur stáhnete v detailu faktury tlačítkem "Stáhnout PDF". Na výběr je 5 layoutů s logem a QR kódem.',
+        en: 'Download invoice PDF in invoice detail with "Download PDF" button. Choose from 5 layouts with logo and QR code.',
+        link: '/invoices'
+      },
+      email: {
+        cs: 'Faktury odešlete emailem z detailu faktury. Faktura se odešle jako PDF příloha.',
+        en: 'Send invoices by email from invoice detail. The invoice is sent as a PDF attachment.',
+        link: '/invoices'
+      },
+    };
 
-  // ── Data / info about the company ──
-  if (about('info', 'udaje', 'data') && about('firm', 'spolecnost', 'company', 'nase', 'our')) {
-    const comp = db.prepare('SELECT * FROM company WHERE tenant_id = ?').get(tenantId);
-    if (comp) {
+    // Combine knowledge for all detected entities
+    if (entities.length > 0) {
+      const primaryEntity = entities[0];
+      const knowledge = knowledgeMap[primaryEntity];
+      if (knowledge) {
+        let answer = isEn ? knowledge.en : knowledge.cs;
+
+        // Enrich with live data if available
+        try {
+          if (primaryEntity === 'invoice') {
+            const s = db.prepare('SELECT COUNT(*) as c FROM invoices WHERE tenant_id = ?').get(tenantId);
+            answer += isEn ? ` You currently have ${s.c} invoices.` : ` Aktuálně máte ${s.c} faktur.`;
+          } else if (primaryEntity === 'client') {
+            const s = db.prepare('SELECT COUNT(*) as c FROM clients WHERE tenant_id = ?').get(tenantId);
+            answer += isEn ? ` You currently have ${s.c} clients.` : ` Aktuálně máte ${s.c} klientů.`;
+          } else if (primaryEntity === 'product') {
+            const s = db.prepare('SELECT COUNT(*) as c FROM products WHERE tenant_id = ?').get(tenantId);
+            answer += isEn ? ` You currently have ${s.c} products.` : ` Aktuálně máte ${s.c} produktů.`;
+          } else if (primaryEntity === 'user') {
+            const s = db.prepare('SELECT COUNT(*) as c FROM users WHERE tenant_id = ? AND active = 1').get(tenantId);
+            answer += isEn ? ` There are ${s.c} active users.` : ` V systému je ${s.c} aktivních uživatelů.`;
+          }
+        } catch (e) { /* ignore enrichment errors */ }
+
+        // If multiple entities, add secondary info
+        if (entities.length > 1 && knowledgeMap[entities[1]]) {
+          const secondary = knowledgeMap[entities[1]];
+          answer += '\n\n' + (isEn ? secondary.en : secondary.cs);
+        }
+
+        return { answer, link: knowledge.link };
+      }
+    }
+
+    // ── Intent-based generation without specific entity ──
+    if (intent === 'navigate') {
       return {
         answer: isEn
-          ? `Company: ${comp.name}, ID: ${comp.ico || '—'}, VAT: ${comp.dic || '—'}`
-          : `Společnost: ${comp.name}, IČO: ${comp.ico || '—'}, DIČ: ${comp.dic || '—'}`,
-        link: '/company'
+          ? 'The ERP system has these main sections:\n• Finance: Invoices, Clients, Evidence, Recurring\n• Accounting: Accounting, VAT, Bank, Currencies\n• Admin: Company, Users\nWhat are you looking for?'
+          : 'ERP systém má tyto hlavní sekce:\n• Finance: Faktury, Klienti, Evidence, Opakované\n• Účetnictví: Účetnictví, DPH, Banka, Měny\n• Správa: Společnost, Uživatelé\nCo hledáte?',
+        link: '/'
       };
     }
+
+    if (intent === 'problem') {
+      return {
+        answer: isEn
+          ? 'If you encounter a problem:\n1. Refresh the page (F5)\n2. Check your permissions\n3. Verify all required fields\n4. Try logging out and back in\nIf the issue persists, contact the administrator.'
+          : 'Pokud narazíte na problém:\n1. Obnovte stránku (F5)\n2. Zkontrolujte svá oprávnění\n3. Ověřte vyplnění povinných polí\n4. Zkuste se odhlásit a přihlásit\nPokud problém přetrvá, kontaktujte administrátora.',
+        link: null
+      };
+    }
+
+    if (intent === 'howto') {
+      return {
+        answer: isEn
+          ? 'I can help you with how-to guides! Try asking specifically:\n• "How to create an invoice?"\n• "How to add a client?"\n• "How to import bank statements?"\n• "How to generate a VAT return?"'
+          : 'Pomohu vám s návody! Zkuste se zeptat konkrétně:\n• "Jak vytvořím fakturu?"\n• "Jak přidám klienta?"\n• "Jak importuji bankovní výpis?"\n• "Jak vytvořím přiznání k DPH?"',
+        link: null
+      };
+    }
+
+    // Weak semantic match — still better than nothing
+    if (semanticResults.length > 0 && semanticResults[0].score > 0.08) {
+      const best = semanticResults[0].doc;
+      return {
+        answer: isEn ? (best.answer_en || best.answer_cs) : best.answer_cs,
+        link: best.link
+      };
+    }
+
+    return null;
   }
 
-  // ── Stav / status / summary ──
-  if (about('stav', 'status', 'prehled', 'overview', 'summary', 'shrn')) {
-    const stats = db.prepare(`SELECT COUNT(*) as total, COALESCE(SUM(CASE WHEN status='paid' THEN 1 ELSE 0 END),0) as paid, COALESCE(SUM(CASE WHEN status='overdue' THEN 1 ELSE 0 END),0) as overdue, COALESCE(SUM(CASE WHEN status='sent' THEN 1 ELSE 0 END),0) as sent FROM invoices WHERE tenant_id = ?`).get(tenantId);
-    const clients = db.prepare('SELECT COUNT(*) as c FROM clients WHERE tenant_id = ?').get(tenantId).c;
-    return {
-      answer: isEn
-        ? `Quick overview: ${stats.total} invoices (${stats.paid} paid, ${stats.sent} sent, ${stats.overdue} overdue), ${clients} clients.`
-        : `Rychlý přehled: ${stats.total} faktur (${stats.paid} zaplacených, ${stats.sent} odeslaných, ${stats.overdue} po splatnosti), ${clients} klientů.`,
-      link: '/'
-    };
+  // Strip common Czech/English prefixes that don't carry semantic meaning
+  stripPrefixes(q) {
+    return q.replace(/^(prosim\s+|prosím\s+|potrebuji\s+|potřebuji\s+|zajima\s+me\s+|zajímá\s+mě\s+|rad\s+bych\s+vedel\s+|rád\s+bych\s+věděl\s+|chtel\s+bych\s+|chtěl\s+bych\s+|potrebuji\s+vedet\s+|potřebuji\s+vědět\s+|please\s+|i\s+need\s+|i\s+want\s+)/i, '').trim();
   }
 
-  // ── Dates / today ──
-  if (about('datum', 'dnes', 'today', 'date', 'den')) {
-    const today = new Date().toLocaleDateString(isEn ? 'en-GB' : 'cs-CZ');
-    return { answer: isEn ? `Today is ${today}.` : `Dnes je ${today}.`, link: null };
+  // Detect help / capability questions
+  isHelpQuery(qNorm) {
+    const stripped = this.stripPrefixes(qNorm);
+    return /\b(pomoc|pomoct|napoved|co umis|what can you|schopnost|funkce chatbot|co znas|co doved|co zvlad)\b/i.test(stripped) ||
+           /^help\b/i.test(stripped) ||
+           /\bjak\b.*\b(pomoc|pomoct|pomuz|help)\b/i.test(stripped) ||
+           /\b(what can|how can).*\b(you|do|help)\b/i.test(stripped) ||
+           /^help$/i.test(stripped);
   }
 
-  // ── Lowered threshold: try knowledge base with score >= 2 ──
-  // Re-run knowledge matching with a lower bar — if we got a partial match, use it
-  if (bestMatch && bestScore >= 2) {
-    return {
-      answer: isEn ? (bestMatch.answer_en || bestMatch.answer_cs) : bestMatch.answer_cs,
-      link: bestMatch.link
-    };
-  }
+  // ── Main reasoning entry point ──
+  reason(query, tenantId, userId, isEn) {
+    this.buildIndex(tenantId);
+    const qNorm = noDiac(query).toLowerCase();
 
-  return null;
+    // Pre-check: strip prefixes and check if remaining content is meaningful
+    const stripped = this.stripPrefixes(qNorm);
+    const isGarbage = stripped.length < 3 || /^[.!?,;:\s?]+$/.test(stripped);
+
+    // If query is essentially empty/garbage after prefix stripping → return null (let fallback handle it)
+    if (isGarbage) return null;
+
+    // If stripped content has no recognizable words (no known entity/intent), don't let TF-IDF match gibberish
+    const strippedIntent = this.classifyIntent(stripped);
+    const strippedEntities = this.extractEntities(stripped);
+    if (strippedIntent === 'general' && strippedEntities.length === 0) {
+      // Check if stripped content has any known Czech/English ERP-related word
+      const hasKnownWord = /\b(faktur|klient|produkt|evidenc|uzivatel|firma|bank|dph|ucetnic|platb|kurz|mena|profil|nastav|dashboard|invoice|client|product|user|company|payment|vat|accounting|currency|help|pomoc|kde|jak|kolik|stav|datum|dnes|tenant|timeout|session|role|export|import|pdf|email|qr|isdoc|ares)\b/i.test(stripped);
+      // Also allow "co je/co to je/what is" pattern — definition queries about any term
+      const isDefinitionQ = /\b(co je|co to je|what is|vysvetli|explain|definic)\b/i.test(stripped);
+      if (!hasKnownWord && !isDefinitionQ) return null; // let the fallback handle truly unknown queries
+    }
+
+    // Confused / lost user — handle before help to distinguish "ztracený pomoc" from "pomoc"
+    const strippedForConfused = this.stripPrefixes(qNorm);
+    if (/\b(confused|lost|nevim co|pomoo+c|simple|jednoduch|zjednoduse|navigate me|make it)\b/i.test(strippedForConfused) ||
+        (/\bztracen/i.test(strippedForConfused) && strippedForConfused.length > 8)) {
+      return {
+        answer: isEn
+          ? "No worries! Try asking a specific question like:\n• \"How to create an invoice?\"\n• \"Where are clients?\"\n• \"How many invoices do I have?\"\nI'm here to help!"
+          : 'Žádný problém! Zkuste se zeptat konkrétně, například:\n• "Jak vytvořím fakturu?"\n• "Kde najdu klienty?"\n• "Kolik mám faktur?"\nJsem tu, abych pomohl!',
+        link: null
+      };
+    }
+
+    // Help / capability queries — handle before general AI matching
+    if (this.isHelpQuery(qNorm)) {
+      return {
+        answer: isEn
+          ? "I can help you with:\n• Navigation — where to find things in the system\n• Invoices — create, send, pay\n• Clients — contact management\n• Accounting — VAT, journal, ledger\n• Settings — company, users, roles\n• Live data — invoice counts, revenue, overdue\nJust ask in your own words!"
+          : 'Pomohu vám s:\n• Navigací — kde co najdete v systému\n• Fakturami — vytvoření, odeslání, platba\n• Klienty — správa kontaktů\n• Účetnictvím — DPH, deník, hlavní kniha\n• Nastavením — firma, uživatelé, role\n• Živými daty — počty faktur, obraty, po splatnosti\nPtejte se vlastními slovy!',
+        link: null
+      };
+    }
+
+    const intent = this.classifyIntent(qNorm);
+    const entities = this.extractEntities(qNorm);
+    const semanticResults = this.semanticSearch(query);
+
+    // 1) Try DB-powered reasoning (live data answers)
+    const dbAnswer = this.reasonFromDB(intent, entities, qNorm, tenantId, userId, isEn);
+    if (dbAnswer) return dbAnswer;
+
+    // 2) Try semantic KB match + contextual generation
+    const generated = this.generateAnswer(query, qNorm, intent, entities, semanticResults, tenantId, isEn);
+    if (generated) return generated;
+
+    // No answer possible
+    return null;
+  }
 }
+
+// Singleton AI engine instance
+const aiEngine = new LocalAIEngine();
 
 // ─── CONVERSATION CONTEXT ─────────────────────────────────────
 // Detects follow-up questions and enriches them with context from previous exchange
@@ -1922,7 +2335,7 @@ function resolveFollowUp(q, conversationId, tenantId) {
   const qWords = qNorm.split(/\s+/).filter(w => w.length > 1);
 
   // Exclude greetings, thanks, bye — these are never follow-ups
-  const greetBye = /^(ahoj|cau|cus|nazdar|zdar|dobry den|dobre rano|dobry vecer|zdravim|hello|hi|hey|hej|dekuji|diky|dik|thanks|thank you|diky moc|na shledanou|nashledanou|nashle|bye|sbohem|goodbye|zatim|mej se|good morning|good afternoon|good evening)\b/i;
+  const greetBye = /^(ahoj|cau|cus|nazdar|zdar|dobry den|dobre rano|dobry vecer|zdravim|hello|hi|hey|hej|dekuji|diky|dik|thanks|thank you|diky moc|na shledanou|nashledanou|nashle|bye|sbohem|goodbye|zatim|mej se|good morning|good afternoon|good evening)(?:\b|$)/i;
   if (greetBye.test(qNorm)) return q;
 
   // Detect follow-up patterns
@@ -1936,8 +2349,8 @@ function resolveFollowUp(q, conversationId, tenantId) {
     /\b(them|those|these|this one|the same|which one)\b/i.test(qNorm) ||
     // Very short question likely referencing context (under 4 words)
     (qWords.length <= 3) ||
-    // "co dál" / "a dál" / "tell me more" / "více" / "detail"
-    /\b(co dal|a dal|vice|detail|podrob|rozsir|upresni|tell me more|more detail|elaborate|go on|rekni mi vic)\b/i.test(qNorm) ||
+    // "co dál" / "a dál" / "tell me more" / "více" / "detail" / superlatives referencing context
+    /\b(co dal|a dal|vice|detail|podrob|rozsir|upresni|tell me more|more detail|elaborate|go on|rekni mi vic|the best|nejlep|top|nejvets|nejvic|kteri jsou|who are the)\b/i.test(qNorm) ||
     // "ukaž mi je" / "zobraz" / "vypiš" without clear topic
     (/\b(ukaz|zobraz|vypis|list|show)\b/i.test(qNorm) && qWords.length <= 4)
   );
@@ -2004,12 +2417,50 @@ app.post('/api/chatbot/message', ...tenanted, (req, res) => {
   if (!message || !message.trim()) return res.status(400).json({ error: 'Zpráva je povinná' });
 
   const rawQ = message.trim().toLowerCase();
-  const isEn = lang === 'en' || /^(how|where|what|can|do|i need|help me|show me|my |the )/i.test(message.trim());
+  const isEn = lang === 'en' || /^(how|where|what|can|do|i need|help me|show me|my |the |thanks|thank you|bye|goodbye|good morning|good afternoon|good evening|hi |hey |hello|who |i'm |i am )/i.test(message.trim());
 
   // Resolve follow-up: enrich query with conversation context if needed
   const q = resolveFollowUp(rawQ, conversation_id, req.tenant_id);
 
-  // 1) Try dynamic AI queries first (real-time data)
+  // 0) Early intercept: greetings, thanks, bye (before any KB matching to avoid false positives)
+  // Strip common prefixes before testing greetings (e.g., "Prosím Hello" → "Hello")
+  const qTestEarly = noDiac(q).replace(/^(prosim|prosím|potrebuji|potřebuji|zajima me|zajímá mě|chtel bych|chtěl bych|rad bych|rád bych)\s+/i, '').trim();
+  const earlyGreetings = /^(ahoj|cau|cus|nazdar|zdar|dobry den|dobre rano|dobry vecer|zdravim|hello|hi|hey|hej|good morning|good afternoon|good evening)(?:\b|$)/i;
+  const earlyThanks = /^(dekuji|diky|dik|thanks|thank you|diky moc)(?:\b|$)/i;
+  const earlyBye = /^(na shledanou|nashledanou|bye|sbohem|nashle|goodbye|cau|zatim|mej se)(?:\b|$)/i;
+
+  if (earlyGreetings.test(qTestEarly)) {
+    const greetAnswer = isEn
+      ? 'Hello! I am Hyňa, your smart ERP assistant. How can I help you today?'
+      : 'Ahoj! Jsem Hyňa, váš chytrý asistent. Jak vám mohu dnes pomoci?';
+    // Save and return
+    let convId = conversation_id;
+    if (convId) {
+      const conv = db.prepare('SELECT * FROM chatbot_conversations WHERE id = ? AND tenant_id = ?').get(convId, req.tenant_id);
+      if (conv) { const msgs = JSON.parse(conv.messages); msgs.push({ role: 'user', text: message.trim(), ts: new Date().toISOString() }); msgs.push({ role: 'bot', text: greetAnswer, link: null, ts: new Date().toISOString() }); db.prepare("UPDATE chatbot_conversations SET messages = ?, updated_at = datetime('now') WHERE id = ?").run(JSON.stringify(msgs), convId); }
+    } else {
+      const msgs = [{ role: 'user', text: message.trim(), ts: new Date().toISOString() }, { role: 'bot', text: greetAnswer, link: null, ts: new Date().toISOString() }];
+      const r = db.prepare('INSERT INTO chatbot_conversations (tenant_id, user_id, messages) VALUES (?, ?, ?)').run(req.tenant_id, req.user.id, JSON.stringify(msgs));
+      convId = r.lastInsertRowid;
+    }
+    return res.json({ answer: greetAnswer, link: null, conversation_id: convId });
+  }
+  if (earlyThanks.test(qTestEarly)) {
+    const thanksAnswer = isEn ? "You're welcome! Anything else I can help with?" : 'Nemáte zač! Mohu ještě s něčím pomoct?';
+    let convId = conversation_id;
+    if (convId) { const conv = db.prepare('SELECT * FROM chatbot_conversations WHERE id = ? AND tenant_id = ?').get(convId, req.tenant_id); if (conv) { const msgs = JSON.parse(conv.messages); msgs.push({ role: 'user', text: message.trim(), ts: new Date().toISOString() }); msgs.push({ role: 'bot', text: thanksAnswer, link: null, ts: new Date().toISOString() }); db.prepare("UPDATE chatbot_conversations SET messages = ?, updated_at = datetime('now') WHERE id = ?").run(JSON.stringify(msgs), convId); } }
+    else { const msgs = [{ role: 'user', text: message.trim(), ts: new Date().toISOString() }, { role: 'bot', text: thanksAnswer, link: null, ts: new Date().toISOString() }]; const r = db.prepare('INSERT INTO chatbot_conversations (tenant_id, user_id, messages) VALUES (?, ?, ?)').run(req.tenant_id, req.user.id, JSON.stringify(msgs)); convId = r.lastInsertRowid; }
+    return res.json({ answer: thanksAnswer, link: null, conversation_id: convId });
+  }
+  if (earlyBye.test(qTestEarly)) {
+    const byeAnswer = isEn ? 'Goodbye! I am here whenever you need help.' : 'Na shledanou! Jsem tu, kdykoliv budete potřebovat.';
+    let convId = conversation_id;
+    if (convId) { const conv = db.prepare('SELECT * FROM chatbot_conversations WHERE id = ? AND tenant_id = ?').get(convId, req.tenant_id); if (conv) { const msgs = JSON.parse(conv.messages); msgs.push({ role: 'user', text: message.trim(), ts: new Date().toISOString() }); msgs.push({ role: 'bot', text: byeAnswer, link: null, ts: new Date().toISOString() }); db.prepare("UPDATE chatbot_conversations SET messages = ?, updated_at = datetime('now') WHERE id = ?").run(JSON.stringify(msgs), convId); } }
+    else { const msgs = [{ role: 'user', text: message.trim(), ts: new Date().toISOString() }, { role: 'bot', text: byeAnswer, link: null, ts: new Date().toISOString() }]; const r = db.prepare('INSERT INTO chatbot_conversations (tenant_id, user_id, messages) VALUES (?, ?, ?)').run(req.tenant_id, req.user.id, JSON.stringify(msgs)); convId = r.lastInsertRowid; }
+    return res.json({ answer: byeAnswer, link: null, conversation_id: convId });
+  }
+
+  // 1) Try dynamic handlers first (real-time data queries with specific patterns)
   const dynamicResult = getDynamicAnswer(q, req.tenant_id, req.user.id, isEn);
 
   let answer, link;
@@ -2017,97 +2468,28 @@ app.post('/api/chatbot/message', ...tenanted, (req, res) => {
     answer = dynamicResult.answer;
     link = dynamicResult.link;
   } else {
-    // 2) Search knowledge base by advanced keyword matching with stemming
-    const allKnowledge = db.prepare('SELECT * FROM chatbot_knowledge WHERE (tenant_id = ? OR tenant_id IS NULL) AND active = 1 ORDER BY priority DESC').all(req.tenant_id);
-
-    const qNorm = noDiac(q); // diacritics-free
-    const queryWords = q.split(/\s+/).filter(w => w.length > 1);
-    const queryWordsNorm = queryWords.map(w => noDiac(w));
-    const queryStems = queryWords.map(w => czStem(noDiac(w).replace(/[?.!,;:]/g, '')));
-
-    let bestMatch = null;
-    let bestScore = 0;
-
-    for (const k of allKnowledge) {
-      const keywords = k.keywords.toLowerCase().split(',').map(s => s.trim());
-      let score = 0;
-
-      for (const kw of keywords) {
-        const kwNorm = noDiac(kw);
-        // Exact substring match (with and without diacritics)
-        if (q.includes(kw) || qNorm.includes(kwNorm)) {
-          score += kw.length * 2 + k.priority;
-          continue;
-        }
-        // Stem matching — more forgiving (diacritics-normalized)
-        // Skip stem matching for multi-word keywords (only substring + word-level)
-        if (!kw.includes(' ')) {
-          const kwStem = czStem(kwNorm);
-          for (const qs of queryStems) {
-            if (qs.length > 2 && kwStem.length > 2) {
-              if (qs === kwStem) score += kw.length + k.priority;
-              else if (qs.includes(kwStem) || kwStem.includes(qs)) score += Math.min(qs.length, kwStem.length);
-            }
-          }
-        }
-        // Word-level matching (diacritics-normalized)
-        const kwWords = kw.split(/\s+/).map(w => noDiac(w));
-        for (const kww of kwWords) {
-          for (const qw of queryWordsNorm) {
-            if (qw.length > 2 && kww.length > 2 && (qw.includes(kww) || kww.includes(qw))) score += Math.min(qw.length, kww.length);
-          }
-        }
-      }
-      // Also check against question text itself (diacritics-normalized)
-      const qText = noDiac((k.question_cs + ' ' + (k.question_en || '')).toLowerCase());
-      for (const qw of queryWordsNorm) {
-        if (qw.length > 3 && qText.includes(qw)) score += 2;
-      }
-      if (score > bestScore) {
-        bestScore = score;
-        bestMatch = k;
-      }
-    }
-
-    if (bestMatch && bestScore >= 4) {
-      answer = isEn ? (bestMatch.answer_en || bestMatch.answer_cs) : bestMatch.answer_cs;
-      link = bestMatch.link;
+    // 2) LOCAL AI ENGINE — TF-IDF semantic matching + intent classification + entity extraction + contextual reasoning
+    const aiResult = aiEngine.reason(q, req.tenant_id, req.user.id, isEn);
+    if (aiResult) {
+      answer = aiResult.answer;
+      link = aiResult.link;
     } else {
-      // 3) Smart AI reasoning — try to figure out the answer autonomously
-      const aiResult = smartReason(q, noDiac(q), req.tenant_id, req.user.id, isEn, bestMatch, bestScore);
-      if (aiResult) {
-        answer = aiResult.answer;
-        link = aiResult.link;
+      // 3) Fallback: confused user, too short, or truly unknown
+      const qTest = noDiac(q);
+      if (q.length < 3 || /^[.!?,;:\s]+$/.test(q)) {
+        answer = isEn ? 'Could you please be more specific? Try asking about invoices, clients, or navigation.' : 'Můžete být konkrétnější? Zkuste se zeptat na faktury, klienty nebo navigaci.';
+      } else if (/\b(confused|lost|ztracen|nevim co|pomoo+c|simple|jednoduch|zjednoduse|navigate me|make it)\b/i.test(qTest)) {
+        answer = isEn
+          ? "No worries! Try asking a specific question like:\n• \"How to create an invoice?\"\n• \"Where are clients?\"\n• \"How many invoices do I have?\"\nI'm here to help!"
+          : 'Žádný problém! Zkuste se zeptat konkrétně, například:\n• "Jak vytvořím fakturu?"\n• "Kde najdu klienty?"\n• "Kolik mám faktur?"\nJsem tu, abych pomohl!';
       } else {
-        // 4) Pattern-based fallback for greetings, thanks, etc.
-        const qTest = noDiac(q); // test without diacritics too
-        const greetings = /^(ahoj|cau|cus|nazdar|zdar|dobry den|dobre rano|dobry vecer|zdravim|hello|hi|hey|hej|good morning|good afternoon|good evening)\b/i;
-        const thanks = /^(dekuji|diky|dik|thanks|thank you|diky moc)\b/i;
-        const bye = /^(na shledanou|nashledanou|bye|sbohem|nashle|goodbye|cau|zatim|mej se)\b/i;
-
-        if (greetings.test(qTest)) {
-          answer = isEn
-            ? 'Hello! I am Hyňa, your smart ERP assistant. How can I help you today?'
-            : 'Ahoj! Jsem Hyňa, váš chytrý asistent. Jak vám mohu dnes pomoci?';
-        } else if (thanks.test(qTest)) {
-          answer = isEn ? "You're welcome! Anything else I can help with?" : 'Nemáte zač! Mohu ještě s něčím pomoct?';
-        } else if (bye.test(qTest)) {
-          answer = isEn ? 'Goodbye! I am here whenever you need help.' : 'Na shledanou! Jsem tu, kdykoliv budete potřebovat.';
-        } else if (q.length < 3 || /^[.!?,;:\s]+$/.test(q)) {
-          answer = isEn ? 'Could you please be more specific? Try asking about invoices, clients, or navigation.' : 'Můžete být konkrétnější? Zkuste se zeptat na faktury, klienty nebo navigaci.';
-        } else if (/\b(confused|lost|ztracen|nevim co|pomoo+c|simple|jednoduch|zjednoduse|navigate me|make it)\b/i.test(qTest)) {
-          answer = isEn
-            ? "No worries! Try asking a specific question like:\n• \"How to create an invoice?\"\n• \"Where are clients?\"\n• \"How many invoices do I have?\"\nI'm here to help!"
-            : 'Žádný problém! Zkuste se zeptat konkrétně, například:\n• "Jak vytvořím fakturu?"\n• "Kde najdu klienty?"\n• "Kolik mám faktur?"\nJsem tu, abych pomohl!';
-        } else {
-          // Log unanswered question for self-learning
-          db.prepare('INSERT INTO chatbot_unanswered (tenant_id, user_id, question) VALUES (?, ?, ?)').run(req.tenant_id, req.user.id, message.trim());
-          answer = isEn
-            ? "I'm sorry, I don't know the answer to that yet. Your question has been logged and an administrator will add an answer soon! Try asking about invoices, clients, payments, or navigation."
-            : 'Omlouvám se, na tuto otázku zatím neznám odpověď. Váš dotaz byl zaznamenán a administrátor brzy doplní odpověď! Zkuste se zeptat na faktury, klienty, platby nebo navigaci.';
-        }
-        link = null;
+        // Log unanswered question for self-learning
+        db.prepare('INSERT INTO chatbot_unanswered (tenant_id, user_id, question) VALUES (?, ?, ?)').run(req.tenant_id, req.user.id, message.trim());
+        answer = isEn
+          ? "I'm sorry, I don't know the answer to that yet. Your question has been logged and an administrator will add an answer soon! Try asking about invoices, clients, payments, or navigation."
+          : 'Omlouvám se, na tuto otázku zatím neznám odpověď. Váš dotaz byl zaznamenán a administrátor brzy doplní odpověď! Zkuste se zeptat na faktury, klienty, platby nebo navigaci.';
       }
+      link = null;
     }
   }
 
