@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api';
 import { useAuth } from '../App';
+import Pagination, { usePagination } from '../components/Pagination';
 
 export default function Accounting() {
   const { can } = useAuth();
@@ -15,8 +16,10 @@ export default function Accounting() {
   const [editItem, setEditItem] = useState(null);
   const [showJournalForm, setShowJournalForm] = useState(false);
   const [filter, setFilter] = useState({ from: '', to: '', status: '' });
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(20);
 
-  useEffect(() => { load(); }, [tab]);
+  useEffect(() => { setPage(1); load(); }, [tab]);
 
   const load = async () => {
     setLoading(true);
@@ -125,7 +128,7 @@ export default function Accounting() {
             <table className="table">
               <thead><tr><th>Číslo</th><th>Název</th><th>Typ</th><th>Akce</th></tr></thead>
               <tbody>
-                {accounts.map(a => (
+                {accounts.slice((page - 1) * perPage, page * perPage).map(a => (
                   <tr key={a.id}>
                     <td><strong>{a.account_number}</strong></td>
                     <td>{a.name}</td>
@@ -141,6 +144,7 @@ export default function Accounting() {
               </tbody>
             </table>
           )}
+          <Pagination total={accounts.length} page={page} perPage={perPage} onPageChange={setPage} onPerPageChange={v => { setPerPage(v); setPage(1); }} />
         </>
       )}
 
@@ -166,7 +170,7 @@ export default function Accounting() {
             <table className="table">
               <thead><tr><th>Číslo</th><th>Datum</th><th>Popis</th><th>MD</th><th>D</th><th>Stav</th><th>Akce</th></tr></thead>
               <tbody>
-                {journal.map(j => {
+                {journal.slice((page - 1) * perPage, page * perPage).map(j => {
                   const totalDebit = j.lines?.reduce((s, l) => s + l.debit, 0) || 0;
                   const totalCredit = j.lines?.reduce((s, l) => s + l.credit, 0) || 0;
                   return (
@@ -192,6 +196,7 @@ export default function Accounting() {
               </tbody>
             </table>
           )}
+          <Pagination total={journal.length} page={page} perPage={perPage} onPageChange={setPage} onPerPageChange={v => { setPerPage(v); setPage(1); }} />
         </>
       )}
 
@@ -207,7 +212,7 @@ export default function Accounting() {
             <table className="table">
               <thead><tr><th>Účet</th><th>Název</th><th>Typ</th><th style={{ textAlign: 'right' }}>Obraty MD</th><th style={{ textAlign: 'right' }}>Obraty D</th><th style={{ textAlign: 'right' }}>Saldo</th></tr></thead>
               <tbody>
-                {balances.map(b => (
+                {balances.slice((page - 1) * perPage, page * perPage).map(b => (
                   <tr key={b.id}>
                     <td><strong>{b.account_number}</strong></td>
                     <td>{b.name}</td>
@@ -228,6 +233,7 @@ export default function Accounting() {
               </tbody>
             </table>
           )}
+          <Pagination total={balances.length} page={page} perPage={perPage} onPageChange={setPage} onPerPageChange={v => { setPerPage(v); setPage(1); }} />
         </>
       )}
     </div>

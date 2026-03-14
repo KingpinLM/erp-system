@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api';
 import { useAuth } from '../App';
+import Pagination, { usePagination } from '../components/Pagination';
 
 export default function Bank() {
   const { can } = useAuth();
@@ -15,6 +16,8 @@ export default function Bank() {
   const [selectedAccount, setSelectedAccount] = useState('');
   const [filter, setFilter] = useState({ status: '', from: '', to: '' });
   const [editAccount, setEditAccount] = useState(null);
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(20);
 
   useEffect(() => { loadAccounts(); }, []);
   useEffect(() => { if (tab === 'transactions') loadTransactions(); }, [tab, selectedAccount]);
@@ -180,7 +183,7 @@ export default function Bank() {
             <table className="table">
               <thead><tr><th>Datum</th><th>Částka</th><th>Protiúčet</th><th>VS</th><th>Popis</th><th>Stav</th><th>Faktura</th><th>Akce</th></tr></thead>
               <tbody>
-                {transactions.map(t => (
+                {transactions.slice((page - 1) * perPage, page * perPage).map(t => (
                   <tr key={t.id}>
                     <td>{new Date(t.date).toLocaleDateString('cs')}</td>
                     <td style={{ fontWeight: 600, color: t.amount >= 0 ? '#22c55e' : '#ef4444', textAlign: 'right' }}>
@@ -203,6 +206,7 @@ export default function Bank() {
               </tbody>
             </table>
           )}
+          <Pagination total={transactions.length} page={page} perPage={perPage} onPageChange={setPage} onPerPageChange={v => { setPerPage(v); setPage(1); }} />
         </>
       )}
     </div>

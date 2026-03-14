@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api';
 import { useAuth } from '../App';
+import Pagination, { usePagination } from '../components/Pagination';
 
 const statusLabels = { draft: 'Koncept', sent: 'Odesláno', paid: 'Zaplaceno', overdue: 'Po splatnosti', cancelled: 'Zrušeno' };
 const fmt = (n, cur = 'CZK') => new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: cur, maximumFractionDigits: 2 }).format(n);
@@ -17,6 +18,8 @@ export default function Invoices() {
   const [sortDir, setSortDir] = useState('desc');
   const [selected, setSelected] = useState(new Set());
   const { can } = useAuth();
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(20);
 
   const load = () => {
     setLoading(true);
@@ -26,7 +29,7 @@ export default function Invoices() {
     api.getInvoices(params).then(setInvoices).finally(() => setLoading(false));
   };
 
-  useEffect(load, [filters]);
+  useEffect(() => { setPage(1); load(); }, [filters]);
 
   const sorted = useMemo(() => {
     const arr = [...invoices];
@@ -118,7 +121,7 @@ export default function Invoices() {
             <table>
               <thead>
                 <tr>
-                  <th style={{ width: 32 }}><input type="checkbox" onChange={e => { if (e.target.checked) setSelected(new Set(sorted.map(i => i.id))); else setSelected(new Set()); }} checked={selected.size === sorted.length && sorted.length > 0} /></th>
+                  <th style={{ width: 32 }}><input type="checkbox" onChange={e => { if (e.target.checked) setSelected(new Set(sorted.slice((page - 1) * perPage, page * perPage).map(i => i.id))); else setSelected(new Set()); }} checked={selected.size > 0 && sorted.slice((page - 1) * perPage, page * perPage).every(i => selected.has(i.id))} /></th>
                   <th style={{ cursor: 'pointer' }} onClick={() => toggleSort('invoice_number')}>Číslo<SortIcon col="invoice_number" /></th>
                   <th style={{ cursor: 'pointer' }} onClick={() => toggleSort('client_name')}>Klient<SortIcon col="client_name" /></th>
                   <th style={{ cursor: 'pointer' }} onClick={() => toggleSort('issue_date')}>Datum vystavení<SortIcon col="issue_date" /></th>
@@ -131,7 +134,7 @@ export default function Invoices() {
                 </tr>
               </thead>
               <tbody>
-                {sorted.map(inv => (
+                {sorted.slice((page - 1) * perPage, page * perPage).map(inv => (
                   <tr key={inv.id} style={{ background: selected.has(inv.id) ? '#eff6ff' : '' }}>
                     <td><input type="checkbox" checked={selected.has(inv.id)} onChange={e => { const s = new Set(selected); if (e.target.checked) s.add(inv.id); else s.delete(inv.id); setSelected(s); }} /></td>
                     <td><Link to={`/invoices/${inv.id}`} style={{ color: 'var(--primary)', fontWeight: 600 }}>{inv.invoice_number}</Link>{inv.invoice_type && inv.invoice_type !== 'regular' && <span style={{ fontSize: 10, color: '#94a3b8', marginLeft: 4 }}>({typeLabels[inv.invoice_type]})</span>}</td>
@@ -155,6 +158,7 @@ export default function Invoices() {
             </table>
           </div>
         )}
+        <Pagination total={sorted.length} page={page} perPage={perPage} onPageChange={setPage} onPerPageChange={v => { setPerPage(v); setPage(1); }} />
       </div>
     </div>
   );

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api';
 import { useAuth } from '../App';
+import Pagination, { usePagination } from '../components/Pagination';
 
 export default function Clients() {
   const [clients, setClients] = useState([]);
@@ -15,6 +16,8 @@ export default function Clients() {
   const [error, setError] = useState('');
   const dupTimerRef = React.useRef(null);
   const { can } = useAuth();
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(20);
 
   const load = () => { setLoading(true); api.getClients().then(setClients).finally(() => setLoading(false)); };
   useEffect(load, []);
@@ -122,7 +125,7 @@ export default function Clients() {
                 <th>Akce</th>
               </tr></thead>
               <tbody>
-                {sorted.map(c => (
+                {sorted.slice((page - 1) * perPage, page * perPage).map(c => (
                   <tr key={c.id}>
                     <td><Link to={`/clients/${c.id}`} style={{ color: 'var(--primary)', fontWeight: 600, textDecoration: 'none' }}>{c.name}</Link></td>
                     <td>{c.ico || '—'}</td>
@@ -143,6 +146,7 @@ export default function Clients() {
             </table>
           </div>
         )}
+        <Pagination total={sorted.length} page={page} perPage={perPage} onPageChange={setPage} onPerPageChange={v => { setPerPage(v); setPage(1); }} />
       </div>
 
       {showModal && (

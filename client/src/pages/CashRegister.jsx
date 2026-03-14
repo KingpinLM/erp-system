@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api';
 import { useAuth } from '../App';
+import Pagination, { usePagination } from '../components/Pagination';
 
 export default function CashRegister() {
   const { can } = useAuth();
@@ -13,9 +14,11 @@ export default function CashRegister() {
   const [showDocForm, setShowDocForm] = useState(false);
   const [selectedRegister, setSelectedRegister] = useState('');
   const [editDoc, setEditDoc] = useState(null);
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(20);
 
   useEffect(() => { loadRegisters(); }, []);
-  useEffect(() => { if (selectedRegister) loadDocuments(); }, [selectedRegister]);
+  useEffect(() => { if (selectedRegister) { setPage(1); loadDocuments(); } }, [selectedRegister]);
 
   const loadRegisters = async () => {
     try { setRegisters(await api.getCashRegisters()); }
@@ -160,7 +163,7 @@ export default function CashRegister() {
             <table className="table">
               <thead><tr><th>Číslo</th><th>Datum</th><th>Typ</th><th style={{ textAlign: 'right' }}>Částka</th><th>Popis</th><th>Kategorie</th><th>Vytvořil</th><th>Akce</th></tr></thead>
               <tbody>
-                {documents.map(d => (
+                {documents.slice((page - 1) * perPage, page * perPage).map(d => (
                   <tr key={d.id}>
                     <td><strong>{d.document_number}</strong></td>
                     <td>{new Date(d.date).toLocaleDateString('cs')}</td>
@@ -182,6 +185,7 @@ export default function CashRegister() {
               </tbody>
             </table>
           )}
+          <Pagination total={documents.length} page={page} perPage={perPage} onPageChange={setPage} onPerPageChange={v => { setPerPage(v); setPage(1); }} />
         </>
       )}
     </div>

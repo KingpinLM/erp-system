@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api';
 import { useAuth } from '../App';
+import Pagination, { usePagination } from '../components/Pagination';
 
 export default function Products() {
   const { can } = useAuth();
@@ -14,8 +15,10 @@ export default function Products() {
   const [showMovement, setShowMovement] = useState(false);
   const [editItem, setEditItem] = useState(null);
   const [typeFilter, setTypeFilter] = useState('');
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(20);
 
-  useEffect(() => { load(); }, [tab]);
+  useEffect(() => { setPage(1); load(); }, [tab]);
 
   const load = async () => {
     setLoading(true);
@@ -168,7 +171,7 @@ export default function Products() {
             <table className="table">
               <thead><tr><th>Název</th><th>SKU</th><th>Typ</th><th>Jednotka</th><th style={{ textAlign: 'right' }}>Cena</th><th style={{ textAlign: 'right' }}>DPH</th><th style={{ textAlign: 'right' }}>Skladem</th><th>Akce</th></tr></thead>
               <tbody>
-                {products.map(p => (
+                {products.slice((page - 1) * perPage, page * perPage).map(p => (
                   <tr key={p.id} style={{ opacity: p.active ? 1 : 0.5 }}>
                     <td><strong>{p.name}</strong>{p.description && <div style={{ fontSize: 11, color: '#64748b' }}>{p.description.slice(0, 50)}</div>}</td>
                     <td>{p.sku || '—'}</td>
@@ -190,6 +193,7 @@ export default function Products() {
               </tbody>
             </table>
           )}
+          <Pagination total={products.length} page={page} perPage={perPage} onPageChange={setPage} onPerPageChange={v => { setPerPage(v); setPage(1); }} />
         </>
       )}
 
@@ -199,7 +203,7 @@ export default function Products() {
           <table className="table">
             <thead><tr><th>Datum</th><th>Produkt</th><th>Typ</th><th style={{ textAlign: 'right' }}>Množství</th><th style={{ textAlign: 'right' }}>Cena/ks</th><th>Poznámka</th><th>Vytvořil</th></tr></thead>
             <tbody>
-              {movements.map(m => (
+              {movements.slice((page - 1) * perPage, page * perPage).map(m => (
                 <tr key={m.id}>
                   <td>{new Date(m.date).toLocaleDateString('cs')}</td>
                   <td><strong>{m.product_name}</strong>{m.sku && <span style={{ fontSize: 11, color: '#64748b' }}> ({m.sku})</span>}</td>
@@ -216,7 +220,8 @@ export default function Products() {
               ))}
             </tbody>
           </table>
-        )
+        )}
+        <Pagination total={movements.length} page={page} perPage={perPage} onPageChange={setPage} onPerPageChange={v => { setPerPage(v); setPage(1); }} />
       )}
 
       {/* Stock report */}

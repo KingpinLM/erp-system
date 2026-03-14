@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { api } from '../api';
 import { useAuth } from '../App';
+import Pagination, { usePagination } from '../components/Pagination';
 
 const fmt = (n, cur = 'CZK') => n != null ? new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: cur, maximumFractionDigits: 2 }).format(n) : '—';
 const fmtDate = (d) => { if (!d) return '—'; const p = d.slice(0,10).split('-'); return p.length === 3 ? `${p[2]}.${p[1]}.${p[0]}` : d; };
@@ -26,6 +27,8 @@ export default function Evidence() {
   const [categoryRules, setCategoryRules] = useState([]);
   const fileRef = useRef();
   const { can } = useAuth();
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(20);
 
   const applyPeriodPreset = (preset) => {
     setPeriodPreset(preset);
@@ -62,7 +65,7 @@ export default function Evidence() {
     api.getCategories().then(setCategories).catch(() => {});
   };
 
-  useEffect(load, [tab, categoryFilter, dateFrom, dateTo]);
+  useEffect(() => { setPage(1); load(); }, [tab, categoryFilter, dateFrom, dateTo]);
 
   const loadCategoryRules = () => {
     api.getCategoryRules().then(setCategoryRules).catch(() => {});
@@ -344,7 +347,7 @@ export default function Evidence() {
                     <th>Měna</th><th>Vytvořil</th><th>Akce</th>
                   </tr></thead>
                   <tbody>
-                    {sorted.map(r => (
+                    {sorted.slice((page - 1) * perPage, page * perPage).map(r => (
                       <tr key={r.id}>
                         <td><strong>{r.title}</strong>{r.description && <div className="text-muted" style={{ fontSize: '0.8rem' }}>{r.description}</div>}</td>
                         <td>{r.category ? <span className="badge">{r.category}</span> : '—'}</td>
@@ -364,6 +367,7 @@ export default function Evidence() {
                 </table>
               </div>
             )}
+            <Pagination total={sorted.length} page={page} perPage={perPage} onPageChange={setPage} onPerPageChange={v => { setPerPage(v); setPage(1); }} />
           </div>
         </>
       )}

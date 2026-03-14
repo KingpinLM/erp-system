@@ -1680,3 +1680,81 @@ a:hover { opacity: 0.85; }
 [data-theme="dark"] .faq-search-clear:hover {
   color: var(--gray-300);
 }
+
+/* ─── PAGINATION ─────────────────────────────────── */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 0;
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+}
+.pagination-info {
+  color: var(--gray-500);
+  white-space: nowrap;
+}
+.pagination-pages {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.pagination-btn {
+  min-width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--gray-200);
+  background: white;
+  color: var(--gray-700);
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.15s;
+  padding: 0 6px;
+}
+.pagination-btn:hover:not(:disabled):not(.active) {
+  background: var(--gray-50);
+  border-color: var(--gray-300);
+}
+.pagination-btn.active {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+  font-weight: 600;
+}
+.pagination-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.pagination-ellipsis {
+  padding: 0 4px;
+  color: var(--gray-400);
+}
+.pagination-select {
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius);
+  font-size: 0.8rem;
+  color: var(--gray-600);
+  background: white;
+}
+[data-theme="dark"] .pagination-btn {
+  background: var(--gray-800);
+  border-color: var(--gray-700);
+  color: var(--gray-300);
+}
+[data-theme="dark"] .pagination-btn:hover:not(:disabled):not(.active) {
+  background: var(--gray-700);
+}
+[data-theme="dark"] .pagination-btn.active {
+  background: var(--primary);
+  color: white;
+}
+[data-theme="dark"] .pagination-select {
+  background: var(--gray-800);
+  border-color: var(--gray-700);
+  color: var(--gray-300);
+}

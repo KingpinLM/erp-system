@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import { useAuth } from '../App';
+import Pagination, { usePagination } from '../components/Pagination';
 
 export default function Orders() {
   const { can } = useAuth();
@@ -13,6 +14,8 @@ export default function Orders() {
   const [showForm, setShowForm] = useState(false);
   const [editOrder, setEditOrder] = useState(null);
   const [filter, setFilter] = useState({ type: '', status: '' });
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(20);
   const [clients, setClients] = useState([]);
   const [products, setProducts] = useState([]);
 
@@ -28,7 +31,7 @@ export default function Orders() {
   const loadClients = async () => { try { setClients(await api.getClients()); } catch {} };
   const loadProducts = async () => { try { setProducts(await api.getProducts()); } catch {} };
 
-  useEffect(() => { load(); }, [filter.type, filter.status]);
+  useEffect(() => { setPage(1); load(); }, [filter.type, filter.status]);
 
   const updateStatus = async (id, status) => {
     try { await api.updateOrderStatus(id, status); load(); }
@@ -86,7 +89,7 @@ export default function Orders() {
         <table className="table">
           <thead><tr><th>Číslo</th><th>Typ</th><th>Klient</th><th>Datum</th><th style={{ textAlign: 'right' }}>Celkem</th><th>Stav</th><th>Akce</th></tr></thead>
           <tbody>
-            {orders.map(o => (
+            {orders.slice((page - 1) * perPage, page * perPage).map(o => (
               <tr key={o.id}>
                 <td><strong>{o.order_number}</strong></td>
                 <td><span className={`badge badge-${o.type === 'received' ? 'paid' : 'sent'}`}>{o.type === 'received' ? 'Přijatá' : 'Vydaná'}</span></td>
@@ -115,6 +118,7 @@ export default function Orders() {
           </tbody>
         </table>
       )}
+      <Pagination total={orders.length} page={page} perPage={perPage} onPageChange={setPage} onPerPageChange={v => { setPerPage(v); setPage(1); }} />
     </div>
   );
 }
