@@ -24,6 +24,7 @@ import VatReport from './pages/VatReport';
 import Bank from './pages/Bank';
 import SearchResults from './pages/SearchResults';
 import ChatWidget from './components/ChatWidget';
+import ChatbotSettings from './pages/ChatbotSettings';
 import './styles.css';
 
 export const AuthContext = createContext(null);
@@ -112,6 +113,7 @@ const NavIcon = ({ name, size = 18 }) => {
     profile: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
     logout: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>,
     search: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>,
+    chat: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>,
   };
   return icons[name] || null;
 };
@@ -151,6 +153,7 @@ function Sidebar({ open, onClose }) {
       items: [
         { to: '/company', label: 'Společnost', icon: 'company' },
         { to: '/users', label: 'Uživatelé', icon: 'users' },
+        { to: '/chatbot', label: 'Chatbot Hyňa', icon: 'chat' },
       ]
     });
   }
@@ -498,6 +501,7 @@ export default function App() {
                   <Route path="/company" element={<Company />} />
                   <Route path="/users" element={<Users />} />
                   <Route path="/users/:id" element={<UserDetail />} />
+                  <Route path="/chatbot" element={<ChatbotSettings />} />
                   <Route path="/profile" element={<Profile />} />
                 </Routes>
               </Layout>
