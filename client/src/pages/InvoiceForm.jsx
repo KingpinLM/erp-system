@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { api } from '../api';
 import { useAuth, usePageTitle } from '../App';
+import { useToast } from '../components/Toast';
 
 const paymentMethods = [
   { value: 'bank_transfer', label: 'Bankovní převod' },
@@ -36,6 +37,16 @@ export default function InvoiceForm() {
   const [isDirty, setIsDirty] = useState(false);
   const [leaveDialog, setLeaveDialog] = useState(false);
   const savedRef = useRef(false); // track if form was saved successfully
+  const toast = useToast();
+
+  // Drag & drop state
+  const [dragIdx, setDragIdx] = useState(null);
+  const [dragOverIdx, setDragOverIdx] = useState(null);
+
+  // Autosave key
+  const autosaveKey = isEdit ? `invoice-draft-edit-${id}` : 'invoice-draft-new';
+  const formRef = useRef(form);
+  formRef.current = form;
 
   // Intercept in-app link clicks when form is dirty
   const pendingHref = useRef(null);
@@ -65,6 +76,65 @@ export default function InvoiceForm() {
     window.addEventListener('beforeunload', handler);
     return () => window.removeEventListener('beforeunload', handler);
   }, [isDirty]);
+
+  // Autosave to localStorage every 30s
+  useEffect(() => {
+    if (!isDirty) return;
+    const timer = setInterval(() => {
+      try {
+        localStorage.setItem(autosaveKey, JSON.stringify({ form: formRef.current, savedAt: Date.now() }));
+      } catch {}
+    }, 30000);
+    return () => clearInterval(timer);
+  }, [isDirty, autosaveKey]);
+
+  // Save on blur (tab switch)
+  useEffect(() => {
+    const handler = () => {
+      if (isDirtyRef.current && !savedRef.current) {
+        try {
+          localStorage.setItem(autosaveKey, JSON.stringify({ form: formRef.current, savedAt: Date.now() }));
+        } catch {}
+      }
+    };
+    window.addEventListener('visibilitychange', handler);
+    return () => window.removeEventListener('visibilitychange', handler);
+  }, [autosaveKey]);
+
+  // Recovery prompt on mount
+  const [recoveryBanner, setRecoveryBanner] = useState(false);
+  const recoveryDataRef = useRef(null);
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(autosaveKey);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        const age = Date.now() - (parsed.savedAt || 0);
+        if (age < 24 * 60 * 60 * 1000 && parsed.form) {
+          recoveryDataRef.current = parsed.form;
+          setRecoveryBanner(true);
+        } else {
+          localStorage.removeItem(autosaveKey);
+        }
+      }
+    } catch { localStorage.removeItem(autosaveKey); }
+  }, [autosaveKey]);
+
+  const restoreDraft = () => {
+    if (recoveryDataRef.current) {
+      setForm(recoveryDataRef.current);
+      setIsDirty(true);
+      toast.success('Koncept obnoven');
+    }
+    setRecoveryBanner(false);
+    localStorage.removeItem(autosaveKey);
+  };
+
+  const discardDraft = () => {
+    setRecoveryBanner(false);
+    localStorage.removeItem(autosaveKey);
+    recoveryDataRef.current = null;
+  };
 
   useEffect(() => {
     const promises = [api.getClients(), api.getCurrencies(), api.getCompany()];
@@ -138,6 +208,23 @@ export default function InvoiceForm() {
   const addItem = () => { setIsDirty(true); setForm(f => ({ ...f, items: [...f.items, { description: '', quantity: 1, unit: 'ks', unit_price: 0, tax_rate: vatPayer ? 21 : 0 }] })); };
   const removeItem = (idx) => { setIsDirty(true); setForm(f => ({ ...f, items: f.items.filter((_, i) => i !== idx) })); };
 
+  // Drag & drop reorder
+  const handleDragStart = (idx) => setDragIdx(idx);
+  const handleDragOver = (e, idx) => { e.preventDefault(); setDragOverIdx(idx); };
+  const handleDrop = (idx) => {
+    if (dragIdx === null || dragIdx === idx) { setDragIdx(null); setDragOverIdx(null); return; }
+    setIsDirty(true);
+    setForm(f => {
+      const items = [...f.items];
+      const [moved] = items.splice(dragIdx, 1);
+      items.splice(idx, 0, moved);
+      return { ...f, items };
+    });
+    setDragIdx(null);
+    setDragOverIdx(null);
+  };
+  const handleDragEnd = () => { setDragIdx(null); setDragOverIdx(null); };
+
   const itemTotals = form.items.map(i => {
     const base = (i.quantity || 0) * (i.unit_price || 0);
     const tax = base * ((i.tax_rate ?? 0) / 100);
@@ -191,6 +278,7 @@ export default function InvoiceForm() {
       }
       savedRef.current = true;
       setIsDirty(false);
+      try { localStorage.removeItem(autosaveKey); } catch {}
       navigate('/invoices');
     } catch (err) {
       setError(err.message);
@@ -210,6 +298,16 @@ export default function InvoiceForm() {
       {!hasBankDetails && (
         <div style={{ background: '#fef2f2', color: '#991b1b', padding: '0.75rem 1rem', borderRadius: 'var(--radius)', marginBottom: '1rem', fontSize: '0.85rem', border: '1px solid #fecaca' }}>
           Nelze vystavit fakturu bez bankovního spojení. <Link to="/company" style={{ color: '#991b1b', fontWeight: 600 }}>Vyplňte údaje v nastavení firmy →</Link>
+        </div>
+      )}
+
+      {recoveryBanner && (
+        <div style={{ background: '#eff6ff', color: '#1e40af', padding: '0.75rem 1rem', borderRadius: 'var(--radius)', marginBottom: '1rem', fontSize: '0.85rem', border: '1px solid #bfdbfe', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <span>Nalezen neuložený koncept. Chcete ho obnovit?</span>
+          <span style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+            <button type="button" className="btn btn-primary btn-sm" onClick={restoreDraft}>Obnovit</button>
+            <button type="button" className="btn btn-outline btn-sm" onClick={discardDraft}>Zahodit</button>
+          </span>
         </div>
       )}
 
@@ -317,6 +415,7 @@ export default function InvoiceForm() {
             <table>
               <thead>
                 <tr>
+                  {form.items.length > 1 && <th style={{width:32}}></th>}
                   <th>Popis</th>
                   <th style={{width:80}}>Množství</th>
                   <th style={{width:80}}>Jednotka</th>
@@ -329,7 +428,24 @@ export default function InvoiceForm() {
               </thead>
               <tbody>
                 {form.items.map((item, idx) => (
-                  <tr key={idx}>
+                  <tr
+                    key={idx}
+                    draggable={form.items.length > 1}
+                    onDragStart={() => handleDragStart(idx)}
+                    onDragOver={(e) => handleDragOver(e, idx)}
+                    onDrop={() => handleDrop(idx)}
+                    onDragEnd={handleDragEnd}
+                    style={{
+                      opacity: dragIdx === idx ? 0.4 : 1,
+                      borderTop: dragOverIdx === idx && dragIdx !== idx ? '2px solid var(--primary, #6366f1)' : undefined,
+                      transition: 'opacity 0.15s',
+                    }}
+                  >
+                    {form.items.length > 1 && (
+                      <td style={{ cursor: 'grab', textAlign: 'center', color: 'var(--gray-400, #94a3b8)', userSelect: 'none', fontSize: 16 }} title="Přetáhněte pro změnu pořadí">
+                        ⠿
+                      </td>
+                    )}
                     <td>
                       {products.length > 0 && (
                         <select className="form-input" style={{ marginBottom: 4, fontSize: 11 }} value="" onChange={e => {

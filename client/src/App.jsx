@@ -197,7 +197,7 @@ function Sidebar({ open, onClose }) {
               </svg>
             </div>
           </Link>
-          <button className="sidebar-close" onClick={onClose}>&times;</button>
+          <button className="sidebar-close" aria-label="Zavřít menu" onClick={onClose}>&times;</button>
         </div>
         <Link to="/profile" onClick={onClose} className="sidebar-user" style={{ textDecoration: 'none', color: 'inherit' }}>
           <div className="avatar">{user?.full_name?.charAt(0)}</div>
@@ -449,10 +449,11 @@ function Layout({ children }) {
   return (
     <PageTitleContext.Provider value={{ subtitle, setSubtitle }}>
     <div className="layout">
+      <a href="#main-content" className="skip-to-content">Přeskočit na obsah</a>
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <div className="main-area">
         <header className="topbar">
-          <button className="menu-btn" onClick={() => setSidebarOpen(true)}>
+          <button className="menu-btn" aria-label="Otevřít menu" onClick={() => setSidebarOpen(true)}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
           </button>
           <div className="topbar-section-title" onClick={() => { window.scrollTo({ top: 0, behavior: 'smooth' }); }}>
@@ -467,7 +468,7 @@ function Layout({ children }) {
           </div>
           <div style={{ flex: 1 }} />
           <GlobalSearch />
-          <button className="dark-toggle" onClick={() => {
+          <button className="dark-toggle" aria-label="Přepnout tmavý/světlý režim" onClick={() => {
             const html = document.documentElement;
             const next = html.getAttribute('data-theme') === 'dark' ? '' : 'dark';
             html.setAttribute('data-theme', next);
@@ -476,7 +477,7 @@ function Layout({ children }) {
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
           </button>
         </header>
-        <main className="content">{children}</main>
+        <main id="main-content" className="content">{children}</main>
         <ChatWidget />
         <ShortcutsHelpWrapper />
       </div>

@@ -39,6 +39,9 @@ function ToastItem({ toast, onRemove }) {
 
   return (
     <div
+      role="alert"
+      aria-live="assertive"
+      aria-atomic="true"
       onClick={dismiss}
       style={{
         display: 'flex', alignItems: 'flex-start', gap: 10, padding: '12px 16px',

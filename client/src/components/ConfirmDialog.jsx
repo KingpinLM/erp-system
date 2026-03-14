@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useContext, createContext } from 'react';
+import React, { useState, useCallback, useContext, createContext, useEffect, useRef } from 'react';
 
 const ConfirmContext = createContext(null);
 
@@ -32,12 +32,36 @@ export function ConfirmProvider({ children }) {
   };
 
   const t = typeStyles[state?.type] || typeStyles.danger;
+  const dialogRef = useRef(null);
+  const confirmBtnRef = useRef(null);
+
+  // Focus trap + auto-focus confirm button + Escape to close
+  useEffect(() => {
+    if (!state) return;
+    confirmBtnRef.current?.focus();
+    const handler = (e) => {
+      if (e.key === 'Escape') { handleCancel(); return; }
+      if (e.key === 'Tab' && dialogRef.current) {
+        const focusable = dialogRef.current.querySelectorAll('button');
+        if (focusable.length === 0) return;
+        const first = focusable[0], last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [state]);
 
   return (
     <ConfirmContext.Provider value={confirm}>
       {children}
       {state && (
         <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="confirm-title"
+          aria-describedby="confirm-desc"
           style={{
             position: 'fixed', inset: 0, zIndex: 10001,
             background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)',
@@ -48,6 +72,7 @@ export function ConfirmProvider({ children }) {
           onClick={handleCancel}
         >
           <div
+            ref={dialogRef}
             onClick={e => e.stopPropagation()}
             style={{
               background: 'var(--card-bg, white)', borderRadius: 14,
@@ -67,10 +92,10 @@ export function ConfirmProvider({ children }) {
                 {t.icon}
               </div>
               <div>
-                <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--gray-900, #0f172a)', marginBottom: 4 }}>
+                <div id="confirm-title" style={{ fontWeight: 700, fontSize: 15, color: 'var(--gray-900, #0f172a)', marginBottom: 4 }}>
                   {state.title || 'Potvrdit akci'}
                 </div>
-                <div style={{ fontSize: 13, color: 'var(--gray-500, #64748b)', lineHeight: 1.5 }}>
+                <div id="confirm-desc" style={{ fontSize: 13, color: 'var(--gray-500, #64748b)', lineHeight: 1.5 }}>
                   {state.message}
                 </div>
               </div>
@@ -93,6 +118,7 @@ export function ConfirmProvider({ children }) {
                 {state.cancelText || 'Zrušit'}
               </button>
               <button
+                ref={confirmBtnRef}
                 onClick={handleConfirm}
                 style={{
                   padding: '8px 16px', borderRadius: 8, border: 'none',
