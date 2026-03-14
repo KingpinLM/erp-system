@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { api } from '../api';
 import { useAuth } from '../App';
 import SignaturePad from '../components/SignaturePad';
+import PasswordFields from '../components/PasswordFields';
 
 const roleLabels = { admin: 'Administrátor', accountant: 'Účetní', manager: 'Manažer', viewer: 'Náhled' };
 
@@ -16,9 +17,9 @@ export default function Profile() {
     first_name: user?.first_name || '',
     last_name: user?.last_name || '',
     email: user?.email || '',
-    password: '',
-    password2: ''
   });
+  const [pwForm, setPwForm] = useState({ current: '', password: '', password2: '' });
+  const [changingPw, setChangingPw] = useState(false);
   const fileRef = useRef();
 
   const saveSignature = async (dataUrl) => {
@@ -57,19 +58,38 @@ export default function Profile() {
 
   const handleProfileSave = async (e) => {
     e.preventDefault();
-    if (form.password && form.password !== form.password2) {
-      setMsg('Hesla se neshodují');
+    setSaving(true);
+    try {
+      const data = { first_name: form.first_name, last_name: form.last_name, email: form.email };
+      const updated = await api.updateProfile(data);
+      updateUser({ full_name: updated.full_name, first_name: updated.first_name, last_name: updated.last_name, email: updated.email });
+      setEditing(false);
+      setMsg('Profil aktualizován!');
+      setTimeout(() => setMsg(''), 3000);
+    } catch (e) {
+      setMsg('Chyba: ' + e.message);
+    }
+    setSaving(false);
+  };
+
+  const handlePasswordChange = async (e) => {
+    e.preventDefault();
+    if (pwForm.password !== pwForm.password2) {
+      setMsg('Chyba: Nová hesla se neshodují');
       return;
     }
     setSaving(true);
     try {
-      const data = { first_name: form.first_name, last_name: form.last_name, email: form.email };
-      if (form.password) data.password = form.password;
-      const updated = await api.updateProfile(data);
-      updateUser({ full_name: updated.full_name, first_name: updated.first_name, last_name: updated.last_name, email: updated.email });
-      setEditing(false);
-      setForm(f => ({ ...f, password: '', password2: '' }));
-      setMsg('Profil aktualizován!');
+      await api.updateProfile({
+        first_name: user.first_name,
+        last_name: user.last_name,
+        email: user.email,
+        current_password: pwForm.current,
+        password: pwForm.password
+      });
+      setPwForm({ current: '', password: '', password2: '' });
+      setChangingPw(false);
+      setMsg('Heslo změněno!');
       setTimeout(() => setMsg(''), 3000);
     } catch (e) {
       setMsg('Chyba: ' + e.message);
@@ -123,19 +143,33 @@ export default function Profile() {
               <label className="form-label">Email *</label>
               <input className="form-input" type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} required />
             </div>
-            <div className="form-group">
-              <label className="form-label">Nové heslo (ponechte prázdné = beze změny)</label>
-              <input className="form-input" type="password" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} placeholder="••••••" />
-            </div>
-            {form.password && (
-              <div className="form-group">
-                <label className="form-label">Potvrzení hesla *</label>
-                <input className="form-input" type="password" value={form.password2} onChange={e => setForm(f => ({ ...f, password2: e.target.value }))} placeholder="••••••" required />
-              </div>
-            )}
             <div className="btn-group" style={{ marginTop: '0.5rem' }}>
               <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Ukládám...' : 'Uložit'}</button>
               <button type="button" className="btn btn-outline" onClick={() => setEditing(false)}>Zrušit</button>
+            </div>
+          </form>
+        )}
+      </div>
+
+      {/* Password change - separate card */}
+      <div className="card" style={{ maxWidth: 600, marginTop: 24 }}>
+        <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 16 }}>Změna hesla</h2>
+        {!changingPw ? (
+          <button className="btn btn-outline btn-sm" onClick={() => setChangingPw(true)}>Změnit heslo</button>
+        ) : (
+          <form onSubmit={handlePasswordChange}>
+            <PasswordFields
+              currentPassword={pwForm.current}
+              onCurrentPasswordChange={v => setPwForm(f => ({ ...f, current: v }))}
+              password={pwForm.password}
+              onPasswordChange={v => setPwForm(f => ({ ...f, password: v }))}
+              password2={pwForm.password2}
+              onPassword2Change={v => setPwForm(f => ({ ...f, password2: v }))}
+              requireCurrent
+            />
+            <div className="btn-group" style={{ marginTop: '0.75rem' }}>
+              <button type="submit" className="btn btn-primary btn-sm" disabled={saving}>{saving ? 'Ukládám...' : 'Změnit heslo'}</button>
+              <button type="button" className="btn btn-outline btn-sm" onClick={() => { setChangingPw(false); setPwForm({ current: '', password: '', password2: '' }); }}>Zrušit</button>
             </div>
           </form>
         )}

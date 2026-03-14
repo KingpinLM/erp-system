@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { api } from '../api';
 import { usePageTitle } from '../App';
 import SignaturePad from '../components/SignaturePad';
+import PasswordFields, { isPasswordValid } from '../components/PasswordFields';
 
 const roleLabels = { admin: 'Administrátor', accountant: 'Účetní', manager: 'Manažer', viewer: 'Náhled' };
 
@@ -16,6 +17,8 @@ export default function UserDetail() {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ first_name: '', last_name: '', email: '' });
+  const [changingPw, setChangingPw] = useState(false);
+  const [pwForm, setPwForm] = useState({ password: '', password2: '' });
   const [msg, setMsg] = useState('');
   const fileRef = useRef();
 
@@ -56,6 +59,36 @@ export default function UserDetail() {
       setUser(u => ({ ...u, first_name: form.first_name, last_name: form.last_name, email: form.email, full_name }));
       setEditing(false);
       setMsg('Údaje uloženy!');
+      setTimeout(() => setMsg(''), 3000);
+    } catch (e) {
+      setMsg('Chyba: ' + e.message);
+    }
+    setSaving(false);
+  };
+
+  const handlePasswordChange = async (e) => {
+    e.preventDefault();
+    if (pwForm.password !== pwForm.password2) {
+      setMsg('Chyba: Hesla se neshodují');
+      return;
+    }
+    if (!isPasswordValid(pwForm.password)) {
+      setMsg('Chyba: Heslo nesplňuje bezpečnostní požadavky');
+      return;
+    }
+    setSaving(true);
+    try {
+      await api.updateUser(id, {
+        first_name: user.first_name,
+        last_name: user.last_name,
+        email: user.email,
+        role: user.role,
+        active: user.active,
+        password: pwForm.password
+      });
+      setPwForm({ password: '', password2: '' });
+      setChangingPw(false);
+      setMsg('Heslo změněno!');
       setTimeout(() => setMsg(''), 3000);
     } catch (e) {
       setMsg('Chyba: ' + e.message);
@@ -145,6 +178,26 @@ export default function UserDetail() {
             </div>
           </div>
         </div>
+      </div>
+
+      <div className="card" style={{ marginTop: '1.5rem', maxWidth: 600 }}>
+        <div className="card-title" style={{ marginBottom: '1rem' }}>Změna hesla</div>
+        {!changingPw ? (
+          <button className="btn btn-outline btn-sm" onClick={() => setChangingPw(true)}>Nastavit nové heslo</button>
+        ) : (
+          <form onSubmit={handlePasswordChange}>
+            <PasswordFields
+              password={pwForm.password}
+              onPasswordChange={v => setPwForm(f => ({ ...f, password: v }))}
+              password2={pwForm.password2}
+              onPassword2Change={v => setPwForm(f => ({ ...f, password2: v }))}
+            />
+            <div className="btn-group" style={{ marginTop: '0.75rem' }}>
+              <button type="submit" className="btn btn-primary btn-sm" disabled={saving}>{saving ? 'Ukládám...' : 'Změnit heslo'}</button>
+              <button type="button" className="btn btn-outline btn-sm" onClick={() => { setChangingPw(false); setPwForm({ password: '', password2: '' }); }}>Zrušit</button>
+            </div>
+          </form>
+        )}
       </div>
 
       <div className="card" style={{ marginTop: '1.5rem', maxWidth: 600 }}>

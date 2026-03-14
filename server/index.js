@@ -529,10 +529,28 @@ app.get('/api/auth/me', authenticate, (req, res) => {
 });
 
 // ─── PROFILE ──────────────────────────────────────────────
+// Password validation: min 8 chars, uppercase, lowercase, number, special char
+function validatePassword(pw) {
+  if (!pw || pw.length < 8) return 'Heslo musí mít alespoň 8 znaků';
+  if (!/[A-Z]/.test(pw)) return 'Heslo musí obsahovat velké písmeno';
+  if (!/[a-z]/.test(pw)) return 'Heslo musí obsahovat malé písmeno';
+  if (!/[0-9]/.test(pw)) return 'Heslo musí obsahovat číslici';
+  if (!/[^A-Za-z0-9]/.test(pw)) return 'Heslo musí obsahovat speciální znak (!@#$%...)';
+  return null;
+}
+
 app.put('/api/profile', ...tenanted, (req, res) => {
-  const { first_name, last_name, email, password } = req.body;
+  const { first_name, last_name, email, password, current_password } = req.body;
   const full_name = `${first_name || ''} ${last_name || ''}`.trim();
   if (password) {
+    // Verify current password
+    if (!current_password) return res.status(400).json({ error: 'Pro změnu hesla zadejte současné heslo' });
+    const dbUser = db.prepare('SELECT password FROM users WHERE id = ?').get(req.user.id);
+    if (!dbUser || !bcrypt.compareSync(current_password, dbUser.password)) {
+      return res.status(400).json({ error: 'Současné heslo není správné' });
+    }
+    const pwErr = validatePassword(password);
+    if (pwErr) return res.status(400).json({ error: pwErr });
     const hash = bcrypt.hashSync(password, 10);
     db.prepare("UPDATE users SET email=?, full_name=?, first_name=?, last_name=?, password=?, updated_at=datetime('now') WHERE id=? AND tenant_id=?")
       .run(email, full_name, first_name || '', last_name || '', hash, req.user.id, req.tenant_id);
@@ -1063,6 +1081,8 @@ app.put('/api/users/:id', ...tenanted, authorize('admin'), (req, res) => {
   const { email, first_name, last_name, role, active, password } = req.body;
   const full_name = `${first_name || ''} ${last_name || ''}`.trim();
   if (password) {
+    const pwErr = validatePassword(password);
+    if (pwErr) return res.status(400).json({ error: pwErr });
     const hash = bcrypt.hashSync(password, 10);
     db.prepare("UPDATE users SET email=?, full_name=?, first_name=?, last_name=?, role=?, active=?, password=?, updated_at=datetime('now') WHERE id=? AND tenant_id=?").run(email, full_name, first_name||'', last_name||'', role, active, hash, req.params.id, req.tenant_id);
   } else {
