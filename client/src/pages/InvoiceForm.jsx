@@ -38,20 +38,24 @@ export default function InvoiceForm() {
 
   // Intercept in-app link clicks when form is dirty
   const pendingHref = useRef(null);
+  const isDirtyRef = useRef(false);
+  isDirtyRef.current = isDirty;
   useEffect(() => {
-    if (!isDirty || savedRef.current) return;
     const handler = (e) => {
+      if (!isDirtyRef.current || savedRef.current) return;
       const anchor = e.target.closest('a[href]');
       if (!anchor) return;
       const href = anchor.getAttribute('href');
       if (!href || href.startsWith('http') || href.startsWith('mailto:')) return;
       e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
       pendingHref.current = href;
       setLeaveDialog(true);
     };
     document.addEventListener('click', handler, true);
     return () => document.removeEventListener('click', handler, true);
-  }, [isDirty]);
+  }, []);
 
   // Browser beforeunload guard
   useEffect(() => {
