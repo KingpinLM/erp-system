@@ -1499,6 +1499,127 @@ function processRecurringInvoices() {
 processRecurringInvoices();
 setInterval(processRecurringInvoices, 6 * 60 * 60 * 1000); // Every 6 hours
 
+// ─── CHATBOT API ──────────────────────────────────────────────
+app.post('/api/chatbot/message', ...tenanted, (req, res) => {
+  const { message, conversation_id, lang } = req.body;
+  if (!message || !message.trim()) return res.status(400).json({ error: 'Zpráva je povinná' });
+
+  const q = message.trim().toLowerCase();
+  const isEn = lang === 'en' || /^(how|where|what|can|do|i need|help me|show me)/i.test(message.trim());
+
+  // Search knowledge base by keyword matching
+  const allKnowledge = db.prepare('SELECT * FROM chatbot_knowledge WHERE (tenant_id = ? OR tenant_id IS NULL) AND active = 1 ORDER BY priority DESC').all(req.tenantId);
+
+  let bestMatch = null;
+  let bestScore = 0;
+
+  for (const k of allKnowledge) {
+    const keywords = k.keywords.toLowerCase().split(',').map(s => s.trim());
+    let score = 0;
+    for (const kw of keywords) {
+      if (q.includes(kw)) {
+        score += kw.length + k.priority;
+      }
+      // Also check individual words from the query
+      const words = q.split(/\s+/);
+      for (const w of words) {
+        if (w.length > 2 && kw.includes(w)) score += w.length;
+      }
+    }
+    if (score > bestScore) {
+      bestScore = score;
+      bestMatch = k;
+    }
+  }
+
+  let answer, link;
+  if (bestMatch && bestScore >= 3) {
+    answer = isEn ? (bestMatch.answer_en || bestMatch.answer_cs) : bestMatch.answer_cs;
+    link = bestMatch.link;
+  } else {
+    // Log unanswered question
+    db.prepare('INSERT INTO chatbot_unanswered (tenant_id, user_id, question) VALUES (?, ?, ?)').run(req.tenantId, req.user.id, message.trim());
+    answer = isEn
+      ? "I'm sorry, I don't know the answer to that yet. Your question has been logged and an administrator will add an answer soon!"
+      : 'Omlouvám se, na tuto otázku zatím neznám odpověď. Váš dotaz byl zaznamenán a administrátor brzy doplní odpověď!';
+    link = null;
+  }
+
+  // Save conversation
+  let convId = conversation_id;
+  if (convId) {
+    const conv = db.prepare('SELECT * FROM chatbot_conversations WHERE id = ? AND tenant_id = ?').get(convId, req.tenantId);
+    if (conv) {
+      const msgs = JSON.parse(conv.messages);
+      msgs.push({ role: 'user', text: message.trim(), ts: new Date().toISOString() });
+      msgs.push({ role: 'bot', text: answer, link, ts: new Date().toISOString() });
+      db.prepare("UPDATE chatbot_conversations SET messages = ?, updated_at = datetime('now') WHERE id = ?").run(JSON.stringify(msgs), convId);
+    }
+  } else {
+    const msgs = [
+      { role: 'user', text: message.trim(), ts: new Date().toISOString() },
+      { role: 'bot', text: answer, link, ts: new Date().toISOString() }
+    ];
+    const r = db.prepare('INSERT INTO chatbot_conversations (tenant_id, user_id, messages) VALUES (?, ?, ?)').run(req.tenantId, req.user.id, JSON.stringify(msgs));
+    convId = r.lastInsertRowid;
+  }
+
+  res.json({ answer, link, conversation_id: convId });
+});
+
+// Admin: get knowledge base
+app.get('/api/chatbot/knowledge', ...tenanted, authorize('admin'), (req, res) => {
+  const items = db.prepare('SELECT * FROM chatbot_knowledge WHERE tenant_id = ? OR tenant_id IS NULL ORDER BY priority DESC, category, id').all(req.tenantId);
+  res.json(items);
+});
+
+// Admin: create knowledge entry
+app.post('/api/chatbot/knowledge', ...tenanted, authorize('admin'), (req, res) => {
+  const { keywords, question_cs, question_en, answer_cs, answer_en, link, category, priority } = req.body;
+  if (!keywords || !question_cs || !answer_cs) return res.status(400).json({ error: 'keywords, question_cs a answer_cs jsou povinné' });
+  const r = db.prepare('INSERT INTO chatbot_knowledge (tenant_id, keywords, question_cs, question_en, answer_cs, answer_en, link, category, priority) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run(req.tenantId, keywords, question_cs, question_en || '', answer_cs, answer_en || '', link || '', category || 'navigation', priority || 0);
+  res.json({ id: r.lastInsertRowid });
+});
+
+// Admin: update knowledge entry
+app.put('/api/chatbot/knowledge/:id', ...tenanted, authorize('admin'), (req, res) => {
+  const { keywords, question_cs, question_en, answer_cs, answer_en, link, category, priority, active } = req.body;
+  db.prepare('UPDATE chatbot_knowledge SET keywords=?, question_cs=?, question_en=?, answer_cs=?, answer_en=?, link=?, category=?, priority=?, active=? WHERE id=? AND tenant_id=?')
+    .run(keywords, question_cs, question_en || '', answer_cs, answer_en || '', link || '', category || 'navigation', priority || 0, active ?? 1, req.params.id, req.tenantId);
+  res.json({ ok: true });
+});
+
+// Admin: delete knowledge entry
+app.delete('/api/chatbot/knowledge/:id', ...tenanted, authorize('admin'), (req, res) => {
+  db.prepare('DELETE FROM chatbot_knowledge WHERE id = ? AND tenant_id = ?').run(req.params.id, req.tenantId);
+  res.json({ ok: true });
+});
+
+// Admin: get unanswered questions
+app.get('/api/chatbot/unanswered', ...tenanted, authorize('admin'), (req, res) => {
+  const items = db.prepare(`SELECT u.*, usr.full_name as user_name FROM chatbot_unanswered u LEFT JOIN users usr ON u.user_id = usr.id WHERE u.tenant_id = ? ORDER BY u.resolved ASC, u.created_at DESC`).all(req.tenantId);
+  res.json(items);
+});
+
+// Admin: resolve unanswered question (create knowledge entry from it)
+app.post('/api/chatbot/unanswered/:id/resolve', ...tenanted, authorize('admin'), (req, res) => {
+  const { keywords, answer_cs, answer_en, link, category } = req.body;
+  const item = db.prepare('SELECT * FROM chatbot_unanswered WHERE id = ? AND tenant_id = ?').get(req.params.id, req.tenantId);
+  if (!item) return res.status(404).json({ error: 'Nenalezeno' });
+  if (keywords && answer_cs) {
+    db.prepare('INSERT INTO chatbot_knowledge (tenant_id, keywords, question_cs, question_en, answer_cs, answer_en, link, category, priority) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(req.tenantId, keywords, item.question, '', answer_cs, answer_en || '', link || '', category || 'custom', 5);
+  }
+  db.prepare('UPDATE chatbot_unanswered SET resolved = 1, answer = ? WHERE id = ?').run(answer_cs || 'Vyřešeno', req.params.id);
+  res.json({ ok: true });
+});
+
+// Admin: delete unanswered question
+app.delete('/api/chatbot/unanswered/:id', ...tenanted, authorize('admin'), (req, res) => {
+  db.prepare('DELETE FROM chatbot_unanswered WHERE id = ? AND tenant_id = ?').run(req.params.id, req.tenantId);
+  res.json({ ok: true });
+});
+
 // GET-based login (bypasses POST issues with port forwarding)
 app.get('/api/auth/get-login', (req, res) => {
   const { username, password } = req.query;

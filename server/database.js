@@ -368,6 +368,44 @@ db.exec(`
   );
 `);
 
+// ─── CHATBOT ─────────────────────────────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS chatbot_knowledge (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tenant_id INTEGER REFERENCES tenants(id),
+    keywords TEXT NOT NULL,
+    question_cs TEXT NOT NULL,
+    question_en TEXT,
+    answer_cs TEXT NOT NULL,
+    answer_en TEXT,
+    link TEXT,
+    category TEXT DEFAULT 'navigation',
+    priority INTEGER DEFAULT 0,
+    active INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS chatbot_conversations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tenant_id INTEGER REFERENCES tenants(id),
+    user_id INTEGER REFERENCES users(id),
+    messages TEXT NOT NULL DEFAULT '[]',
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS chatbot_unanswered (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tenant_id INTEGER REFERENCES tenants(id),
+    user_id INTEGER REFERENCES users(id),
+    question TEXT NOT NULL,
+    resolved INTEGER DEFAULT 0,
+    answer TEXT,
+    link TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+`);
+
 // ─── CUSTOM ROLES ────────────────────────────────────────
 db.exec(`
   CREATE TABLE IF NOT EXISTS custom_roles (

@@ -225,4 +225,14 @@ export const api = {
   createStockMovement: (data) => request('/stock-movements', { method: 'POST', body: JSON.stringify(data) }),
   getStockReport: () => request('/stock/report'),
 
+  // Chatbot
+  chatbotMessage: (message, conversation_id, lang) => request('/chatbot/message', { method: 'POST', body: JSON.stringify({ message, conversation_id, lang }) }),
+  getChatbotKnowledge: () => request('/chatbot/knowledge'),
+  createChatbotKnowledge: (data) => request('/chatbot/knowledge', { method: 'POST', body: JSON.stringify(data) }),
+  updateChatbotKnowledge: (id, data) => request(`/chatbot/knowledge/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteChatbotKnowledge: (id) => request(`/chatbot/knowledge/${id}`, { method: 'DELETE' }),
+  getChatbotUnanswered: () => request('/chatbot/unanswered'),
+  resolveChatbotUnanswered: (id, data) => request(`/chatbot/unanswered/${id}/resolve`, { method: 'POST', body: JSON.stringify(data) }),
+  deleteChatbotUnanswered: (id) => request(`/chatbot/unanswered/${id}`, { method: 'DELETE' }),
+
 };

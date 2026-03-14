@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../api';
+import { useAuth } from '../App';
 
 const invoiceLayouts = [
   {
@@ -219,6 +220,172 @@ const separatorOptions = [
   { value: '/', label: 'Lomítko (/)' },
   { value: '', label: 'Bez oddělovače' },
 ];
+
+function ChatbotAdmin() {
+  const [tab, setTab] = useState('knowledge');
+  const [knowledge, setKnowledge] = useState([]);
+  const [unanswered, setUnanswered] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [editItem, setEditItem] = useState(null);
+  const [showForm, setShowForm] = useState(false);
+  const emptyForm = { keywords: '', question_cs: '', question_en: '', answer_cs: '', answer_en: '', link: '', category: 'navigation', priority: 0 };
+  const [form, setForm] = useState(emptyForm);
+  const [resolveItem, setResolveItem] = useState(null);
+  const [resolveForm, setResolveForm] = useState({ keywords: '', answer_cs: '', answer_en: '', link: '', category: 'custom' });
+
+  const load = () => {
+    setLoading(true);
+    Promise.all([api.getChatbotKnowledge(), api.getChatbotUnanswered()])
+      .then(([k, u]) => { setKnowledge(k); setUnanswered(u); })
+      .finally(() => setLoading(false));
+  };
+  useEffect(load, []);
+
+  const handleSave = async (e) => {
+    e.preventDefault();
+    if (editItem) {
+      await api.updateChatbotKnowledge(editItem.id, { ...form, active: editItem.active ?? 1 });
+    } else {
+      await api.createChatbotKnowledge(form);
+    }
+    setShowForm(false); setEditItem(null); setForm(emptyForm); load();
+  };
+
+  const handleDelete = async (id) => {
+    if (!confirm('Smazat tuto položku znalostní báze?')) return;
+    await api.deleteChatbotKnowledge(id); load();
+  };
+
+  const handleResolve = async (e) => {
+    e.preventDefault();
+    await api.resolveChatbotUnanswered(resolveItem.id, resolveForm);
+    setResolveItem(null); setResolveForm({ keywords: '', answer_cs: '', answer_en: '', link: '', category: 'custom' }); load();
+  };
+
+  const handleDeleteUnanswered = async (id) => {
+    await api.deleteChatbotUnanswered(id); load();
+  };
+
+  const catLabels = { navigation: 'Navigace', feature: 'Funkce', help: 'Nápověda', custom: 'Vlastní' };
+  const unresolvedCount = unanswered.filter(u => !u.resolved).length;
+
+  return (
+    <div className="card" style={{ marginTop: '1.5rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+        <div className="card-title" style={{ margin: 0 }}>Chatbot Hyňa</div>
+        <div className="btn-group">
+          <button className={`btn btn-sm ${tab === 'knowledge' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setTab('knowledge')}>Znalosti ({knowledge.length})</button>
+          <button className={`btn btn-sm ${tab === 'unanswered' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setTab('unanswered')}>
+            Nezodpovězené {unresolvedCount > 0 && <span className="badge badge-overdue" style={{ marginLeft: 4, fontSize: 10 }}>{unresolvedCount}</span>}
+          </button>
+        </div>
+      </div>
+
+      {loading ? <div className="loading">Načítání...</div> : tab === 'knowledge' ? (
+        <>
+          <div style={{ marginBottom: '0.75rem' }}>
+            <button className="btn btn-primary btn-sm" onClick={() => { setEditItem(null); setForm(emptyForm); setShowForm(true); }}>+ Přidat znalost</button>
+          </div>
+          {showForm && (
+            <form onSubmit={handleSave} style={{ background: 'var(--gray-50)', padding: '1rem', borderRadius: 'var(--radius)', marginBottom: '1rem' }}>
+              <div className="form-group"><label className="form-label">Klíčová slova (oddělená čárkou) *</label><input className="form-input" value={form.keywords} onChange={e => setForm(f => ({ ...f, keywords: e.target.value }))} required placeholder="faktura,invoice,vystavit" /></div>
+              <div className="form-row">
+                <div className="form-group"><label className="form-label">Otázka CZ *</label><input className="form-input" value={form.question_cs} onChange={e => setForm(f => ({ ...f, question_cs: e.target.value }))} required /></div>
+                <div className="form-group"><label className="form-label">Otázka EN</label><input className="form-input" value={form.question_en} onChange={e => setForm(f => ({ ...f, question_en: e.target.value }))} /></div>
+              </div>
+              <div className="form-group"><label className="form-label">Odpověď CZ *</label><textarea className="form-input" rows="2" value={form.answer_cs} onChange={e => setForm(f => ({ ...f, answer_cs: e.target.value }))} required /></div>
+              <div className="form-group"><label className="form-label">Odpověď EN</label><textarea className="form-input" rows="2" value={form.answer_en} onChange={e => setForm(f => ({ ...f, answer_en: e.target.value }))} /></div>
+              <div className="form-row">
+                <div className="form-group"><label className="form-label">Odkaz</label><input className="form-input" value={form.link} onChange={e => setForm(f => ({ ...f, link: e.target.value }))} placeholder="/invoices" /></div>
+                <div className="form-group"><label className="form-label">Kategorie</label>
+                  <select className="form-select" value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}>
+                    <option value="navigation">Navigace</option><option value="feature">Funkce</option><option value="help">Nápověda</option><option value="custom">Vlastní</option>
+                  </select>
+                </div>
+                <div className="form-group"><label className="form-label">Priorita</label><input className="form-input" type="number" value={form.priority} onChange={e => setForm(f => ({ ...f, priority: parseInt(e.target.value) || 0 }))} /></div>
+              </div>
+              <div className="btn-group"><button type="submit" className="btn btn-primary btn-sm">{editItem ? 'Uložit' : 'Přidat'}</button><button type="button" className="btn btn-outline btn-sm" onClick={() => { setShowForm(false); setEditItem(null); }}>Zrušit</button></div>
+            </form>
+          )}
+          <div className="table-responsive">
+            <table>
+              <thead><tr><th>Otázka</th><th>Kategorie</th><th>Odkaz</th><th>Priorita</th><th>Akce</th></tr></thead>
+              <tbody>
+                {knowledge.map(k => (
+                  <tr key={k.id} style={{ opacity: k.active ? 1 : 0.5 }}>
+                    <td><strong style={{ fontSize: '0.85rem' }}>{k.question_cs}</strong><div style={{ fontSize: '0.75rem', color: 'var(--gray-500)' }}>{k.keywords}</div></td>
+                    <td><span className="badge badge-draft">{catLabels[k.category] || k.category}</span></td>
+                    <td style={{ fontSize: '0.8rem', fontFamily: 'monospace' }}>{k.link || '—'}</td>
+                    <td>{k.priority}</td>
+                    <td>
+                      <div className="btn-group">
+                        <button className="btn btn-outline btn-sm" onClick={() => { setEditItem(k); setForm({ keywords: k.keywords, question_cs: k.question_cs, question_en: k.question_en || '', answer_cs: k.answer_cs, answer_en: k.answer_en || '', link: k.link || '', category: k.category, priority: k.priority }); setShowForm(true); }}>Upravit</button>
+                        <button className="btn btn-danger btn-sm" onClick={() => handleDelete(k.id)}>Smazat</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      ) : (
+        <>
+          {unanswered.length === 0 ? <div className="empty-state">Žádné nezodpovězené dotazy</div> : (
+            <div className="table-responsive">
+              <table>
+                <thead><tr><th>Dotaz</th><th>Uživatel</th><th>Datum</th><th>Stav</th><th>Akce</th></tr></thead>
+                <tbody>
+                  {unanswered.map(u => (
+                    <tr key={u.id} style={{ opacity: u.resolved ? 0.5 : 1 }}>
+                      <td style={{ fontWeight: 600, fontSize: '0.85rem' }}>{u.question}</td>
+                      <td>{u.user_name || '—'}</td>
+                      <td style={{ fontSize: '0.8rem' }}>{u.created_at ? new Date(u.created_at).toLocaleDateString('cs-CZ') : '—'}</td>
+                      <td><span className={`badge ${u.resolved ? 'badge-paid' : 'badge-overdue'}`}>{u.resolved ? 'Vyřešeno' : 'Čeká'}</span></td>
+                      <td>
+                        <div className="btn-group">
+                          {!u.resolved && <button className="btn btn-primary btn-sm" onClick={() => { setResolveItem(u); setResolveForm({ keywords: '', answer_cs: '', answer_en: '', link: '', category: 'custom' }); }}>Zodpovědět</button>}
+                          <button className="btn btn-danger btn-sm" onClick={() => handleDeleteUnanswered(u.id)}>Smazat</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {resolveItem && (
+            <div className="modal-overlay" onClick={() => setResolveItem(null)}>
+              <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 550 }}>
+                <div className="modal-header">
+                  <h3 className="modal-title">Zodpovědět dotaz</h3>
+                  <button className="modal-close" onClick={() => setResolveItem(null)}>&times;</button>
+                </div>
+                <div style={{ padding: '0 1.5rem', marginBottom: '0.75rem' }}>
+                  <div style={{ background: 'var(--gray-50)', padding: '0.75rem', borderRadius: 'var(--radius)', fontSize: '0.9rem', fontWeight: 600 }}>„{resolveItem.question}"</div>
+                </div>
+                <form onSubmit={handleResolve} style={{ padding: '0 1.5rem 1.5rem' }}>
+                  <div className="form-group"><label className="form-label">Klíčová slova *</label><input className="form-input" value={resolveForm.keywords} onChange={e => setResolveForm(f => ({ ...f, keywords: e.target.value }))} required placeholder="klíčové slovo1, slovo2" /></div>
+                  <div className="form-group"><label className="form-label">Odpověď CZ *</label><textarea className="form-input" rows="3" value={resolveForm.answer_cs} onChange={e => setResolveForm(f => ({ ...f, answer_cs: e.target.value }))} required /></div>
+                  <div className="form-group"><label className="form-label">Odpověď EN</label><textarea className="form-input" rows="2" value={resolveForm.answer_en} onChange={e => setResolveForm(f => ({ ...f, answer_en: e.target.value }))} /></div>
+                  <div className="form-row">
+                    <div className="form-group"><label className="form-label">Odkaz</label><input className="form-input" value={resolveForm.link} onChange={e => setResolveForm(f => ({ ...f, link: e.target.value }))} placeholder="/invoices" /></div>
+                    <div className="form-group"><label className="form-label">Kategorie</label>
+                      <select className="form-select" value={resolveForm.category} onChange={e => setResolveForm(f => ({ ...f, category: e.target.value }))}>
+                        <option value="navigation">Navigace</option><option value="feature">Funkce</option><option value="help">Nápověda</option><option value="custom">Vlastní</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="btn-group"><button type="submit" className="btn btn-primary">Uložit a přidat do znalostí</button><button type="button" className="btn btn-outline" onClick={() => setResolveItem(null)}>Zrušit</button></div>
+                </form>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
 
 export default function Company() {
   const [form, setForm] = useState({
@@ -573,6 +740,8 @@ export default function Company() {
         <a href="/api/backup" className="btn btn-outline" download>Stáhnout zálohu databáze</a>
         <small style={{ color: 'var(--gray-500)', fontSize: '0.75rem', display: 'block', marginTop: '0.5rem' }}>Stáhne kompletní zálohu databáze (SQLite soubor)</small>
       </div>
+
+      <ChatbotAdmin />
     </div>
   );
 }

@@ -23,6 +23,7 @@ import Accounting from './pages/Accounting';
 import VatReport from './pages/VatReport';
 import Bank from './pages/Bank';
 import SearchResults from './pages/SearchResults';
+import ChatWidget from './components/ChatWidget';
 import './styles.css';
 
 export const AuthContext = createContext(null);
@@ -455,6 +456,7 @@ function Layout({ children }) {
           </button>
         </header>
         <main className="content">{children}</main>
+        <ChatWidget />
       </div>
     </div>
     </PageTitleContext.Provider>
