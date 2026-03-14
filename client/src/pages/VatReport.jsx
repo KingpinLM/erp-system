@@ -58,9 +58,7 @@ export default function VatReport() {
       </div>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-        <Link to="/kontrolni-hlaseni" className="btn btn-ghost">Kontrolní hlášení DPH</Link>
-        <Link to="/souhrnne-hlaseni" className="btn btn-ghost">Souhrnné hlášení</Link>
-        <Link to="/danove-priznani" className="btn btn-ghost">Daňové přiznání DPFO</Link>
+        <Link to="/financni-urad" className="btn btn-ghost">Finanční úřad (KH, SH, DPFO)</Link>
       </div>
 
       {loading ? <p>Načítání...</p> : report && (
