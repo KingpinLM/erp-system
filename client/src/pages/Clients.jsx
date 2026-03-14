@@ -3,6 +3,10 @@ import { Link } from 'react-router-dom';
 import { api } from '../api';
 import { useAuth } from '../App';
 import Pagination, { usePagination } from '../components/Pagination';
+import { useToast } from '../components/Toast';
+import { useConfirm } from '../components/ConfirmDialog';
+import { SkeletonTable } from '../components/Skeleton';
+import EmptyState from '../components/EmptyState';
 
 export default function Clients() {
   const [clients, setClients] = useState([]);
@@ -16,6 +20,8 @@ export default function Clients() {
   const [error, setError] = useState('');
   const dupTimerRef = React.useRef(null);
   const { can } = useAuth();
+  const toast = useToast();
+  const confirm = useConfirm();
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(20);
 
@@ -77,16 +83,17 @@ export default function Clients() {
     e.preventDefault();
     setError('');
     try {
-      if (editing) { await api.updateClient(editing.id, form); } else { await api.createClient(form); }
+      if (editing) { await api.updateClient(editing.id, form); toast.success('Klient byl upraven'); } else { await api.createClient(form); toast.success('Klient byl vytvořen'); }
       setShowModal(false);
       load();
-    } catch (err) { setError(err.message); }
+    } catch (err) { setError(err.message); toast.error(err.message); }
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('Opravdu smazat tohoto klienta?')) return;
-    await api.deleteClient(id);
-    load();
+    const ok = await confirm({ title: 'Smazat klienta', message: 'Opravdu chcete smazat tohoto klienta? Všechny jeho faktury zůstanou zachovány.', type: 'danger', confirmText: 'Smazat' });
+    if (!ok) return;
+    try { await api.deleteClient(id); toast.success('Klient byl smazán'); load(); }
+    catch (e) { toast.error(e.message); }
   };
 
   return (
@@ -111,7 +118,7 @@ export default function Clients() {
       </div>
 
       <div className="card">
-        {loading ? <div className="loading">Načítání...</div> : sorted.length === 0 ? <div className="empty-state">Žádní klienti</div> : (
+        {loading ? <SkeletonTable rows={5} cols={7} /> : sorted.length === 0 ? <EmptyState type="clients" title="Žádní klienti" description="Přidejte prvního klienta pro začátek fakturace." action={can('admin', 'accountant', 'manager') ? openNew : undefined} actionLabel="+ Nový klient" /> : (
           <div className="table-responsive">
             <table>
               <thead><tr>
@@ -187,7 +194,7 @@ export default function Clients() {
                         const data = await api.aresLookup(form.ico);
                         const updates = { name: data.name || form.name, dic: data.dic || form.dic, address: data.address || form.address, city: data.city || form.city, zip: data.zip || form.zip, country: data.country || form.country };
                         updateForm(updates, editing?.id);
-                      } catch (e) { alert(e.message); }
+                      } catch (e) { toast.error(e.message); }
                     }}>ARES</button>
                   </div>
                 </div>

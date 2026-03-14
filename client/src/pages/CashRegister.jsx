@@ -2,9 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../api';
 import { useAuth } from '../App';
 import Pagination, { usePagination } from '../components/Pagination';
+import { useToast } from '../components/Toast';
+import { useConfirm } from '../components/ConfirmDialog';
 
 export default function CashRegister() {
   const { can } = useAuth();
+  const toast = useToast();
+  const confirmDialog = useConfirm();
   const [registers, setRegisters] = useState([]);
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -63,9 +67,10 @@ export default function CashRegister() {
   };
 
   const deleteDoc = async (id) => {
-    if (!confirm('Smazat doklad?')) return;
-    try { await api.deleteCashDocument(id); loadDocuments(); loadRegisters(); }
-    catch (e) { setError(e.message); }
+    const ok = await confirmDialog({ title: 'Smazat doklad', message: 'Opravdu chcete smazat tento pokladní doklad?', type: 'danger', confirmText: 'Smazat' });
+    if (!ok) return;
+    try { await api.deleteCashDocument(id); toast.success('Doklad smazán'); loadDocuments(); loadRegisters(); }
+    catch (e) { toast.error(e.message); }
   };
 
   return (

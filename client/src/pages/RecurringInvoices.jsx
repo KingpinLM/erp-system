@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api';
 import { useAuth } from '../App';
+import { useToast } from '../components/Toast';
+import { useConfirm } from '../components/ConfirmDialog';
 
 const intervalLabels = { weekly: 'Týdně', monthly: 'Měsíčně', quarterly: 'Čtvrtletně', yearly: 'Ročně' };
 const fmtDate = (d) => { if (!d) return '—'; const p = d.slice(0,10).split('-'); return p.length === 3 ? `${p[2]}.${p[1]}.${p[0]}` : d; };
@@ -13,6 +15,8 @@ export default function RecurringInvoices() {
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
   const { can } = useAuth();
+  const toast = useToast();
+  const confirm = useConfirm();
 
   const emptyForm = { client_id: '', currency: 'CZK', payment_method: 'bank_transfer', note: '', interval: 'monthly', next_date: new Date().toISOString().slice(0, 10), end_date: '', items: [{ description: '', quantity: 1, unit: 'ks', unit_price: 0, tax_rate: 0 }] };
   const [form, setForm] = useState(emptyForm);
@@ -36,8 +40,8 @@ export default function RecurringInvoices() {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('Opravdu smazat opakovanou fakturu?')) return;
-    await api.deleteRecurring(id); load();
+    const ok = await confirm({ title: 'Smazat opakovanou fakturu', message: 'Opravdu chcete smazat tuto opakovanou fakturu?', type: 'danger', confirmText: 'Smazat' }); if (!ok) return;
+    await api.deleteRecurring(id); toast.success('Opakovaná faktura smazána'); load();
   };
 
   const updateItem = (idx, field, value) => setForm(f => {

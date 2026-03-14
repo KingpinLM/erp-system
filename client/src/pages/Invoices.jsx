@@ -1,8 +1,12 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import { useAuth } from '../App';
 import Pagination, { usePagination } from '../components/Pagination';
+import { useToast } from '../components/Toast';
+import { useConfirm } from '../components/ConfirmDialog';
+import { SkeletonTable } from '../components/Skeleton';
+import EmptyState from '../components/EmptyState';
 
 const statusLabels = { draft: 'Koncept', sent: 'Odesláno', paid: 'Zaplaceno', overdue: 'Po splatnosti', cancelled: 'Zrušeno' };
 const statusColors = { draft: '#64748b', sent: '#4f46e5', paid: '#059669', overdue: '#dc2626', cancelled: '#d97706' };
@@ -85,6 +89,9 @@ export default function Invoices() {
   const [sortDir, setSortDir] = useState('desc');
   const [selected, setSelected] = useState(new Set());
   const { can } = useAuth();
+  const toast = useToast();
+  const confirm = useConfirm();
+  const navigate = useNavigate();
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(20);
   const [hoveredInv, setHoveredInv] = useState(null);
@@ -171,9 +178,13 @@ export default function Invoices() {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('Opravdu smazat tuto fakturu?')) return;
-    await api.deleteInvoice(id);
-    load();
+    const ok = await confirm({ title: 'Smazat fakturu', message: 'Opravdu chcete smazat tuto fakturu? Tato akce je nevratná.', type: 'danger', confirmText: 'Smazat', cancelText: 'Zrušit' });
+    if (!ok) return;
+    try {
+      await api.deleteInvoice(id);
+      toast.success('Faktura byla smazána');
+      load();
+    } catch (e) { toast.error(e.message); }
   };
 
   return (
@@ -188,8 +199,8 @@ export default function Invoices() {
       {selected.size > 0 && can('admin', 'accountant', 'manager') && (
         <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem', alignItems: 'center', background: '#eff6ff', padding: '0.5rem 1rem', borderRadius: 'var(--radius)' }}>
           <strong style={{ fontSize: '0.85rem' }}>{selected.size} vybráno</strong>
-          <button className="btn btn-sm btn-outline" onClick={async () => { await api.bulkStatus([...selected], 'sent'); setSelected(new Set()); load(); }}>Odeslat</button>
-          <button className="btn btn-sm btn-success" onClick={async () => { await api.bulkStatus([...selected], 'paid'); setSelected(new Set()); load(); }}>Zaplaceno</button>
+          <button className="btn btn-sm btn-outline" onClick={async () => { await api.bulkStatus([...selected], 'sent'); toast.success(`${selected.size} faktur označeno jako odesláno`); setSelected(new Set()); load(); }}>Odeslat</button>
+          <button className="btn btn-sm btn-success" onClick={async () => { await api.bulkStatus([...selected], 'paid'); toast.success(`${selected.size} faktur označeno jako zaplaceno`); setSelected(new Set()); load(); }}>Zaplaceno</button>
           <button className="btn btn-sm btn-warning" onClick={async () => { await api.bulkStatus([...selected], 'cancelled'); setSelected(new Set()); load(); }}>Zrušit</button>
           <button className="btn btn-sm btn-outline" onClick={() => setSelected(new Set())}>Zrušit výběr</button>
         </div>
@@ -225,8 +236,10 @@ export default function Invoices() {
         </button>
       </div>
 
+      {loading ? <SkeletonTable rows={6} cols={8} /> : sorted.length === 0 ? (
+        <div className="card"><EmptyState type="invoices" title="Žádné faktury" description="Zatím nemáte žádné faktury. Vytvořte první fakturu a začněte fakturovat." action={can('admin', 'accountant') ? () => navigate('/invoices/new') : undefined} actionLabel="+ Nová faktura" /></div>
+      ) : (
       <div className="card">
-        {loading ? <div className="loading">Načítání...</div> : sorted.length === 0 ? <div className="empty-state">Žádné faktury</div> : (
           <div className="table-responsive">
             <table>
               <thead>
@@ -271,9 +284,9 @@ export default function Invoices() {
               </tbody>
             </table>
           </div>
-        )}
         <Pagination total={sorted.length} page={page} perPage={perPage} onPageChange={setPage} onPerPageChange={v => { setPerPage(v); setPage(1); }} />
       </div>
+      )}
 
       {/* Hover preview anchored to invoice row */}
       {hoveredInv && hoverDetail && hoverDetail.id === hoveredInv && (

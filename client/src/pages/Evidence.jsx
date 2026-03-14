@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { api } from '../api';
 import { useAuth } from '../App';
 import Pagination, { usePagination } from '../components/Pagination';
+import { useToast } from '../components/Toast';
+import { useConfirm } from '../components/ConfirmDialog';
 
 const fmt = (n, cur = 'CZK') => n != null ? new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: cur, maximumFractionDigits: 2 }).format(n) : '—';
 const fmtDate = (d) => { if (!d) return '—'; const p = d.slice(0,10).split('-'); return p.length === 3 ? `${p[2]}.${p[1]}.${p[0]}` : d; };
@@ -27,6 +29,8 @@ export default function Evidence() {
   const [categoryRules, setCategoryRules] = useState([]);
   const fileRef = useRef();
   const { can } = useAuth();
+  const toast = useToast();
+  const confirm = useConfirm();
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(20);
 
@@ -120,8 +124,10 @@ export default function Evidence() {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('Opravdu smazat tento záznam?')) return;
+    const ok = await confirm({ title: 'Smazat záznam', message: 'Opravdu chcete smazat tento záznam?', type: 'danger', confirmText: 'Smazat' });
+    if (!ok) return;
     await api.deleteEvidence(id);
+    toast.success('Záznam smazán');
     load();
   };
 
@@ -137,7 +143,7 @@ export default function Evidence() {
       }
       setUploadResults(allResults);
     } catch (e) {
-      alert('Chyba: ' + e.message);
+      toast.error(e.message);
     }
     setUploading(false);
   };

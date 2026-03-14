@@ -3,9 +3,13 @@ import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import { useAuth } from '../App';
 import Pagination, { usePagination } from '../components/Pagination';
+import { useToast } from '../components/Toast';
+import { useConfirm } from '../components/ConfirmDialog';
 
 export default function Orders() {
   const { can } = useAuth();
+  const toast = useToast();
+  const confirmDialog = useConfirm();
   const navigate = useNavigate();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -47,8 +51,9 @@ export default function Orders() {
   };
 
   const deleteOrder = async (id) => {
-    if (!confirm('Smazat objednávku?')) return;
-    try { await api.deleteOrder(id); load(); } catch (e) { setError(e.message); }
+    const ok = await confirmDialog({ title: 'Smazat objednávku', message: 'Opravdu chcete smazat tuto objednávku?', type: 'danger', confirmText: 'Smazat' });
+    if (!ok) return;
+    try { await api.deleteOrder(id); toast.success('Objednávka smazána'); load(); } catch (e) { toast.error(e.message); }
   };
 
   const statusLabels = { draft: 'Koncept', confirmed: 'Potvrzeno', in_progress: 'V realizaci', completed: 'Dokončeno', cancelled: 'Stornováno', invoiced: 'Fakturováno' };

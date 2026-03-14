@@ -1,9 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api';
 import { useAuth } from '../App';
+import { useToast } from '../components/Toast';
+import { useConfirm } from '../components/ConfirmDialog';
 
 export default function SuperAdmin() {
   const { logout } = useAuth();
+  const toast = useToast();
+  const confirmDialog = useConfirm();
   const [tenants, setTenants] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -45,9 +49,10 @@ export default function SuperAdmin() {
   };
 
   const deleteTenant = async (t) => {
-    if (!confirm(`Opravdu smazat tenant "${t.name}" a VŠECHNA jeho data? Tato akce je nevratná!`)) return;
-    await api.deleteTenant(t.id);
-    load();
+    const ok = await confirmDialog({ title: 'Smazat tenanta', message: `Opravdu smazat tenant "${t.name}" a VŠECHNA jeho data? Tato akce je nevratná!`, type: 'danger', confirmText: 'Smazat vše' });
+    if (!ok) return;
+    try { await api.deleteTenant(t.id); toast.success(`Tenant "${t.name}" smazán`); load(); }
+    catch (e) { toast.error(e.message); }
   };
 
   const showDetail = async (t) => {

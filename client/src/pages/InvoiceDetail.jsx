@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import { useAuth, usePageTitle } from '../App';
+import { useToast } from '../components/Toast';
 
 const statusLabels = { draft: 'Koncept', sent: 'Odesláno', paid: 'Zaplaceno', overdue: 'Po splatnosti', cancelled: 'Zrušeno' };
 const paymentLabels = { bank_transfer: 'Bankovní převod', cash: 'Hotově', card: 'Kartou', other: 'Jiný' };
@@ -199,6 +200,7 @@ export default function InvoiceDetail() {
   const [showPayment, setShowPayment] = useState(false);
   const [payForm, setPayForm] = useState({ amount: '', date: new Date().toISOString().slice(0, 10), note: '' });
   const { can } = useAuth();
+  const toast = useToast();
   const invoiceRef = useRef();
   usePageTitle(invoice ? `Faktura ${invoice.invoice_number}` : undefined);
 
@@ -537,11 +539,11 @@ export default function InvoiceDetail() {
         {can('admin', 'accountant') && <>
           <Link to={`/invoices/${id}/edit`} className="btn btn-outline">Upravit</Link>
           <button className="btn btn-outline" onClick={async () => {
-            try { await api.sendInvoiceEmail(id, {}); alert('Email odeslán'); } catch (e) { alert(e.message); }
+            try { await api.sendInvoiceEmail(id, {}); toast.success('Email odeslán'); } catch (e) { toast.error(e.message); }
           }}>Odeslat emailem</button>
           {(invoice.status === 'overdue' || invoice.status === 'sent') && (
             <button className="btn btn-outline" style={{ color: '#ef4444' }} onClick={async () => {
-              try { await api.sendInvoiceReminder(id); alert('Upomínka odeslána'); } catch (e) { alert(e.message); }
+              try { await api.sendInvoiceReminder(id); toast.success('Upomínka odeslána'); } catch (e) { toast.error(e.message); }
             }}>Upomínka</button>
           )}
         </>}

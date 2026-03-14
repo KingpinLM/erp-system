@@ -2,9 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../api';
 import { useAuth } from '../App';
 import Pagination, { usePagination } from '../components/Pagination';
+import { useToast } from '../components/Toast';
+import { useConfirm } from '../components/ConfirmDialog';
 
 export default function Products() {
   const { can } = useAuth();
+  const toast = useToast();
+  const confirm = useConfirm();
   const [tab, setTab] = useState('list');
   const [products, setProducts] = useState([]);
   const [movements, setMovements] = useState([]);
@@ -60,8 +64,8 @@ export default function Products() {
   };
 
   const deleteProduct = async (id) => {
-    if (!confirm('Smazat produkt?')) return;
-    try { await api.deleteProduct(id); load(); } catch (e) { setError(e.message); }
+    const ok = await confirm({ title: 'Smazat produkt', message: 'Opravdu chcete smazat tento produkt?', type: 'danger', confirmText: 'Smazat' }); if (!ok) return;
+    try { await api.deleteProduct(id); toast.success('Produkt smazán'); load(); } catch (e) { setError(e.message); }
   };
 
   return (

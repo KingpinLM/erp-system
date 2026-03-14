@@ -26,6 +26,9 @@ import SearchResults from './pages/SearchResults';
 import ChatWidget from './components/ChatWidget';
 import ChatbotSettings from './pages/ChatbotSettings';
 import FinancniUrad from './pages/FinancniUrad';
+import { ToastProvider } from './components/Toast';
+import { ConfirmProvider } from './components/ConfirmDialog';
+import { useKeyboardShortcuts, ShortcutsHelp } from './components/KeyboardShortcuts';
 import './styles.css';
 
 export const AuthContext = createContext(null);
@@ -430,6 +433,11 @@ const routeSections = [
   { match: /^\/search/, title: 'Výsledky hledání', home: '/' },
 ];
 
+function ShortcutsHelpWrapper() {
+  const { showHelp, setShowHelp } = useKeyboardShortcuts();
+  return <ShortcutsHelp open={showHelp} onClose={() => setShowHelp(false)} />;
+}
+
 function Layout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [subtitle, setSubtitle] = useState('');
@@ -470,6 +478,7 @@ function Layout({ children }) {
         </header>
         <main className="content">{children}</main>
         <ChatWidget />
+        <ShortcutsHelpWrapper />
       </div>
     </div>
     </PageTitleContext.Provider>
@@ -479,6 +488,8 @@ function Layout({ children }) {
 export default function App() {
   return (
     <BrowserRouter>
+      <ToastProvider>
+      <ConfirmProvider>
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<Login />} />
@@ -520,6 +531,8 @@ export default function App() {
           } />
         </Routes>
       </AuthProvider>
+      </ConfirmProvider>
+      </ToastProvider>
     </BrowserRouter>
   );
 }

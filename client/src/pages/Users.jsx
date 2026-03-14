@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api';
 import { useAuth } from '../App';
+import { useToast } from '../components/Toast';
+import { useConfirm } from '../components/ConfirmDialog';
 
 const roleLabels = { admin: 'Administrátor', accountant: 'Účetní', manager: 'Manažer', viewer: 'Náhled' };
 
@@ -29,6 +31,8 @@ const roleDefaults = {
 
 /* ═══ Single group card — always shows everything, fully editable ═══ */
 function GroupCard({ group, users, loadGroups, allPermissions, permissionGroups, groupColors }) {
+  const toast = useToast();
+  const confirm = useConfirm();
   const [name, setName] = useState(group.name);
   const [desc, setDesc] = useState(group.description || '');
   const [saving, setSaving] = useState(false);
@@ -50,7 +54,7 @@ function GroupCard({ group, users, loadGroups, allPermissions, permissionGroups,
     try {
       await api.updateUserGroup(group.id, { name: data.name ?? name, description: data.desc ?? desc, permissions: data.permissions ?? perms, color: data.color ?? group.color });
       await loadGroups();
-    } catch (e) { alert(e.message); }
+    } catch (e) { toast.error(e.message); }
     setSaving(false);
   };
 
@@ -71,15 +75,15 @@ function GroupCard({ group, users, loadGroups, allPermissions, permissionGroups,
       await api.setGroupMembers(group.id, memberIds);
       setShowMembers(false);
       await loadGroups();
-    } catch (e) { alert(e.message); }
+    } catch (e) { toast.error(e.message); }
     setSaving(false);
   };
 
   const del = async () => {
-    if (confirm(`Smazat skupinu „${group.name}"?`)) {
-      await api.deleteUserGroup(group.id);
-      loadGroups();
-    }
+    const ok = await confirm({ title: 'Smazat skupinu', message: `Opravdu chcete smazat skupinu „${group.name}"?`, type: 'danger', confirmText: 'Smazat' }); if (!ok) return;
+    await api.deleteUserGroup(group.id);
+    toast.success('Skupina smazána');
+    loadGroups();
   };
 
   return (
@@ -306,6 +310,8 @@ function SystemRoleCard({ roleKey, label, defaultPerms, currentPerms, userCount,
 
 /* ═══ Custom role card — collapsed by default, expands to show editing ═══ */
 function RoleCard({ role, loadRoles, allPermissions, permissionGroups }) {
+  const toast = useToast();
+  const confirm = useConfirm();
   const [name, setName] = useState(role.name);
   const [desc, setDesc] = useState(role.description || '');
   const [baseRole, setBaseRole] = useState(role.base_role || 'viewer');
@@ -329,7 +335,7 @@ function RoleCard({ role, loadRoles, allPermissions, permissionGroups }) {
       await api.updateRole(role.id, { name, description: desc, base_role: baseRole, permissions: perms });
       await loadRoles();
       setDirty(false);
-    } catch (e) { alert(e.message); }
+    } catch (e) { toast.error(e.message); }
     setSaving(false);
   };
 
@@ -342,10 +348,10 @@ function RoleCard({ role, loadRoles, allPermissions, permissionGroups }) {
   };
 
   const del = async () => {
-    if (confirm(`Smazat roli „${role.name}"?`)) {
-      await api.deleteRole(role.id);
-      loadRoles();
-    }
+    const ok = await confirm({ title: 'Smazat roli', message: `Opravdu chcete smazat roli „${role.name}"?`, type: 'danger', confirmText: 'Smazat' }); if (!ok) return;
+    await api.deleteRole(role.id);
+    toast.success('Role smazána');
+    loadRoles();
   };
 
   return (
@@ -500,6 +506,8 @@ export default function Users() {
   const [pendingStatus, setPendingStatus] = useState({}); // { [userId]: 0|1 }
   const [savingStatus, setSavingStatus] = useState(false);
   const { can } = useAuth();
+  const toast = useToast();
+  const confirm = useConfirm();
 
   const load = () => {
     setLoading(true);
@@ -743,7 +751,7 @@ export default function Users() {
                               load();
                             }}>Schválit</button>
                             <button className="btn btn-danger btn-sm" onClick={async () => {
-                              if (confirm('Opravdu zamítnout registraci?')) { await api.rejectUser(u.id); load(); }
+                              const ok = await confirm({ title: 'Zamítnout registraci', message: 'Opravdu chcete zamítnout tuto registraci?', type: 'danger', confirmText: 'Zamítnout' }); if (ok) { await api.rejectUser(u.id); toast.success('Registrace zamítnuta'); load(); }
                             }}>Zamítnout</button>
                           </div>
                         </td>
@@ -827,8 +835,8 @@ export default function Users() {
                             <Link to={`/users/${u.id}`} className="btn btn-outline btn-sm">Detail</Link>
                             <button className="btn btn-outline btn-sm" onClick={() => openEdit(u)}>Upravit</button>
                             <button className="btn btn-danger btn-sm" onClick={async () => {
-                              if (!confirm(`Smazat uživatele ${u.username}?`)) return;
-                              try { await api.deleteUser(u.id); load(); } catch (e) { setError(e.message); }
+                              const ok = await confirm({ title: 'Smazat uživatele', message: `Opravdu chcete smazat uživatele ${u.username}?`, type: 'danger', confirmText: 'Smazat' }); if (!ok) return;
+                              try { await api.deleteUser(u.id); toast.success('Uživatel smazán'); load(); } catch (e) { setError(e.message); }
                             }}>Smazat</button>
                           </div>
                         </td>

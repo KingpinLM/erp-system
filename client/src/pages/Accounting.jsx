@@ -2,9 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../api';
 import { useAuth } from '../App';
 import Pagination, { usePagination } from '../components/Pagination';
+import { useToast } from '../components/Toast';
+import { useConfirm } from '../components/ConfirmDialog';
 
 export default function Accounting() {
   const { can } = useAuth();
+  const toast = useToast();
+  const confirm = useConfirm();
   const [tab, setTab] = useState('accounts');
   const [accounts, setAccounts] = useState([]);
   const [journal, setJournal] = useState([]);
@@ -55,8 +59,8 @@ export default function Accounting() {
   };
 
   const deleteAccount = async (id) => {
-    if (!confirm('Smazat účet?')) return;
-    try { await api.deleteAccount(id); load(); } catch (e) { setError(e.message); }
+    const ok = await confirm({ title: 'Smazat účet', message: 'Opravdu chcete smazat tento účet?', type: 'danger', confirmText: 'Smazat' }); if (!ok) return;
+    try { await api.deleteAccount(id); toast.success('Účet smazán'); load(); } catch (e) { setError(e.message); }
   };
 
   const postEntry = async (id) => {
@@ -68,8 +72,8 @@ export default function Accounting() {
   };
 
   const deleteEntry = async (id) => {
-    if (!confirm('Smazat zápis?')) return;
-    try { await api.deleteJournalEntry(id); load(); } catch (e) { setError(e.message); }
+    const ok = await confirm({ title: 'Smazat zápis', message: 'Opravdu chcete smazat tento zápis?', type: 'danger', confirmText: 'Smazat' }); if (!ok) return;
+    try { await api.deleteJournalEntry(id); toast.success('Zápis smazán'); load(); } catch (e) { setError(e.message); }
   };
 
   const typeLabels = { asset: 'Aktivum', liability: 'Pasivum', equity: 'Vlastní kapitál', revenue: 'Výnos', expense: 'Náklad' };
