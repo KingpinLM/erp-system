@@ -601,7 +601,7 @@ app.get('/api/dashboard', ...tenanted, (req, res) => {
   `).all(tid);
 
   const topClients = db.prepare(`
-    SELECT c.name, SUM(i.total_czk) as total FROM invoices i
+    SELECT c.id, c.name, SUM(i.total_czk) as total FROM invoices i
     JOIN clients c ON i.client_id = c.id
     WHERE i.type='issued' AND i.status='paid' AND i.tenant_id=?${dateFilter('i.paid_date')}
     GROUP BY c.id ORDER BY total DESC LIMIT 5
@@ -609,7 +609,7 @@ app.get('/api/dashboard', ...tenanted, (req, res) => {
 
   // Top suppliers (received invoices)
   const topSuppliers = db.prepare(`
-    SELECT c.name, SUM(i.total_czk) as total FROM invoices i
+    SELECT c.id, c.name, SUM(i.total_czk) as total FROM invoices i
     JOIN clients c ON i.client_id = c.id
     WHERE i.type='received' AND i.tenant_id=?${dateFilter('i.issue_date')}
     GROUP BY c.id ORDER BY total DESC LIMIT 10

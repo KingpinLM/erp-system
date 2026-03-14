@@ -453,7 +453,7 @@ export default function Dashboard() {
               <div className="dash-kpi-accent" style={{ background: '#0891b2' }} />
             </div>
 
-            <div className="dash-kpi">
+            <Link to="/clients" className="dash-kpi" style={{ textDecoration: 'none', color: 'inherit' }}>
               <div className="dash-kpi-icon-wrap" style={{ color: '#0f766e', background: 'rgba(15, 118, 110, 0.08)' }}>
                 {Icons.clients}
               </div>
@@ -462,7 +462,7 @@ export default function Dashboard() {
                 <span className="dash-kpi-value">{kpis.totalClients}</span>
               </div>
               <div className="dash-kpi-accent" style={{ background: '#0f766e' }} />
-            </div>
+            </Link>
           </div>
 
           {/* Rillion-inspired: Payment Performance Strip */}
@@ -616,7 +616,7 @@ export default function Dashboard() {
                   {topClients.slice(0, 5).map((c, i) => {
                     const max = topClients[0]?.total || 1;
                     return (
-                      <div key={c.name} className="dash-rank-item">
+                      <Link to={`/clients/${c.id}`} key={c.id || c.name} className="dash-rank-item" style={{ textDecoration: 'none', color: 'inherit' }}>
                         <span className="dash-rank-pos">{i + 1}</span>
                         <div className="dash-rank-info">
                           <div className="dash-rank-header">
@@ -627,7 +627,7 @@ export default function Dashboard() {
                             <div className="dash-rank-bar" style={{ width: `${(c.total / max) * 100}%`, background: CHART_COLORS.muted[i % CHART_COLORS.muted.length] }} />
                           </div>
                         </div>
-                      </div>
+                      </Link>
                     );
                   })}
                 </div>
@@ -641,7 +641,7 @@ export default function Dashboard() {
                   {(topSuppliers || []).slice(0, 5).map((s, i) => {
                     const max = topSuppliers[0]?.total || 1;
                     return (
-                      <div key={s.name} className="dash-rank-item">
+                      <Link to={`/clients/${s.id}`} key={s.id || s.name} className="dash-rank-item" style={{ textDecoration: 'none', color: 'inherit' }}>
                         <span className="dash-rank-pos">{i + 1}</span>
                         <div className="dash-rank-info">
                           <div className="dash-rank-header">
@@ -652,7 +652,7 @@ export default function Dashboard() {
                             <div className="dash-rank-bar" style={{ width: `${(s.total / max) * 100}%`, background: CHART_COLORS.muted[(i + 5) % CHART_COLORS.muted.length] }} />
                           </div>
                         </div>
-                      </div>
+                      </Link>
                     );
                   })}
                 </div>
@@ -1032,7 +1032,7 @@ export default function Dashboard() {
                 {topClients.map((c, i) => {
                   const max = topClients[0]?.total || 1;
                   return (
-                    <div key={c.name} className="dash-rank-item">
+                    <Link to={`/clients/${c.id}`} key={c.id || c.name} className="dash-rank-item" style={{ textDecoration: 'none', color: 'inherit' }}>
                       <span className="dash-rank-pos">{i + 1}</span>
                       <div className="dash-rank-info">
                         <div className="dash-rank-header">
@@ -1043,7 +1043,7 @@ export default function Dashboard() {
                           <div className="dash-rank-bar" style={{ width: `${(c.total / max) * 100}%`, background: CHART_COLORS.muted[i % CHART_COLORS.muted.length] }} />
                         </div>
                       </div>
-                    </div>
+                    </Link>
                   );
                 })}
               </div>

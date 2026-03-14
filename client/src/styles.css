@@ -955,7 +955,9 @@ a:hover { opacity: 0.85; }
 
 /* Ranking list */
 .dash-rank-list { display: flex; flex-direction: column; gap: 0.75rem; }
-.dash-rank-item { display: flex; align-items: center; gap: 0.75rem; }
+.dash-rank-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.35rem 0.5rem; border-radius: var(--radius); transition: background 0.15s; cursor: pointer; margin: -0.35rem -0.5rem; margin-bottom: 0; }
+a.dash-rank-item:hover { background: var(--gray-50); }
+[data-theme="dark"] a.dash-rank-item:hover { background: var(--gray-800); }
 .dash-rank-pos {
   font-size: 0.7rem; font-weight: 800; color: var(--gray-400);
   width: 26px; height: 26px; display: flex; align-items: center; justify-content: center;
