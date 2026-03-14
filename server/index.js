@@ -673,6 +673,24 @@ app.get('/api/dashboard', ...tenanted, (req, res) => {
     GROUP BY year ORDER BY year
   `).all(tid);
 
+  // Client performance for selected period
+  const clientPerformance = db.prepare(`
+    SELECT c.id, c.name, c.ico, c.dic, c.email, c.phone, c.city, c.country,
+      COUNT(CASE WHEN i.type='issued' THEN 1 END) as issued_count,
+      COUNT(CASE WHEN i.type='received' THEN 1 END) as received_count,
+      COALESCE(SUM(CASE WHEN i.type='issued' THEN i.total_czk ELSE 0 END), 0) as issued_total,
+      COALESCE(SUM(CASE WHEN i.type='received' THEN i.total_czk ELSE 0 END), 0) as received_total,
+      COALESCE(SUM(CASE WHEN i.type='issued' AND i.status='paid' THEN i.total_czk ELSE 0 END), 0) as paid_total,
+      COALESCE(SUM(CASE WHEN i.type='issued' AND i.status IN ('sent','overdue') THEN i.total_czk ELSE 0 END), 0) as unpaid_total,
+      COUNT(CASE WHEN i.status='overdue' THEN 1 END) as overdue_count,
+      COUNT(CASE WHEN i.status='paid' THEN 1 END) as paid_count
+    FROM clients c
+    JOIN invoices i ON i.client_id = c.id AND i.tenant_id = c.tenant_id
+    WHERE c.tenant_id = ?${dateFilter('i.issue_date')}
+    GROUP BY c.id
+    ORDER BY issued_total DESC
+  `).all(tid, ...dateParams());
+
   const pendingItems = [];
   const overdueList = db.prepare(`
     SELECT i.id, i.invoice_number, i.total, i.currency, i.due_date, c.name as client_name
@@ -700,7 +718,7 @@ app.get('/api/dashboard', ...tenanted, (req, res) => {
   res.json({
     kpis: { totalRevenue, totalExpenses, profit: totalRevenue - totalExpenses, unpaidInvoices, overdueInvoices, totalClients, draftInvoices, pendingUsers },
     revenueByMonth, expensesByCategory, invoicesByStatus, recentInvoices, topClients, topSuppliers, currencyBreakdown,
-    monthlyIssued, monthlyExpenses, quarterlyIssued, quarterlyExpenses, yearlyIssued, yearlyExpenses, pendingItems, chartYear
+    monthlyIssued, monthlyExpenses, quarterlyIssued, quarterlyExpenses, yearlyIssued, yearlyExpenses, pendingItems, chartYear, clientPerformance
   });
 });
 

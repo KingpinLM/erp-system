@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area, LineChart, Line } from 'recharts';
 import { api } from '../api';
 import { useAuth } from '../App';
+import Pagination from '../components/Pagination';
 
 const fmt = (n) => new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: 'CZK', maximumFractionDigits: 0 }).format(n);
 const fmtNum = (n) => new Intl.NumberFormat('cs-CZ').format(n);
@@ -131,6 +132,10 @@ export default function Dashboard() {
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
   const [selectedBar, setSelectedBar] = useState(null);
+  const [clientPage, setClientPage] = useState(1);
+  const [clientPerPage, setClientPerPage] = useState(20);
+  const [clientSort, setClientSort] = useState('issued_total');
+  const [clientSortDir, setClientSortDir] = useState('desc');
   const { can } = useAuth();
 
   const loadData = () => {
@@ -146,7 +151,7 @@ export default function Dashboard() {
     api.dashboard(params).then(setData).finally(() => setLoading(false));
   };
 
-  useEffect(loadData, [period, customFrom, customTo]);
+  useEffect(() => { loadData(); setClientPage(1); if (period === 'all' && tab === 'clients') setTab('overview'); }, [period, customFrom, customTo]);
 
   if (loading) return (
     <div className="dash-loading">
@@ -156,7 +161,7 @@ export default function Dashboard() {
   );
   if (!data || data.error || !data.kpis) return <div className="dash-empty-hero"><span className="dash-empty-icon">{Icons.alert}</span><span>{data?.error || 'Nelze načíst data'}</span></div>;
 
-  const { kpis, revenueByMonth, expensesByCategory, invoicesByStatus, recentInvoices, topClients, topSuppliers, currencyBreakdown, monthlyIssued, monthlyExpenses, quarterlyIssued, quarterlyExpenses, yearlyIssued, yearlyExpenses, pendingItems, chartYear } = data;
+  const { kpis, revenueByMonth, expensesByCategory, invoicesByStatus, recentInvoices, topClients, topSuppliers, currencyBreakdown, monthlyIssued, monthlyExpenses, quarterlyIssued, quarterlyExpenses, yearlyIssued, yearlyExpenses, pendingItems, chartYear, clientPerformance } = data;
 
   const statusLabels = { draft: 'Koncept', sent: 'Odesláno', paid: 'Zaplaceno', overdue: 'Po splatnosti', cancelled: 'Zrušeno' };
   const statusColors = { draft: '#94a3b8', sent: '#0891b2', paid: '#0d9488', overdue: '#e11d48', cancelled: '#d97706' };
@@ -223,8 +228,16 @@ export default function Dashboard() {
   const paidRate = totalInvoices > 0 ? ((paidInvoices?.count || 0) / totalInvoices * 100).toFixed(0) : 0;
   const overdueRate = totalInvoices > 0 ? ((overdueInvoices?.count || 0) / totalInvoices * 100).toFixed(0) : 0;
 
+  const hasPeriod = period !== 'all';
+  const clientPerfSorted = [...(clientPerformance || [])].sort((a, b) => {
+    const va = a[clientSort] || 0, vb = b[clientSort] || 0;
+    if (typeof va === 'string') return clientSortDir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+    return clientSortDir === 'asc' ? va - vb : vb - va;
+  });
+
   const tabs = [
     { key: 'overview', label: 'Přehled' },
+    ...(hasPeriod ? [{ key: 'clients', label: 'Klienti', badge: clientPerformance?.length || 0 }] : []),
     { key: 'cashflow', label: 'Cash Flow' },
     { key: 'pending', label: 'K vyřízení', badge: pendingCount },
     { key: 'reports', label: 'Analytika' },
@@ -605,6 +618,103 @@ export default function Dashboard() {
                   })}
                 </div>
               </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* === CLIENTS PERFORMANCE === */}
+      {tab === 'clients' && hasPeriod && (
+        <div className="dash-content dash-fade-in">
+          <div className="dash-kpi-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+            <div className="dash-kpi">
+              <div className="dash-kpi-icon-wrap" style={{ color: '#0d9488', background: 'rgba(13, 148, 136, 0.08)' }}>{Icons.clients}</div>
+              <div className="dash-kpi-body">
+                <span className="dash-kpi-label">Aktivních klientů</span>
+                <span className="dash-kpi-value">{clientPerformance?.length || 0}</span>
+              </div>
+              <div className="dash-kpi-accent" style={{ background: '#0d9488' }} />
+            </div>
+            <div className="dash-kpi">
+              <div className="dash-kpi-icon-wrap" style={{ color: '#0891b2', background: 'rgba(8, 145, 178, 0.08)' }}>{Icons.revenue}</div>
+              <div className="dash-kpi-body">
+                <span className="dash-kpi-label">Celkem fakturováno</span>
+                <span className="dash-kpi-value" style={{ color: '#0d9488' }}>{fmt((clientPerformance || []).reduce((s, c) => s + c.issued_total, 0))}</span>
+              </div>
+              <div className="dash-kpi-accent" style={{ background: '#0891b2' }} />
+            </div>
+            <div className="dash-kpi">
+              <div className="dash-kpi-icon-wrap" style={{ color: '#059669', background: 'rgba(5, 150, 105, 0.08)' }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+              </div>
+              <div className="dash-kpi-body">
+                <span className="dash-kpi-label">Zaplaceno</span>
+                <span className="dash-kpi-value" style={{ color: '#059669' }}>{fmt((clientPerformance || []).reduce((s, c) => s + c.paid_total, 0))}</span>
+              </div>
+              <div className="dash-kpi-accent" style={{ background: '#059669' }} />
+            </div>
+            <div className="dash-kpi">
+              <div className="dash-kpi-icon-wrap" style={{ color: '#e11d48', background: 'rgba(225, 29, 72, 0.08)' }}>{Icons.alert}</div>
+              <div className="dash-kpi-body">
+                <span className="dash-kpi-label">Nezaplaceno</span>
+                <span className="dash-kpi-value" style={{ color: '#e11d48' }}>{fmt((clientPerformance || []).reduce((s, c) => s + c.unpaid_total, 0))}</span>
+              </div>
+              <div className="dash-kpi-accent" style={{ background: '#e11d48' }} />
+            </div>
+          </div>
+
+          <div className="dash-card">
+            <h3 className="dash-card-title" style={{ marginBottom: '1rem' }}>Plnění klientů za období</h3>
+            {(!clientPerformance || clientPerformance.length === 0) ? (
+              <div className="dash-empty-small">Žádní klienti v tomto období</div>
+            ) : (
+              <>
+                <div className="table-responsive">
+                  <table>
+                    <thead>
+                      <tr>
+                        {[
+                          ['name', 'Klient'],
+                          ['ico', 'IČO'],
+                          ['city', 'Město'],
+                          ['country', 'Země'],
+                          ['issued_count', 'Vydané'],
+                          ['received_count', 'Přijaté'],
+                          ['issued_total', 'Fakturováno (CZK)'],
+                          ['paid_total', 'Zaplaceno (CZK)'],
+                          ['unpaid_total', 'Nezaplaceno (CZK)'],
+                          ['overdue_count', 'Po splatnosti'],
+                        ].map(([key, label]) => (
+                          <th key={key} style={{ cursor: 'pointer', whiteSpace: 'nowrap' }} onClick={() => {
+                            if (clientSort === key) setClientSortDir(d => d === 'asc' ? 'desc' : 'asc');
+                            else { setClientSort(key); setClientSortDir(key === 'name' ? 'asc' : 'desc'); }
+                            setClientPage(1);
+                          }} className={['issued_total','paid_total','unpaid_total'].includes(key) ? 'text-right' : ''}>
+                            {label}{clientSort === key ? (clientSortDir === 'asc' ? ' ↑' : ' ↓') : ''}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {clientPerfSorted.slice((clientPage - 1) * clientPerPage, clientPage * clientPerPage).map(c => (
+                        <tr key={c.id}>
+                          <td><Link to={`/clients/${c.id}`} style={{ color: 'var(--primary)', fontWeight: 600, textDecoration: 'none' }}>{c.name}</Link></td>
+                          <td style={{ fontSize: '0.85rem' }}>{c.ico || '—'}</td>
+                          <td style={{ fontSize: '0.85rem' }}>{c.city || '—'}</td>
+                          <td style={{ fontSize: '0.85rem' }}>{c.country || '—'}</td>
+                          <td style={{ textAlign: 'center' }}>{c.issued_count || 0}</td>
+                          <td style={{ textAlign: 'center' }}>{c.received_count || 0}</td>
+                          <td className="text-right" style={{ fontWeight: 600, color: '#0d9488' }}>{fmt(c.issued_total)}</td>
+                          <td className="text-right" style={{ fontWeight: 600, color: '#059669' }}>{fmt(c.paid_total)}</td>
+                          <td className="text-right" style={{ fontWeight: 600, color: c.unpaid_total > 0 ? '#e11d48' : '#64748b' }}>{fmt(c.unpaid_total)}</td>
+                          <td style={{ textAlign: 'center' }}>{c.overdue_count > 0 ? <span style={{ color: '#e11d48', fontWeight: 700 }}>{c.overdue_count}</span> : '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <Pagination total={clientPerfSorted.length} page={clientPage} perPage={clientPerPage} onPageChange={setClientPage} onPerPageChange={v => { setClientPerPage(v); setClientPage(1); }} />
+              </>
             )}
           </div>
         </div>
