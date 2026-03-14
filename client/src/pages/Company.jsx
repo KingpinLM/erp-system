@@ -221,6 +221,126 @@ const separatorOptions = [
   { value: '', label: 'Bez oddělovače' },
 ];
 
+const CURRENCY_FLAGS = { CZK: '🇨🇿', EUR: '🇪🇺', USD: '🇺🇸', GBP: '🇬🇧', PLN: '🇵🇱' };
+const CURRENCY_LABELS = { CZK: 'Korunový účet', EUR: 'Eurový účet', USD: 'Dolarový účet', GBP: 'Librový účet', PLN: 'Zlotový účet' };
+const CURRENCY_ORDER = ['CZK', 'EUR', 'USD', 'GBP', 'PLN'];
+
+function BankAccountsSection({ accounts, bankForm, setBankForm, bankError, setBankError, onReload }) {
+  const { can } = useAuth();
+  const usedCurrencies = accounts.map(a => a.currency);
+  const availableCurrencies = CURRENCY_ORDER.filter(c => !usedCurrencies.includes(c));
+
+  const handleSave = async (e) => {
+    e.preventDefault();
+    setBankError('');
+    try {
+      if (bankForm.id) {
+        await api.updateBankAccount(bankForm.id, bankForm);
+      } else {
+        await api.createBankAccount(bankForm);
+      }
+      setBankForm(null);
+      onReload();
+    } catch (err) { setBankError(err.message || 'Chyba při ukládání'); }
+  };
+
+  const sortedAccounts = [...accounts].sort((a, b) => {
+    const ia = CURRENCY_ORDER.indexOf(a.currency), ib = CURRENCY_ORDER.indexOf(b.currency);
+    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+  });
+
+  return (
+    <div className="card">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+        <div>
+          <div className="card-title" style={{ margin: 0 }}>Bankovní účty</div>
+          <div style={{ fontSize: '0.8rem', color: 'var(--gray-500)', marginTop: 2 }}>Pro každou měnu jeden účet — zobrazuje se na fakturách</div>
+        </div>
+        {can('admin', 'accountant') && availableCurrencies.length > 0 && !bankForm && (
+          <button type="button" className="btn btn-primary btn-sm" onClick={() => setBankForm({ name: '', account_number: '', iban: '', currency: availableCurrencies[0], initial_balance: 0 })}>
+            + Přidat účet
+          </button>
+        )}
+      </div>
+
+      {bankError && <div className="alert alert-error" style={{ marginBottom: '0.75rem' }} onClick={() => setBankError('')}>{bankError}</div>}
+
+      {bankForm && (
+        <form onSubmit={handleSave} style={{ background: 'var(--gray-50)', padding: '1rem', borderRadius: 'var(--radius)', marginBottom: '1rem', border: '1px solid var(--border, #e2e8f0)' }}>
+          <div style={{ fontWeight: 600, marginBottom: '0.75rem', fontSize: '0.9rem' }}>{bankForm.id ? 'Upravit účet' : 'Nový bankovní účet'}</div>
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">Měna</label>
+              <select className="form-select" value={bankForm.currency} onChange={e => setBankForm(f => ({ ...f, currency: e.target.value }))} disabled={!!bankForm.id}>
+                {bankForm.id
+                  ? <option value={bankForm.currency}>{bankForm.currency}</option>
+                  : availableCurrencies.map(c => <option key={c} value={c}>{CURRENCY_FLAGS[c] || '💱'} {c} — {CURRENCY_LABELS[c] || c}</option>)
+                }
+              </select>
+            </div>
+            <div className="form-group" style={{ flex: 2 }}>
+              <label className="form-label">Název účtu *</label>
+              <input className="form-input" value={bankForm.name} onChange={e => setBankForm(f => ({ ...f, name: e.target.value }))} required placeholder={`Např. Hlavní ${bankForm.currency} účet`} />
+            </div>
+          </div>
+          <div className="form-row">
+            <div className="form-group"><label className="form-label">Číslo účtu</label><input className="form-input" value={bankForm.account_number || ''} onChange={e => setBankForm(f => ({ ...f, account_number: e.target.value }))} placeholder="123456789/0100" /></div>
+            <div className="form-group"><label className="form-label">IBAN</label><input className="form-input" value={bankForm.iban || ''} onChange={e => setBankForm(f => ({ ...f, iban: e.target.value }))} placeholder="CZ65 0800 0000 1920 0014 5399" /></div>
+          </div>
+          <div className="btn-group" style={{ marginTop: '0.5rem' }}>
+            <button type="submit" className="btn btn-primary btn-sm">{bankForm.id ? 'Uložit' : 'Přidat'}</button>
+            <button type="button" className="btn btn-outline btn-sm" onClick={() => { setBankForm(null); setBankError(''); }}>Zrušit</button>
+          </div>
+        </form>
+      )}
+
+      {sortedAccounts.length === 0 && !bankForm ? (
+        <div style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--gray-400)', fontSize: '0.85rem' }}>
+          Zatím nemáte žádné bankovní účty. Přidejte účet pro každou měnu, kterou používáte.
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          {sortedAccounts.map(a => {
+            const flag = CURRENCY_FLAGS[a.currency] || '💱';
+            const label = CURRENCY_LABELS[a.currency] || a.currency;
+            return (
+              <div key={a.id} style={{
+                display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem 1rem',
+                background: 'var(--gray-50, #f8fafc)', borderRadius: 'var(--radius)', border: '1px solid var(--border, #e2e8f0)',
+              }}>
+                <span style={{ fontSize: '1.4rem' }}>{flag}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <strong style={{ fontSize: '0.9rem' }}>{a.name}</strong>
+                    <span className="badge badge-secondary" style={{ fontSize: '0.7rem' }}>{a.currency}</span>
+                  </div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--gray-500)', marginTop: 2 }}>
+                    {a.account_number && <span>{a.account_number}</span>}
+                    {a.account_number && a.iban && <span> · </span>}
+                    {a.iban && <span>IBAN: {a.iban}</span>}
+                    {!a.account_number && !a.iban && <span style={{ fontStyle: 'italic' }}>Bez čísla účtu</span>}
+                  </div>
+                </div>
+                {can('admin', 'accountant') && (
+                  <button type="button" className="btn btn-outline btn-sm" onClick={() => setBankForm({ id: a.id, name: a.name, account_number: a.account_number || '', iban: a.iban || '', currency: a.currency, initial_balance: a.initial_balance || 0 })}>
+                    Upravit
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {accounts.length > 0 && availableCurrencies.length > 0 && !bankForm && can('admin', 'accountant') && (
+        <div style={{ marginTop: '0.75rem', fontSize: '0.8rem', color: 'var(--gray-400)' }}>
+          Dostupné měny: {availableCurrencies.map(c => `${CURRENCY_FLAGS[c]} ${c}`).join(', ')}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Company() {
   const [form, setForm] = useState({
     name: 'Rainbow Family Investment', ico: '', dic: '', email: '', phone: '',
@@ -233,11 +353,17 @@ export default function Company() {
   const [saved, setSaved] = useState(false);
   const [hoveredLayout, setHoveredLayout] = useState(null);
   const hoverRef = useRef(null);
+  const [bankAccounts, setBankAccounts] = useState([]);
+  const [bankForm, setBankForm] = useState(null); // null = hidden, object = editing/creating
+  const [bankError, setBankError] = useState('');
+
+  const loadBankAccounts = () => api.getBankAccounts().then(setBankAccounts).catch(() => {});
 
   useEffect(() => {
     api.getCompany().then(data => {
       if (data && data.name) setForm(f => ({ ...f, ...data }));
     }).finally(() => setLoading(false));
+    loadBankAccounts();
   }, []);
 
   const handleSubmit = async (e) => {
@@ -284,85 +410,6 @@ export default function Company() {
             <div className="form-group"><label className="form-label">Město</label><input className="form-input" value={form.city || ''} onChange={e => setForm(f => ({ ...f, city: e.target.value }))} /></div>
             <div className="form-group"><label className="form-label">PSČ</label><input className="form-input" value={form.zip || ''} onChange={e => setForm(f => ({ ...f, zip: e.target.value }))} /></div>
             <div className="form-group"><label className="form-label">Země</label><input className="form-input" value={form.country || ''} onChange={e => setForm(f => ({ ...f, country: e.target.value }))} /></div>
-          </div>
-        </div>
-        <div className="card">
-          <div className="card-title" style={{ marginBottom: '1rem' }}>Bankovní údaje</div>
-          <div className="form-row">
-            <div className="form-group" style={{ flex: 2 }}>
-              <label className="form-label">Číslo účtu</label>
-              <input className="form-input" value={form.bank_account || ''} onChange={e => setForm(f => ({ ...f, bank_account: e.target.value }))} placeholder="123456789" />
-            </div>
-            <div className="form-group" style={{ flex: 1 }}>
-              <label className="form-label">Kód banky</label>
-              <select className="form-select" value={form.bank_code || ''} onChange={e => setForm(f => ({ ...f, bank_code: e.target.value }))}>
-                <option value="">— Vyberte —</option>
-                <option value="0100">0100 — Komerční banka</option>
-                <option value="0300">0300 — ČSOB</option>
-                <option value="0600">0600 — MONETA Money Bank</option>
-                <option value="0710">0710 — Česká národní banka</option>
-                <option value="0800">0800 — Česká spořitelna</option>
-                <option value="2010">2010 — Fio banka</option>
-                <option value="2020">2020 — BANCO</option>
-                <option value="2060">2060 — Citfin</option>
-                <option value="2070">2070 — Moravský Peněžní Ústav</option>
-                <option value="2100">2100 — Hypoteční banka</option>
-                <option value="2200">2200 — Creditas</option>
-                <option value="2220">2220 — Artesa</option>
-                <option value="2240">2240 — Poštová banka</option>
-                <option value="2250">2250 — Banka CREDITAS</option>
-                <option value="2260">2260 — NEY spořitelní družstvo</option>
-                <option value="2275">2275 — Podnikatelská družstevní záložna</option>
-                <option value="2600">2600 — Citibank Europe</option>
-                <option value="2700">2700 — UniCredit Bank</option>
-                <option value="3030">3030 — Air Bank</option>
-                <option value="3050">3050 — BNP Paribas Personal Finance</option>
-                <option value="3060">3060 — PKO BP S.A.</option>
-                <option value="3500">3500 — ING Bank</option>
-                <option value="4000">4000 — Expobank CZ</option>
-                <option value="4300">4300 — Českomoravská záruční a rozvojová banka</option>
-                <option value="5500">5500 — Raiffeisenbank</option>
-                <option value="5800">5800 — J&T Banka</option>
-                <option value="6000">6000 — PPF banka</option>
-                <option value="6100">6100 — Equa bank (Raiffeisenbank)</option>
-                <option value="6200">6200 — COMMERZBANK</option>
-                <option value="6210">6210 — mBank</option>
-                <option value="6300">6300 — BNP Paribas</option>
-                <option value="6700">6700 — Všeobecná úverová banka</option>
-                <option value="6800">6800 — Sberbank CZ (Česká spořitelna)</option>
-                <option value="7910">7910 — Deutsche Bank</option>
-                <option value="7940">7940 — Waldviertler Sparkasse Bank</option>
-                <option value="7950">7950 — Raiffeisen stavební spořitelna</option>
-                <option value="7960">7960 — Českomoravská stavební spořitelna</option>
-                <option value="7970">7970 — Modrá pyramida stavební spořitelna</option>
-                <option value="7990">7990 — Stavební spořitelna České spořitelny</option>
-                <option value="8030">8030 — Volksbank Raiffeisenbank Nordoberpfalz</option>
-                <option value="8040">8040 — Oberbank</option>
-                <option value="8060">8060 — Stavební spořitelna HYPO</option>
-                <option value="8090">8090 — Česká exportní banka</option>
-                <option value="8150">8150 — HSBC Continental Europe</option>
-                <option value="8200">8200 — PRIVAT BANK</option>
-                <option value="8220">8220 — Payment Execution</option>
-                <option value="8230">8230 — EEPAYS</option>
-                <option value="8240">8240 — Družstevní záložna Kredit</option>
-                <option value="8250">8250 — Bank of China</option>
-                <option value="8255">8255 — Bank of Communications</option>
-                <option value="8265">8265 — Industrial and Commercial Bank of China</option>
-                <option value="8270">8270 — Fairplay Pay</option>
-                <option value="8280">8280 — B-Efekt</option>
-                <option value="8293">8293 — Revolut</option>
-                <option value="8299">8299 — Partners banka</option>
-              </select>
-            </div>
-          </div>
-          {form.bank_account && form.bank_code && (
-            <div style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: 'var(--gray-500)' }}>
-              Celé číslo účtu: <strong>{form.bank_account}/{form.bank_code}</strong>
-            </div>
-          )}
-          <div className="form-row" style={{ marginTop: '1rem' }}>
-            <div className="form-group"><label className="form-label">IBAN</label><input className="form-input" value={form.iban || ''} onChange={e => setForm(f => ({ ...f, iban: e.target.value }))} placeholder="CZ65 0800 0000 1920 0014 5399" /></div>
-            <div className="form-group"><label className="form-label">SWIFT/BIC</label><input className="form-input" value={form.swift || ''} onChange={e => setForm(f => ({ ...f, swift: e.target.value }))} placeholder="GIBACZPX" /></div>
           </div>
         </div>
         <div className="card">
@@ -504,6 +551,15 @@ export default function Company() {
         </div>
         <button type="submit" className="btn btn-primary">Uložit nastavení</button>
       </form>
+
+      <BankAccountsSection
+        accounts={bankAccounts}
+        bankForm={bankForm}
+        setBankForm={setBankForm}
+        bankError={bankError}
+        setBankError={setBankError}
+        onReload={loadBankAccounts}
+      />
 
       <div className="card" style={{ marginTop: '1.5rem' }}>
         <div className="card-title" style={{ marginBottom: '1rem' }}>Logo společnosti</div>

@@ -1438,6 +1438,12 @@ app.get('/api/invoices/:id/pdf', ...tenanted, async (req, res) => {
     if (!invoice) return res.status(404).json({ error: 'Faktura nenalezena' });
     const company = db.prepare('SELECT * FROM company WHERE tenant_id = ?').get(req.tenant_id);
     const items = db.prepare('SELECT * FROM invoice_items WHERE invoice_id = ?').all(req.params.id);
+    // Get bank account matching invoice currency (falls back to company fields)
+    const bankAccount = db.prepare('SELECT * FROM bank_accounts WHERE tenant_id = ? AND currency = ? AND active = 1').get(req.tenant_id, invoice.currency || 'CZK');
+    if (bankAccount) {
+      company.bank_account = bankAccount.account_number;
+      company.iban = bankAccount.iban;
+    }
     const pdfBuffer = await generateInvoicePDF(invoice, company, items);
     res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename=${invoice.invoice_number}.pdf` });
     res.send(pdfBuffer);
