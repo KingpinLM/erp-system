@@ -2,15 +2,34 @@ import React, { useState, useRef, useEffect } from 'react';
 import { api } from '../api';
 import { useNavigate } from 'react-router-dom';
 
-const GREETING_CS = 'Ahoj! Jsem Hyňa, váš asistent pro navigaci v ERP systému. Jak vám mohu pomoci?';
-const GREETING_EN = 'Hello! I\'m Hyňa, your ERP navigation assistant. How can I help you?';
+const GREETING = 'Ahoj! Jsem Hyňa, váš chytrý asistent. Pomohu vám s navigací, fakturami, účetnictvím i živými daty. Na co se chcete zeptat?';
+
+const QUICK_ACTIONS = [
+  { label: 'Kolik mám faktur?', icon: '📊' },
+  { label: 'Faktury po splatnosti', icon: '⏰' },
+  { label: 'Kde vytvořím fakturu?', icon: '📄' },
+  { label: 'Co umíš?', icon: '🤖' },
+];
+
+function BubbleText({ text }) {
+  // Render multiline text with proper line breaks and bullet styling
+  const parts = text.split('\n');
+  if (parts.length <= 1) return <>{text}</>;
+  return parts.map((line, i) => (
+    <React.Fragment key={i}>
+      {i > 0 && <br />}
+      {line.startsWith('• ') ? <span style={{ display: 'block', paddingLeft: 4 }}>{line}</span> : line}
+    </React.Fragment>
+  ));
+}
 
 export default function ChatWidget() {
   const [open, setOpen] = useState(false);
-  const [messages, setMessages] = useState([{ role: 'bot', text: GREETING_CS }]);
+  const [messages, setMessages] = useState([{ role: 'bot', text: GREETING }]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [convId, setConvId] = useState(null);
+  const [showQuick, setShowQuick] = useState(true);
   const messagesEnd = useRef(null);
   const inputRef = useRef(null);
   const navigate = useNavigate();
@@ -23,10 +42,10 @@ export default function ChatWidget() {
     messagesEnd.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const send = async () => {
-    const text = input.trim();
+  const sendMessage = async (text) => {
     if (!text || loading) return;
     setInput('');
+    setShowQuick(false);
     setMessages(m => [...m, { role: 'user', text }]);
     setLoading(true);
     try {
@@ -38,6 +57,8 @@ export default function ChatWidget() {
     }
     setLoading(false);
   };
+
+  const send = () => sendMessage(input.trim());
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
@@ -54,7 +75,7 @@ export default function ChatWidget() {
       <button
         className="chatbot-fab"
         onClick={() => setOpen(o => !o)}
-        title="Hyňa - asistent"
+        title="Hyňa - chytrý asistent"
       >
         {open ? (
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -71,7 +92,7 @@ export default function ChatWidget() {
               <div className="chatbot-avatar">H</div>
               <div>
                 <div className="chatbot-name">Hyňa</div>
-                <div className="chatbot-status">Asistent navigace</div>
+                <div className="chatbot-status">AI asistent ERP systému</div>
               </div>
             </div>
             <button className="chatbot-close" onClick={() => setOpen(false)}>&times;</button>
@@ -80,7 +101,7 @@ export default function ChatWidget() {
             {messages.map((m, i) => (
               <div key={i} className={`chatbot-msg chatbot-msg-${m.role}`}>
                 <div className="chatbot-bubble">
-                  {m.text}
+                  <BubbleText text={m.text} />
                   {m.link && (
                     <button className="chatbot-link" onClick={() => handleLink(m.link)}>
                       Přejít na stránku →
@@ -89,6 +110,16 @@ export default function ChatWidget() {
                 </div>
               </div>
             ))}
+            {/* Quick action chips after greeting */}
+            {showQuick && messages.length === 1 && !loading && (
+              <div className="chatbot-quick-actions">
+                {QUICK_ACTIONS.map((a, i) => (
+                  <button key={i} className="chatbot-quick-btn" onClick={() => sendMessage(a.label)}>
+                    <span>{a.icon}</span> {a.label}
+                  </button>
+                ))}
+              </div>
+            )}
             {loading && (
               <div className="chatbot-msg chatbot-msg-bot">
                 <div className="chatbot-bubble chatbot-typing">
@@ -105,7 +136,7 @@ export default function ChatWidget() {
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Napište zprávu..."
+              placeholder="Zeptejte se na cokoliv..."
               disabled={loading}
             />
             <button className="chatbot-send" onClick={send} disabled={!input.trim() || loading}>

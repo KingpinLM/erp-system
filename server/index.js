@@ -1499,56 +1499,263 @@ function processRecurringInvoices() {
 processRecurringInvoices();
 setInterval(processRecurringInvoices, 6 * 60 * 60 * 1000); // Every 6 hours
 
+// ─── CHATBOT AI ENGINE ────────────────────────────────────────
+// Czech stemming — strip common suffixes for fuzzy matching
+function czStem(word) {
+  if (word.length < 5) return word;
+  let w = word;
+  w = w.replace(/(ování|ností|ovými|ovým|ových)$/i, '')
+    .replace(/(ová|ové|ový|ově)$/i, '')
+    .replace(/(nost|nosti|nostem)$/i, '')
+    .replace(/(ení|ání|ění)$/i, '')
+    .replace(/(ách|ata|aty|ími|emi)$/i, '')
+    .replace(/(ami|ích|ech|ům)$/i, '')
+    .replace(/(kám|kách|kami|ků)$/i, '')
+    .replace(/(ných|ným|nými)$/i, '')
+    .replace(/(ní|ně|ný|ná|né)$/i, '')
+    .replace(/(ky|ce|ku|ek|ka|ko)$/i, '')
+    .replace(/(uje|ují)$/i, '')
+    .replace(/(ovat|ít|ět|out)$/i, '')
+    .replace(/(ovi|ou|em)$/i, '');
+  // Ensure stem is at least 3 chars to avoid false positives
+  return w.length >= 3 ? w : word;
+}
+
+// Dynamic AI queries — real-time system data analysis
+function getDynamicAnswer(q, tenantId, userId, isEn) {
+  const stems = q.split(/\s+/).map(w => czStem(w.replace(/[?.!,;:]/g, '')));
+  const has = (...words) => words.some(w => {
+    if (q.includes(w)) return true;
+    const ws = czStem(w);
+    if (ws.length < 3) return false;
+    return stems.some(s => s.length >= 3 && (s === ws || (s.length >= 4 && ws.length >= 4 && (s.startsWith(ws) || ws.startsWith(s)))));
+  });
+
+  // === REAL-TIME DATA QUERIES ===
+
+  // "How many invoices?" / "Kolik mám faktur?"
+  if (has('kolik', 'počet', 'count', 'how many', 'celkem') && has('faktur', 'invoice', 'faktura', 'doklad')) {
+    const stats = db.prepare(`SELECT COUNT(*) as total, COALESCE(SUM(CASE WHEN status='draft' THEN 1 ELSE 0 END),0) as drafts, COALESCE(SUM(CASE WHEN status='sent' THEN 1 ELSE 0 END),0) as sent, COALESCE(SUM(CASE WHEN status='paid' THEN 1 ELSE 0 END),0) as paid, COALESCE(SUM(CASE WHEN status='overdue' THEN 1 ELSE 0 END),0) as overdue FROM invoices WHERE tenant_id = ?`).get(tenantId);
+    return {
+      answer: isEn
+        ? `You have ${stats.total} invoices in total: ${stats.drafts} drafts, ${stats.sent} sent, ${stats.paid} paid, ${stats.overdue} overdue.`
+        : `Máte celkem ${stats.total} faktur: ${stats.drafts} konceptů, ${stats.sent} odeslaných, ${stats.paid} zaplacených, ${stats.overdue} po splatnosti.`,
+      link: '/invoices'
+    };
+  }
+
+  // "How many clients?" / "Kolik mám klientů?"
+  if (has('kolik', 'počet', 'count', 'how many') && has('klient', 'client', 'zákazník', 'odběratel')) {
+    const cnt = db.prepare('SELECT COUNT(*) as c FROM clients WHERE tenant_id = ?').get(tenantId).c;
+    return {
+      answer: isEn ? `You have ${cnt} clients registered.` : `Máte registrováno ${cnt} klientů.`,
+      link: '/clients'
+    };
+  }
+
+  // Revenue / total / obrat
+  if (has('obrat', 'revenue', 'příjem', 'tržby', 'celkov') && has('faktur', 'invoice', 'měsíc', 'rok', 'year', 'month', 'total')) {
+    const totals = db.prepare(`SELECT COALESCE(SUM(total_czk),0) as total_all, COALESCE(SUM(CASE WHEN status='paid' THEN total_czk ELSE 0 END),0) as paid FROM invoices WHERE tenant_id = ? AND type='issued'`).get(tenantId);
+    const fmt = (n) => Math.round(n || 0).toLocaleString('cs-CZ');
+    return {
+      answer: isEn
+        ? `Total issued invoices: ${fmt(totals.total_all)} CZK. Of which paid: ${fmt(totals.paid)} CZK.`
+        : `Celková hodnota vydaných faktur: ${fmt(totals.total_all)} Kč. Z toho uhrazeno: ${fmt(totals.paid)} Kč.`,
+      link: '/'
+    };
+  }
+
+  // Overdue / po splatnosti / nezaplacené
+  if (has('po splatnosti', 'overdue', 'nezaplacen', 'dluh', 'pohledávk', 'neuhrazen', 'nesplacen')) {
+    const overdue = db.prepare(`SELECT i.invoice_number, i.total, i.currency, c.name as client_name, i.due_date FROM invoices i LEFT JOIN clients c ON i.client_id = c.id WHERE i.tenant_id = ? AND i.status = 'overdue' ORDER BY i.due_date ASC LIMIT 5`).all(tenantId);
+    if (overdue.length === 0) {
+      return { answer: isEn ? 'Great news! You have no overdue invoices.' : 'Skvělá zpráva! Nemáte žádné faktury po splatnosti.', link: '/invoices' };
+    }
+    const list = overdue.map(o => `• ${o.invoice_number} — ${o.client_name || '?'} (${Math.round(o.total)} ${o.currency})`).join('\n');
+    return {
+      answer: isEn
+        ? `You have ${overdue.length} overdue invoice(s):\n${list}`
+        : `Máte ${overdue.length} faktur po splatnosti:\n${list}`,
+      link: '/invoices'
+    };
+  }
+
+  // Unpaid / k zaplacení
+  if (has('zaplatit', 'uhradit', 'k úhradě', 'unpaid', 'nezaplacen', 'čeká na platbu', 'splatnost')) {
+    const unpaid = db.prepare(`SELECT COUNT(*) as c, COALESCE(SUM(total_czk),0) as total FROM invoices WHERE tenant_id = ? AND status IN ('sent','overdue') AND type='issued'`).get(tenantId);
+    const fmt = (n) => Math.round(n || 0).toLocaleString('cs-CZ');
+    return {
+      answer: isEn
+        ? `You have ${unpaid.c} unpaid invoices totaling ${fmt(unpaid.total)} CZK.`
+        : `Máte ${unpaid.c} nezaplacených faktur v celkové hodnotě ${fmt(unpaid.total)} Kč.`,
+      link: '/invoices'
+    };
+  }
+
+  // Company info / údaje firmy
+  if (has('údaje', 'info', 'ičo', 'dič', 'information') && has('firm', 'společnost', 'company', 'naše')) {
+    const comp = db.prepare('SELECT * FROM company WHERE tenant_id = ?').get(tenantId);
+    if (comp) {
+      return {
+        answer: isEn
+          ? `Company: ${comp.name}, ID: ${comp.ico || '—'}, VAT: ${comp.dic || '—'}, Bank: ${comp.bank_account ? comp.bank_account + '/' + (comp.bank_code || '') : '—'}, IBAN: ${comp.iban || '—'}`
+          : `Společnost: ${comp.name}, IČO: ${comp.ico || '—'}, DIČ: ${comp.dic || '—'}, Účet: ${comp.bank_account ? comp.bank_account + '/' + (comp.bank_code || '') : '—'}, IBAN: ${comp.iban || '—'}`,
+        link: '/company'
+      };
+    }
+  }
+
+  // Current user info / můj účet
+  if (has('můj', 'my', 'account', 'kdo jsem', 'profil', 'who am i', 'role', 'oprávnění')) {
+    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
+    const roleLabels = { admin: 'Administrátor', accountant: 'Účetní', manager: 'Manažer', viewer: 'Náhled' };
+    if (user) {
+      return {
+        answer: isEn
+          ? `You are logged in as ${user.full_name} (${user.username}), role: ${user.role}, email: ${user.email}.`
+          : `Jste přihlášen/a jako ${user.full_name} (${user.username}), role: ${roleLabels[user.role] || user.role}, email: ${user.email}.`,
+        link: '/profile'
+      };
+    }
+  }
+
+  // How many users?
+  if (has('kolik', 'počet', 'count', 'how many') && has('uživatel', 'user', 'lidí', 'zaměstnanc')) {
+    const cnt = db.prepare('SELECT COUNT(*) as c FROM users WHERE tenant_id = ? AND active = 1').get(tenantId).c;
+    return {
+      answer: isEn ? `There are ${cnt} active users in the system.` : `V systému je ${cnt} aktivních uživatelů.`,
+      link: '/users'
+    };
+  }
+
+  // Recent invoices
+  if (has('poslední', 'nedávn', 'recent', 'latest', 'nové') && has('faktur', 'invoice')) {
+    const recent = db.prepare(`SELECT i.invoice_number, i.total, i.currency, i.status, c.name as client_name FROM invoices i LEFT JOIN clients c ON i.client_id = c.id WHERE i.tenant_id = ? ORDER BY i.created_at DESC LIMIT 5`).all(tenantId);
+    if (recent.length === 0) return { answer: isEn ? 'No invoices found.' : 'Žádné faktury nenalezeny.', link: '/invoices' };
+    const statusLabels = { draft: 'koncept', sent: 'odeslaná', paid: 'zaplacená', overdue: 'po splatnosti', cancelled: 'stornovaná' };
+    const list = recent.map(r => `• ${r.invoice_number} — ${r.client_name || '?'} — ${Math.round(r.total)} ${r.currency} (${isEn ? r.status : statusLabels[r.status] || r.status})`).join('\n');
+    return {
+      answer: isEn ? `Last 5 invoices:\n${list}` : `Posledních 5 faktur:\n${list}`,
+      link: '/invoices'
+    };
+  }
+
+  // Evidence / expenses summary
+  if (has('kolik', 'počet', 'celk') && has('evidence', 'doklad', 'výdaj', 'náklad', 'expense')) {
+    const stats = db.prepare(`SELECT type, COUNT(*) as c, SUM(amount) as total FROM evidence WHERE tenant_id = ? GROUP BY type`).all(tenantId);
+    const fmt = (n) => Math.round(n || 0).toLocaleString('cs-CZ');
+    const lines = stats.map(s => {
+      const labels = { income: 'příjmy', expense: 'výdaje', asset: 'majetek', document: 'dokumenty' };
+      return `• ${isEn ? s.type : labels[s.type] || s.type}: ${s.c}x (${fmt(s.total)} Kč)`;
+    }).join('\n');
+    return {
+      answer: isEn ? `Evidence summary:\n${lines}` : `Přehled evidence:\n${lines}`,
+      link: '/evidence'
+    };
+  }
+
+  // Today's date / current date
+  if (has('datum', 'dnes', 'today', 'date', 'jaký je den')) {
+    const today = new Date().toLocaleDateString(isEn ? 'en-GB' : 'cs-CZ');
+    return {
+      answer: isEn ? `Today's date is ${today}.` : `Dnešní datum je ${today}.`,
+      link: null
+    };
+  }
+
+  // Currencies / exchange rates
+  if (has('kurz', 'rate', 'exchange', 'převod') && has('euro', 'eur', 'dolar', 'usd', 'gbp', 'měn')) {
+    const rates = db.prepare('SELECT code, name, rate_to_czk FROM currencies ORDER BY code').all();
+    const list = rates.map(r => `• ${r.code} (${r.name}): ${r.rate_to_czk.toFixed(2)} Kč`).join('\n');
+    return {
+      answer: isEn ? `Current exchange rates:\n${list}` : `Aktuální kurzy:\n${list}`,
+      link: '/currencies'
+    };
+  }
+
+  // No dynamic match
+  return null;
+}
+
 // ─── CHATBOT API ──────────────────────────────────────────────
 app.post('/api/chatbot/message', ...tenanted, (req, res) => {
   const { message, conversation_id, lang } = req.body;
   if (!message || !message.trim()) return res.status(400).json({ error: 'Zpráva je povinná' });
 
   const q = message.trim().toLowerCase();
-  const isEn = lang === 'en' || /^(how|where|what|can|do|i need|help me|show me)/i.test(message.trim());
+  const isEn = lang === 'en' || /^(how|where|what|can|do|i need|help me|show me|my |the )/i.test(message.trim());
 
-  // Search knowledge base by keyword matching
-  const allKnowledge = db.prepare('SELECT * FROM chatbot_knowledge WHERE (tenant_id = ? OR tenant_id IS NULL) AND active = 1 ORDER BY priority DESC').all(req.tenantId);
-
-  let bestMatch = null;
-  let bestScore = 0;
-
-  for (const k of allKnowledge) {
-    const keywords = k.keywords.toLowerCase().split(',').map(s => s.trim());
-    let score = 0;
-    for (const kw of keywords) {
-      if (q.includes(kw)) {
-        score += kw.length + k.priority;
-      }
-      // Also check individual words from the query
-      const words = q.split(/\s+/);
-      for (const w of words) {
-        if (w.length > 2 && kw.includes(w)) score += w.length;
-      }
-    }
-    if (score > bestScore) {
-      bestScore = score;
-      bestMatch = k;
-    }
-  }
+  // 1) Try dynamic AI queries first (real-time data)
+  const dynamicResult = getDynamicAnswer(q, req.tenant_id, req.user.id, isEn);
 
   let answer, link;
-  if (bestMatch && bestScore >= 3) {
-    answer = isEn ? (bestMatch.answer_en || bestMatch.answer_cs) : bestMatch.answer_cs;
-    link = bestMatch.link;
+  if (dynamicResult) {
+    answer = dynamicResult.answer;
+    link = dynamicResult.link;
   } else {
-    // Log unanswered question
-    db.prepare('INSERT INTO chatbot_unanswered (tenant_id, user_id, question) VALUES (?, ?, ?)').run(req.tenantId, req.user.id, message.trim());
-    answer = isEn
-      ? "I'm sorry, I don't know the answer to that yet. Your question has been logged and an administrator will add an answer soon!"
-      : 'Omlouvám se, na tuto otázku zatím neznám odpověď. Váš dotaz byl zaznamenán a administrátor brzy doplní odpověď!';
-    link = null;
+    // 2) Search knowledge base by advanced keyword matching with stemming
+    const allKnowledge = db.prepare('SELECT * FROM chatbot_knowledge WHERE (tenant_id = ? OR tenant_id IS NULL) AND active = 1 ORDER BY priority DESC').all(req.tenant_id);
+
+    const queryWords = q.split(/\s+/).filter(w => w.length > 1);
+    const queryStems = queryWords.map(w => czStem(w.replace(/[?.!,;:]/g, '')));
+
+    let bestMatch = null;
+    let bestScore = 0;
+
+    for (const k of allKnowledge) {
+      const keywords = k.keywords.toLowerCase().split(',').map(s => s.trim());
+      let score = 0;
+
+      for (const kw of keywords) {
+        // Exact substring match
+        if (q.includes(kw)) {
+          score += kw.length * 2 + k.priority;
+          continue;
+        }
+        // Stem matching — more forgiving
+        const kwStem = czStem(kw);
+        for (const qs of queryStems) {
+          if (qs.length > 2 && kwStem.length > 2) {
+            if (qs === kwStem) score += kw.length + k.priority;
+            else if (qs.includes(kwStem) || kwStem.includes(qs)) score += Math.min(qs.length, kwStem.length);
+          }
+        }
+        // Word-level matching
+        const kwWords = kw.split(/\s+/);
+        for (const kww of kwWords) {
+          for (const qw of queryWords) {
+            if (qw.length > 2 && kww.length > 2 && (qw.includes(kww) || kww.includes(qw))) score += Math.min(qw.length, kww.length);
+          }
+        }
+      }
+      // Also check against question text itself
+      const qText = (k.question_cs + ' ' + (k.question_en || '')).toLowerCase();
+      for (const qw of queryWords) {
+        if (qw.length > 3 && qText.includes(qw)) score += 2;
+      }
+      if (score > bestScore) {
+        bestScore = score;
+        bestMatch = k;
+      }
+    }
+
+    if (bestMatch && bestScore >= 4) {
+      answer = isEn ? (bestMatch.answer_en || bestMatch.answer_cs) : bestMatch.answer_cs;
+      link = bestMatch.link;
+    } else {
+      // 3) Log unanswered question for self-learning
+      db.prepare('INSERT INTO chatbot_unanswered (tenant_id, user_id, question) VALUES (?, ?, ?)').run(req.tenant_id, req.user.id, message.trim());
+      answer = isEn
+        ? "I'm sorry, I don't know the answer to that yet. Your question has been logged and an administrator will add an answer soon! Try asking about invoices, clients, payments, or navigation."
+        : 'Omlouvám se, na tuto otázku zatím neznám odpověď. Váš dotaz byl zaznamenán a administrátor brzy doplní odpověď! Zkuste se zeptat na faktury, klienty, platby nebo navigaci.';
+      link = null;
+    }
   }
 
   // Save conversation
   let convId = conversation_id;
   if (convId) {
-    const conv = db.prepare('SELECT * FROM chatbot_conversations WHERE id = ? AND tenant_id = ?').get(convId, req.tenantId);
+    const conv = db.prepare('SELECT * FROM chatbot_conversations WHERE id = ? AND tenant_id = ?').get(convId, req.tenant_id);
     if (conv) {
       const msgs = JSON.parse(conv.messages);
       msgs.push({ role: 'user', text: message.trim(), ts: new Date().toISOString() });
@@ -1560,7 +1767,7 @@ app.post('/api/chatbot/message', ...tenanted, (req, res) => {
       { role: 'user', text: message.trim(), ts: new Date().toISOString() },
       { role: 'bot', text: answer, link, ts: new Date().toISOString() }
     ];
-    const r = db.prepare('INSERT INTO chatbot_conversations (tenant_id, user_id, messages) VALUES (?, ?, ?)').run(req.tenantId, req.user.id, JSON.stringify(msgs));
+    const r = db.prepare('INSERT INTO chatbot_conversations (tenant_id, user_id, messages) VALUES (?, ?, ?)').run(req.tenant_id, req.user.id, JSON.stringify(msgs));
     convId = r.lastInsertRowid;
   }
 
@@ -1569,7 +1776,7 @@ app.post('/api/chatbot/message', ...tenanted, (req, res) => {
 
 // Admin: get knowledge base
 app.get('/api/chatbot/knowledge', ...tenanted, authorize('admin'), (req, res) => {
-  const items = db.prepare('SELECT * FROM chatbot_knowledge WHERE tenant_id = ? OR tenant_id IS NULL ORDER BY priority DESC, category, id').all(req.tenantId);
+  const items = db.prepare('SELECT * FROM chatbot_knowledge WHERE tenant_id = ? OR tenant_id IS NULL ORDER BY priority DESC, category, id').all(req.tenant_id);
   res.json(items);
 });
 
@@ -1577,7 +1784,7 @@ app.get('/api/chatbot/knowledge', ...tenanted, authorize('admin'), (req, res) =>
 app.post('/api/chatbot/knowledge', ...tenanted, authorize('admin'), (req, res) => {
   const { keywords, question_cs, question_en, answer_cs, answer_en, link, category, priority } = req.body;
   if (!keywords || !question_cs || !answer_cs) return res.status(400).json({ error: 'keywords, question_cs a answer_cs jsou povinné' });
-  const r = db.prepare('INSERT INTO chatbot_knowledge (tenant_id, keywords, question_cs, question_en, answer_cs, answer_en, link, category, priority) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run(req.tenantId, keywords, question_cs, question_en || '', answer_cs, answer_en || '', link || '', category || 'navigation', priority || 0);
+  const r = db.prepare('INSERT INTO chatbot_knowledge (tenant_id, keywords, question_cs, question_en, answer_cs, answer_en, link, category, priority) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run(req.tenant_id, keywords, question_cs, question_en || '', answer_cs, answer_en || '', link || '', category || 'navigation', priority || 0);
   res.json({ id: r.lastInsertRowid });
 });
 
@@ -1585,30 +1792,30 @@ app.post('/api/chatbot/knowledge', ...tenanted, authorize('admin'), (req, res) =
 app.put('/api/chatbot/knowledge/:id', ...tenanted, authorize('admin'), (req, res) => {
   const { keywords, question_cs, question_en, answer_cs, answer_en, link, category, priority, active } = req.body;
   db.prepare('UPDATE chatbot_knowledge SET keywords=?, question_cs=?, question_en=?, answer_cs=?, answer_en=?, link=?, category=?, priority=?, active=? WHERE id=? AND tenant_id=?')
-    .run(keywords, question_cs, question_en || '', answer_cs, answer_en || '', link || '', category || 'navigation', priority || 0, active ?? 1, req.params.id, req.tenantId);
+    .run(keywords, question_cs, question_en || '', answer_cs, answer_en || '', link || '', category || 'navigation', priority || 0, active ?? 1, req.params.id, req.tenant_id);
   res.json({ ok: true });
 });
 
 // Admin: delete knowledge entry
 app.delete('/api/chatbot/knowledge/:id', ...tenanted, authorize('admin'), (req, res) => {
-  db.prepare('DELETE FROM chatbot_knowledge WHERE id = ? AND tenant_id = ?').run(req.params.id, req.tenantId);
+  db.prepare('DELETE FROM chatbot_knowledge WHERE id = ? AND tenant_id = ?').run(req.params.id, req.tenant_id);
   res.json({ ok: true });
 });
 
 // Admin: get unanswered questions
 app.get('/api/chatbot/unanswered', ...tenanted, authorize('admin'), (req, res) => {
-  const items = db.prepare(`SELECT u.*, usr.full_name as user_name FROM chatbot_unanswered u LEFT JOIN users usr ON u.user_id = usr.id WHERE u.tenant_id = ? ORDER BY u.resolved ASC, u.created_at DESC`).all(req.tenantId);
+  const items = db.prepare(`SELECT u.*, usr.full_name as user_name FROM chatbot_unanswered u LEFT JOIN users usr ON u.user_id = usr.id WHERE u.tenant_id = ? ORDER BY u.resolved ASC, u.created_at DESC`).all(req.tenant_id);
   res.json(items);
 });
 
 // Admin: resolve unanswered question (create knowledge entry from it)
 app.post('/api/chatbot/unanswered/:id/resolve', ...tenanted, authorize('admin'), (req, res) => {
   const { keywords, answer_cs, answer_en, link, category } = req.body;
-  const item = db.prepare('SELECT * FROM chatbot_unanswered WHERE id = ? AND tenant_id = ?').get(req.params.id, req.tenantId);
+  const item = db.prepare('SELECT * FROM chatbot_unanswered WHERE id = ? AND tenant_id = ?').get(req.params.id, req.tenant_id);
   if (!item) return res.status(404).json({ error: 'Nenalezeno' });
   if (keywords && answer_cs) {
     db.prepare('INSERT INTO chatbot_knowledge (tenant_id, keywords, question_cs, question_en, answer_cs, answer_en, link, category, priority) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
-      .run(req.tenantId, keywords, item.question, '', answer_cs, answer_en || '', link || '', category || 'custom', 5);
+      .run(req.tenant_id, keywords, item.question, '', answer_cs, answer_en || '', link || '', category || 'custom', 5);
   }
   db.prepare('UPDATE chatbot_unanswered SET resolved = 1, answer = ? WHERE id = ?').run(answer_cs || 'Vyřešeno', req.params.id);
   res.json({ ok: true });
@@ -1616,7 +1823,7 @@ app.post('/api/chatbot/unanswered/:id/resolve', ...tenanted, authorize('admin'),
 
 // Admin: delete unanswered question
 app.delete('/api/chatbot/unanswered/:id', ...tenanted, authorize('admin'), (req, res) => {
-  db.prepare('DELETE FROM chatbot_unanswered WHERE id = ? AND tenant_id = ?').run(req.params.id, req.tenantId);
+  db.prepare('DELETE FROM chatbot_unanswered WHERE id = ? AND tenant_id = ?').run(req.params.id, req.tenant_id);
   res.json({ ok: true });
 });
 

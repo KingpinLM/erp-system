@@ -1351,6 +1351,43 @@ a:hover { opacity: 0.85; }
   opacity: 0.85;
 }
 
+.chatbot-quick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px 0;
+}
+.chatbot-quick-btn {
+  background: var(--primary-50, #eef2ff);
+  color: var(--primary);
+  border: 1px solid var(--primary-100, #e0e7ff);
+  border-radius: 20px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+.chatbot-quick-btn:hover {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+[data-theme="dark"] .chatbot-quick-btn {
+  background: var(--gray-700);
+  color: var(--primary-300, #a5b4fc);
+  border-color: var(--gray-600);
+}
+[data-theme="dark"] .chatbot-quick-btn:hover {
+  background: var(--primary);
+  color: white;
+}
+
 [data-theme="dark"] .chatbot-window {
   background: var(--card-bg);
   border-color: var(--gray-700);
