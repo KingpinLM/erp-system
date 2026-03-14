@@ -6,7 +6,7 @@ import SignaturePad from '../components/SignaturePad';
 const roleLabels = { admin: 'Administrátor', accountant: 'Účetní', manager: 'Manažer', viewer: 'Náhled' };
 
 export default function Profile() {
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
   const [signature, setSignature] = useState(user?.signature || null);
   const [mode, setMode] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -28,9 +28,7 @@ export default function Profile() {
       setSignature(dataUrl);
       setMode(null);
       setMsg('Podpis uložen!');
-      const saved = JSON.parse(localStorage.getItem('erp_user') || '{}');
-      saved.signature = dataUrl;
-      localStorage.setItem('erp_user', JSON.stringify(saved));
+      updateUser({ signature: dataUrl });
       setTimeout(() => setMsg(''), 3000);
     } catch (e) {
       setMsg('Chyba při ukládání: ' + e.message);
@@ -51,9 +49,7 @@ export default function Profile() {
     setSaving(true);
     await api.updateSignature(null);
     setSignature(null);
-    const saved = JSON.parse(localStorage.getItem('erp_user') || '{}');
-    saved.signature = null;
-    localStorage.setItem('erp_user', JSON.stringify(saved));
+    updateUser({ signature: null });
     setMsg('Podpis odstraněn');
     setSaving(false);
     setTimeout(() => setMsg(''), 3000);
@@ -70,10 +66,7 @@ export default function Profile() {
       const data = { first_name: form.first_name, last_name: form.last_name, email: form.email };
       if (form.password) data.password = form.password;
       const updated = await api.updateProfile(data);
-      // Update local storage
-      const saved = JSON.parse(localStorage.getItem('erp_user') || '{}');
-      Object.assign(saved, { full_name: updated.full_name, first_name: updated.first_name, last_name: updated.last_name, email: updated.email });
-      localStorage.setItem('erp_user', JSON.stringify(saved));
+      updateUser({ full_name: updated.full_name, first_name: updated.first_name, last_name: updated.last_name, email: updated.email });
       setEditing(false);
       setForm(f => ({ ...f, password: '', password2: '' }));
       setMsg('Profil aktualizován!');

@@ -31,7 +31,7 @@ export const AuthContext = createContext(null);
 export const useAuth = () => useContext(AuthContext);
 
 function AuthProvider({ children }) {
-  const [user] = useState(() => {
+  const [user, setUser] = useState(() => {
     if (window.__AUTH__?.user) {
       localStorage.setItem('erp_user', JSON.stringify(window.__AUTH__.user));
       return window.__AUTH__.user;
@@ -53,6 +53,14 @@ function AuthProvider({ children }) {
     try { return JSON.parse(localStorage.getItem('erp_tenant')); } catch { return null; }
   });
 
+  const updateUser = (updates) => {
+    setUser(prev => {
+      const next = { ...prev, ...updates };
+      localStorage.setItem('erp_user', JSON.stringify(next));
+      return next;
+    });
+  };
+
   const logout = () => {
     localStorage.removeItem('erp_token');
     localStorage.removeItem('erp_user');
@@ -64,7 +72,7 @@ function AuthProvider({ children }) {
   const isSuperadmin = user?.role === 'superadmin';
 
   return (
-    <AuthContext.Provider value={{ user, token, tenant, logout, can, isSuperadmin }}>
+    <AuthContext.Provider value={{ user, updateUser, token, tenant, logout, can, isSuperadmin }}>
       {children}
     </AuthContext.Provider>
   );

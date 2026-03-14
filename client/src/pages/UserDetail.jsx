@@ -13,10 +13,17 @@ export default function UserDetail() {
   usePageTitle(user ? `${user.first_name} ${user.last_name}` : undefined);
   const [sigMode, setSigMode] = useState(null);
   const [sigMsg, setSigMsg] = useState('');
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({ first_name: '', last_name: '', email: '' });
+  const [msg, setMsg] = useState('');
   const fileRef = useRef();
 
   useEffect(() => {
-    api.getUser(id).then(setUser).finally(() => setLoading(false));
+    api.getUser(id).then(u => {
+      setUser(u);
+      setForm({ first_name: u.first_name || '', last_name: u.last_name || '', email: u.email || '' });
+    }).finally(() => setLoading(false));
   }, [id]);
 
   const saveSig = async (dataUrl) => {
@@ -34,51 +41,106 @@ export default function UserDetail() {
     setTimeout(() => setSigMsg(''), 3000);
   };
 
+  const handleSave = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await api.updateUser(id, {
+        first_name: form.first_name,
+        last_name: form.last_name,
+        email: form.email,
+        role: user.role,
+        active: user.active
+      });
+      const full_name = `${form.first_name} ${form.last_name}`.trim();
+      setUser(u => ({ ...u, first_name: form.first_name, last_name: form.last_name, email: form.email, full_name }));
+      setEditing(false);
+      setMsg('Údaje uloženy!');
+      setTimeout(() => setMsg(''), 3000);
+    } catch (e) {
+      setMsg('Chyba: ' + e.message);
+    }
+    setSaving(false);
+  };
+
   if (loading) return <div className="loading">Načítání...</div>;
   if (!user) return <div className="empty-state">Uživatel nenalezen</div>;
 
+  const labelStyle = { fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--gray-500)', marginBottom: 4 };
+
   return (
     <div>
+      {msg && <div style={{ marginBottom: 16, padding: '10px 16px', background: msg.includes('Chyba') ? '#fee2e2' : '#d1fae5', borderRadius: 8, color: msg.includes('Chyba') ? '#dc2626' : '#059669', fontSize: 13 }}>{msg}</div>}
+
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
         <div className="card">
           <div className="card-title" style={{ marginBottom: '1rem' }}>Osobní údaje</div>
-          <div style={{ display: 'grid', gap: '1rem' }}>
-            <div>
-              <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--gray-500)', marginBottom: 4 }}>Jméno</div>
-              <div style={{ fontSize: '1rem', fontWeight: 600 }}>{user.first_name || '—'}</div>
+          {!editing ? (
+            <div style={{ display: 'grid', gap: '1rem' }}>
+              <div>
+                <div style={labelStyle}>Jméno</div>
+                <div style={{ fontSize: '1rem', fontWeight: 600 }}>{user.first_name || '—'}</div>
+              </div>
+              <div>
+                <div style={labelStyle}>Příjmení</div>
+                <div style={{ fontSize: '1rem', fontWeight: 600 }}>{user.last_name || '—'}</div>
+              </div>
+              <div>
+                <div style={labelStyle}>Uživatelské jméno (login)</div>
+                <div style={{ fontSize: '1rem', fontWeight: 600, fontFamily: 'monospace' }}>{user.username}</div>
+              </div>
+              <div>
+                <div style={labelStyle}>Email</div>
+                <div style={{ fontSize: '1rem' }}>{user.email}</div>
+              </div>
+              <button className="btn btn-primary btn-sm" style={{ justifySelf: 'start' }} onClick={() => setEditing(true)}>Upravit údaje</button>
             </div>
-            <div>
-              <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--gray-500)', marginBottom: 4 }}>Příjmení</div>
-              <div style={{ fontSize: '1rem', fontWeight: 600 }}>{user.last_name || '—'}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--gray-500)', marginBottom: 4 }}>Uživatelské jméno (login)</div>
-              <div style={{ fontSize: '1rem', fontWeight: 600 }}>{user.username}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--gray-500)', marginBottom: 4 }}>Email</div>
-              <div style={{ fontSize: '1rem' }}>{user.email}</div>
-            </div>
-          </div>
+          ) : (
+            <form onSubmit={handleSave}>
+              <div style={{ display: 'grid', gap: '0.75rem' }}>
+                <div className="form-group">
+                  <label className="form-label">Jméno *</label>
+                  <input className="form-input" value={form.first_name} onChange={e => setForm(f => ({ ...f, first_name: e.target.value }))} required />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Příjmení</label>
+                  <input className="form-input" value={form.last_name} onChange={e => setForm(f => ({ ...f, last_name: e.target.value }))} />
+                </div>
+                <div>
+                  <div style={labelStyle}>Uživatelské jméno (login)</div>
+                  <div style={{ fontSize: '1rem', fontWeight: 600, fontFamily: 'monospace', color: 'var(--gray-400)' }}>{user.username}</div>
+                  <small style={{ color: 'var(--gray-400)', fontSize: 11 }}>Nelze změnit</small>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Email *</label>
+                  <input className="form-input" type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} required />
+                </div>
+                <div className="btn-group" style={{ marginTop: '0.25rem' }}>
+                  <button type="submit" className="btn btn-primary btn-sm" disabled={saving}>{saving ? 'Ukládám...' : 'Uložit'}</button>
+                  <button type="button" className="btn btn-outline btn-sm" onClick={() => { setEditing(false); setForm({ first_name: user.first_name || '', last_name: user.last_name || '', email: user.email || '' }); }}>Zrušit</button>
+                </div>
+              </div>
+            </form>
+          )}
         </div>
 
         <div className="card">
           <div className="card-title" style={{ marginBottom: '1rem' }}>Systémové údaje</div>
           <div style={{ display: 'grid', gap: '1rem' }}>
             <div>
-              <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--gray-500)', marginBottom: 4 }}>Role</div>
+              <div style={labelStyle}>Role</div>
               <div><span className={`badge badge-${user.role}`}>{roleLabels[user.role]}</span></div>
             </div>
             <div>
-              <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--gray-500)', marginBottom: 4 }}>Status</div>
+              <div style={labelStyle}>Status</div>
               <div><span className={`badge ${user.active ? 'badge-paid' : 'badge-cancelled'}`}>{user.active ? 'Aktivní' : 'Neaktivní'}</span></div>
             </div>
             <div>
-              <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--gray-500)', marginBottom: 4 }}>Vytvořen</div>
+              <div style={labelStyle}>Vytvořen</div>
               <div style={{ fontSize: '1rem' }}>{user.created_at ? (() => { const p = user.created_at.slice(0,10).split('-'); return p.length === 3 ? `${p[2]}.${p[1]}.${p[0]}` : user.created_at; })() : '—'}</div>
             </div>
             <div>
-              <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--gray-500)', marginBottom: 4 }}>Vystavených faktur</div>
+              <div style={labelStyle}>Vystavených faktur</div>
               <div style={{ fontSize: '1.25rem', fontWeight: 700 }}>{user.invoice_count}</div>
             </div>
           </div>
