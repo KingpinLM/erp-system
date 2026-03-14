@@ -1556,7 +1556,7 @@ function getDynamicAnswer(q, tenantId, userId, isEn) {
   }
 
   // "How many clients?" / "Kolik mám klientů?"
-  if (has('kolik', 'počet', 'count', 'how many') && has('klient', 'client', 'zákazník', 'odběratel')) {
+  if (has('kolik', 'počet', 'count', 'how many') && has('klient', 'client', 'zákazník', 'odběratel', 'customer')) {
     const cnt = db.prepare('SELECT COUNT(*) as c FROM clients WHERE tenant_id = ?').get(tenantId).c;
     return {
       answer: isEn ? `You have ${cnt} clients registered.` : `Máte registrováno ${cnt} klientů.`,
@@ -1592,7 +1592,7 @@ function getDynamicAnswer(q, tenantId, userId, isEn) {
   }
 
   // Unpaid / k zaplacení
-  if (has('zaplatit', 'uhradit', 'k úhradě', 'unpaid', 'nezaplacen', 'čeká na platbu', 'splatnost')) {
+  if (has('zaplatit', 'uhradit', 'k úhradě', 'unpaid', 'nezaplacen', 'čeká na platbu', 'splatnost', 'owe', 'dlužím')) {
     const unpaid = db.prepare(`SELECT COUNT(*) as c, COALESCE(SUM(total_czk),0) as total FROM invoices WHERE tenant_id = ? AND status IN ('sent','overdue') AND type='issued'`).get(tenantId);
     const fmt = (n) => Math.round(n || 0).toLocaleString('cs-CZ');
     return {
@@ -1685,7 +1685,7 @@ function getDynamicAnswer(q, tenantId, userId, isEn) {
   }
 
   // Top clients by revenue
-  if (has('top', 'nejlepší', 'nejvíce', 'největší', 'best') && has('klient', 'client', 'zákazník', 'odběratel')) {
+  if (has('top', 'nejlepší', 'nejvíce', 'největší', 'best') && has('klient', 'client', 'zákazník', 'odběratel', 'customer')) {
     const top = db.prepare(`SELECT c.name, COUNT(i.id) as cnt, COALESCE(SUM(i.total_czk),0) as total FROM clients c LEFT JOIN invoices i ON i.client_id = c.id AND i.tenant_id = c.tenant_id WHERE c.tenant_id = ? GROUP BY c.id ORDER BY total DESC LIMIT 5`).all(tenantId);
     if (top.length === 0) return { answer: isEn ? 'No clients found.' : 'Žádní klienti nenalezeni.', link: '/clients' };
     const fmt = (n) => Math.round(n || 0).toLocaleString('cs-CZ');
@@ -1825,9 +1825,9 @@ app.post('/api/chatbot/message', ...tenanted, (req, res) => {
       link = bestMatch.link;
     } else {
       // 3) Smart fallback — try to detect intent before giving up
-      const greetings = /^(ahoj|čau|nazdar|dobrý den|zdravím|hello|hi|hey|good morning|good afternoon)\b/i;
+      const greetings = /^(ahoj|čau|čus|nazdar|zdar|dobrý den|dobré ráno|dobrý večer|zdravím|hello|hi|hey|hej|good morning|good afternoon|good evening)\b/i;
       const thanks = /^(děkuji|díky|dík|thanks|thank you|díky moc)\b/i;
-      const bye = /^(na shledanou|bye|sbohem|nashle|goodbye|čau|zatím)\b/i;
+      const bye = /^(na shledanou|bye|sbohem|nashle|goodbye|čau|zatím|měj se)\b/i;
 
       if (greetings.test(q)) {
         answer = isEn
@@ -1837,8 +1837,12 @@ app.post('/api/chatbot/message', ...tenanted, (req, res) => {
         answer = isEn ? "You're welcome! Anything else I can help with?" : 'Nemáte zač! Mohu ještě s něčím pomoct?';
       } else if (bye.test(q)) {
         answer = isEn ? 'Goodbye! I am here whenever you need help.' : 'Na shledanou! Jsem tu, kdykoliv budete potřebovat.';
-      } else if (q.length < 3) {
+      } else if (q.length < 3 || /^[.!?,;:\s]+$/.test(q)) {
         answer = isEn ? 'Could you please be more specific? Try asking about invoices, clients, or navigation.' : 'Můžete být konkrétnější? Zkuste se zeptat na faktury, klienty nebo navigaci.';
+      } else if (/\b(confused|lost|ztracen|nevím co|pomoo+c|simple|jednoduch|zjednodušen|navigate me|make it)\b/i.test(q)) {
+        answer = isEn
+          ? "No worries! Try asking a specific question like:\n• \"How to create an invoice?\"\n• \"Where are clients?\"\n• \"How many invoices do I have?\"\nI'm here to help!"
+          : 'Žádný problém! Zkuste se zeptat konkrétně, například:\n• "Jak vytvořím fakturu?"\n• "Kde najdu klienty?"\n• "Kolik mám faktur?"\nJsem tu, abych pomohl!';
       } else {
         // Log unanswered question for self-learning
         db.prepare('INSERT INTO chatbot_unanswered (tenant_id, user_id, question) VALUES (?, ?, ?)').run(req.tenant_id, req.user.id, message.trim());
