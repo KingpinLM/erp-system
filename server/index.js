@@ -1532,6 +1532,8 @@ function getDynamicAnswer(q, tenantId, userId, isEn) {
   const has = (...words) => words.some(w => {
     const wNorm = noDiac(w);
     if (q.includes(w) || qNorm.includes(wNorm)) return true;
+    // Skip stem matching for multi-word phrases — only substring match
+    if (w.includes(' ')) return false;
     const ws = czStem(wNorm);
     if (ws.length < 3) return false;
     return stems.some(s => s.length >= 3 && (s === ws || (s.length >= 4 && ws.length >= 4 && (s.startsWith(ws) || ws.startsWith(s)))));
@@ -1585,7 +1587,7 @@ function getDynamicAnswer(q, tenantId, userId, isEn) {
   }
 
   // Revenue / total / obrat
-  if (has('obrat', 'revenue', 'příjem', 'tržby', 'celkov') && has('faktur', 'invoice', 'měsíc', 'rok', 'year', 'month', 'total')) {
+  if (has('obrat', 'revenue', 'tržby') || (has('příjem', 'celkov') && has('faktur', 'invoice', 'měsíc', 'rok', 'year', 'month', 'total'))) {
     const totals = db.prepare(`SELECT COALESCE(SUM(total_czk),0) as total_all, COALESCE(SUM(CASE WHEN status='paid' THEN total_czk ELSE 0 END),0) as paid FROM invoices WHERE tenant_id = ? AND type='issued'`).get(tenantId);
     const fmt = (n) => Math.round(n || 0).toLocaleString('cs-CZ');
     return {
@@ -1681,7 +1683,7 @@ function getDynamicAnswer(q, tenantId, userId, isEn) {
   }
 
   // Currencies / exchange rates
-  if ((has('kurz', 'rate', 'exchange', 'převod') || (has('kolik', 'stojí', 'cena') && has('euro', 'eur', 'dolar', 'usd', 'gbp'))) && has('euro', 'eur', 'dolar', 'usd', 'gbp', 'měn')) {
+  if ((has('kurz', 'rate', 'exchange', 'převod') || (has('kolik', 'stojí', 'cena') && has('euro', 'eura', 'eur', 'dolar', 'usd', 'gbp'))) && has('euro', 'eura', 'eur', 'dolar', 'dolaru', 'usd', 'gbp', 'měn', 'librami', 'libra', 'libr')) {
     const rates = db.prepare('SELECT code, name, rate_to_czk FROM currencies ORDER BY code').all();
     const list = rates.map(r => `• ${r.code} (${r.name}): ${r.rate_to_czk.toFixed(2)} Kč`).join('\n');
     return {
@@ -1900,13 +1902,112 @@ function smartReason(q, qNorm, tenantId, userId, isEn, bestMatch, bestScore) {
   return null;
 }
 
+// ─── CONVERSATION CONTEXT ─────────────────────────────────────
+// Detects follow-up questions and enriches them with context from previous exchange
+function resolveFollowUp(q, conversationId, tenantId) {
+  if (!conversationId) return q;
+
+  const conv = db.prepare('SELECT messages FROM chatbot_conversations WHERE id = ? AND tenant_id = ?').get(conversationId, tenantId);
+  if (!conv) return q;
+
+  const msgs = JSON.parse(conv.messages);
+  if (msgs.length < 2) return q;
+
+  // Get the last bot answer and last user question
+  const lastBot = [...msgs].reverse().find(m => m.role === 'bot');
+  const lastUser = [...msgs].reverse().find(m => m.role === 'user');
+  if (!lastBot || !lastUser) return q;
+
+  const qNorm = noDiac(q);
+  const qWords = qNorm.split(/\s+/).filter(w => w.length > 1);
+
+  // Exclude greetings, thanks, bye — these are never follow-ups
+  const greetBye = /^(ahoj|cau|cus|nazdar|zdar|dobry den|dobre rano|dobry vecer|zdravim|hello|hi|hey|hej|dekuji|diky|dik|thanks|thank you|diky moc|na shledanou|nashledanou|nashle|bye|sbohem|goodbye|zatim|mej se|good morning|good afternoon|good evening)\b/i;
+  if (greetBye.test(qNorm)) return q;
+
+  // Detect follow-up patterns
+  const isFollowUp = (
+    // Starts with conjunction / connector
+    /^(a |ale |tak |takze |no |no a |hmm |ok |dobre |fajn |super |jo |ano |ne )/i.test(qNorm + ' ') ||
+    // Contains back-reference pronouns (Czech: nich, jim, toho, tomu, tom, tím, těch, těm, těmi, jich, nimi)
+    // Note: 'je' excluded (too common — means "is"), 'to' excluded (too common), 'ty' excluded
+    /\b(z nich|o nich|na ne|o tom|k tomu|nich|jim|jej|toho|tomu|tech|tem|temi|jich|nimi)\b/i.test(qNorm) ||
+    // English back-references
+    /\b(them|those|these|this one|the same|which one)\b/i.test(qNorm) ||
+    // Very short question likely referencing context (under 4 words)
+    (qWords.length <= 3) ||
+    // "co dál" / "a dál" / "tell me more" / "více" / "detail"
+    /\b(co dal|a dal|vice|detail|podrob|rozsir|upresni|tell me more|more detail|elaborate|go on|rekni mi vic)\b/i.test(qNorm) ||
+    // "ukaž mi je" / "zobraz" / "vypiš" without clear topic
+    (/\b(ukaz|zobraz|vypis|list|show)\b/i.test(qNorm) && qWords.length <= 4)
+  );
+
+  if (!isFollowUp) return q;
+
+  // Extract topic keywords from previous exchange (both user question and bot answer)
+  const prevContext = noDiac((lastUser.text + ' ' + lastBot.text).toLowerCase());
+
+  // Identify the topic from previous context
+  const topicMap = [
+    { patterns: ['faktur', 'invoice', 'doklad'], topic: 'faktury' },
+    { patterns: ['klient', 'client', 'zakaznik', 'odberatel'], topic: 'klienty' },
+    { patterns: ['produkt', 'product', 'sluzb', 'zbozi', 'poloz'], topic: 'produkty' },
+    { patterns: ['evidenc', 'vydaj', 'naklad', 'prijem', 'expense'], topic: 'evidenci' },
+    { patterns: ['uzivatel', 'user', 'ucet', 'account'], topic: 'uživatele' },
+    { patterns: ['platb', 'payment', 'uhrad', 'zaplac'], topic: 'platby' },
+    { patterns: ['splatnost', 'overdue', 'po splatnosti', 'dluz'], topic: 'faktury po splatnosti' },
+    { patterns: ['bank', 'ucet', 'account'], topic: 'bankovní účty' },
+    { patterns: ['nastav', 'setting', 'konfigurac'], topic: 'nastavení' },
+    { patterns: ['obrat', 'revenue', 'trzb', 'prijem'], topic: 'obrat' },
+    { patterns: ['kurz', 'exchange', 'men', 'euro', 'dollar'], topic: 'kurzy' },
+  ];
+
+  let detectedTopic = '';
+  for (const { patterns, topic } of topicMap) {
+    if (patterns.some(p => prevContext.includes(p))) {
+      detectedTopic = topic;
+      break;
+    }
+  }
+
+  if (!detectedTopic) {
+    // Fallback: extract significant words from previous user question
+    const prevWords = noDiac(lastUser.text.toLowerCase()).split(/\s+/).filter(w => w.length > 3);
+    const stopWords = new Set(['kolik','kdyz','jake','jaky','jakou','proc','ktere','ktery','moje','moji','mohu','muzu','chci','prosim','porad','treba','jeste','taky','take','potom','potaz','odpoved','otazk']);
+    const significant = prevWords.filter(w => !stopWords.has(w)).slice(0, 3);
+    if (significant.length > 0) detectedTopic = significant.join(' ');
+  }
+
+  if (!detectedTopic) return q;
+
+  // Check if the follow-up query already has its own distinct topic
+  // If so, don't pollute it with previous context
+  for (const { patterns, topic } of topicMap) {
+    if (topic === detectedTopic) continue; // skip same topic
+    if (patterns.some(p => qNorm.includes(p))) {
+      // Query has its own different topic — treat as independent question
+      return q;
+    }
+  }
+
+  // If the follow-up already contains the detected topic, don't duplicate
+  const qHasTopic = noDiac(detectedTopic).split(/\s+/).some(tw => tw.length > 3 && qNorm.includes(tw));
+  if (qHasTopic) return q;
+
+  // Append topic context to the query
+  return q + ' ' + detectedTopic;
+}
+
 // ─── CHATBOT API ──────────────────────────────────────────────
 app.post('/api/chatbot/message', ...tenanted, (req, res) => {
   const { message, conversation_id, lang } = req.body;
   if (!message || !message.trim()) return res.status(400).json({ error: 'Zpráva je povinná' });
 
-  const q = message.trim().toLowerCase();
+  const rawQ = message.trim().toLowerCase();
   const isEn = lang === 'en' || /^(how|where|what|can|do|i need|help me|show me|my |the )/i.test(message.trim());
+
+  // Resolve follow-up: enrich query with conversation context if needed
+  const q = resolveFollowUp(rawQ, conversation_id, req.tenant_id);
 
   // 1) Try dynamic AI queries first (real-time data)
   const dynamicResult = getDynamicAnswer(q, req.tenant_id, req.user.id, isEn);
@@ -1939,11 +2040,14 @@ app.post('/api/chatbot/message', ...tenanted, (req, res) => {
           continue;
         }
         // Stem matching — more forgiving (diacritics-normalized)
-        const kwStem = czStem(kwNorm);
-        for (const qs of queryStems) {
-          if (qs.length > 2 && kwStem.length > 2) {
-            if (qs === kwStem) score += kw.length + k.priority;
-            else if (qs.includes(kwStem) || kwStem.includes(qs)) score += Math.min(qs.length, kwStem.length);
+        // Skip stem matching for multi-word keywords (only substring + word-level)
+        if (!kw.includes(' ')) {
+          const kwStem = czStem(kwNorm);
+          for (const qs of queryStems) {
+            if (qs.length > 2 && kwStem.length > 2) {
+              if (qs === kwStem) score += kw.length + k.priority;
+              else if (qs.includes(kwStem) || kwStem.includes(qs)) score += Math.min(qs.length, kwStem.length);
+            }
           }
         }
         // Word-level matching (diacritics-normalized)
