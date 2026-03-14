@@ -497,6 +497,8 @@ export default function Users() {
   const [showGroupMembers, setShowGroupMembers] = useState(null);
   const [groupMemberIds, setGroupMemberIds] = useState([]);
   const [roleOverrides, setRoleOverrides] = useState({});
+  const [pendingStatus, setPendingStatus] = useState({}); // { [userId]: 0|1 }
+  const [savingStatus, setSavingStatus] = useState(false);
   const { can } = useAuth();
 
   const load = () => {
@@ -586,6 +588,24 @@ export default function Users() {
       ...f,
       permissions: f.permissions.includes(key) ? f.permissions.filter(p => p !== key) : [...f.permissions, key]
     }));
+  };
+
+  const hasPendingStatus = Object.keys(pendingStatus).length > 0;
+
+  const saveAllStatus = async () => {
+    setSavingStatus(true);
+    setError('');
+    try {
+      for (const [userId, newActive] of Object.entries(pendingStatus)) {
+        const u = users.find(x => x.id === Number(userId));
+        if (u) {
+          await api.updateUser(u.id, { email: u.email, first_name: u.first_name, last_name: u.last_name, role: u.role, active: newActive });
+        }
+      }
+      setPendingStatus({});
+      load();
+    } catch (e) { setError(e.message); }
+    setSavingStatus(false);
   };
 
   const handleQuickRoleChange = async (userId, newRole) => {
@@ -770,24 +790,34 @@ export default function Users() {
                           )}
                         </td>
                         <td>
-                          {can('admin') ? (
-                            <button
-                              className={`badge ${u.active ? 'badge-paid' : 'badge-cancelled'}`}
-                              style={{ cursor: 'pointer', border: 'none', transition: 'all 0.15s' }}
-                              title={u.active ? 'Klikněte pro deaktivaci' : 'Klikněte pro aktivaci'}
-                              onClick={async () => {
-                                const newActive = u.active ? 0 : 1;
-                                const action = newActive ? 'aktivovat' : 'deaktivovat';
-                                if (!confirm(`Opravdu chcete ${action} uživatele ${u.username}?${!newActive ? '\n\nDeaktivovaný uživatel se nebude moci přihlásit.' : ''}`)) return;
-                                try {
-                                  await api.updateUser(u.id, { email: u.email, first_name: u.first_name, last_name: u.last_name, role: u.role, active: newActive });
-                                  load();
-                                } catch (e) { setError(e.message); }
-                              }}
-                            >
-                              {u.active ? 'Aktivní' : 'Neaktivní'}
-                            </button>
-                          ) : (
+                          {can('admin') ? (() => {
+                            const currentVal = pendingStatus.hasOwnProperty(u.id) ? pendingStatus[u.id] : u.active;
+                            const changed = pendingStatus.hasOwnProperty(u.id) && pendingStatus[u.id] !== u.active;
+                            return (
+                              <select
+                                className="form-select"
+                                value={currentVal}
+                                onChange={e => {
+                                  const val = Number(e.target.value);
+                                  setPendingStatus(prev => {
+                                    const next = { ...prev };
+                                    if (val === u.active) { delete next[u.id]; } else { next[u.id] = val; }
+                                    return next;
+                                  });
+                                }}
+                                style={{
+                                  width: 120, fontSize: '0.8rem', padding: '0.3rem 0.5rem',
+                                  color: currentVal ? '#059669' : '#ef4444',
+                                  fontWeight: 600,
+                                  borderColor: changed ? 'var(--primary)' : undefined,
+                                  background: changed ? 'var(--primary-50, #eef2ff)' : undefined,
+                                }}
+                              >
+                                <option value={1} style={{ color: '#059669' }}>Aktivní</option>
+                                <option value={0} style={{ color: '#ef4444' }}>Neaktivní</option>
+                              </select>
+                            );
+                          })() : (
                             <span className={`badge ${u.active ? 'badge-paid' : 'badge-cancelled'}`}>{u.active ? 'Aktivní' : 'Neaktivní'}</span>
                           )}
                         </td>
@@ -806,6 +836,17 @@ export default function Users() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            )}
+            {can('admin') && hasPendingStatus && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '1rem', padding: '0.75rem 1rem', background: 'var(--primary-50, #eef2ff)', borderRadius: 'var(--radius)', border: '1px solid var(--primary, #6366f1)' }}>
+                <span style={{ fontSize: '0.85rem', color: 'var(--gray-700)', flex: 1 }}>
+                  {Object.keys(pendingStatus).length} {Object.keys(pendingStatus).length === 1 ? 'změna' : 'změny'} ke uložení
+                </span>
+                <button className="btn btn-outline btn-sm" onClick={() => setPendingStatus({})}>Zrušit změny</button>
+                <button className="btn btn-primary btn-sm" onClick={saveAllStatus} disabled={savingStatus}>
+                  {savingStatus ? 'Ukládám...' : 'Uložit změny'}
+                </button>
               </div>
             )}
           </div>
