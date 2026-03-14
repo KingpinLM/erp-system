@@ -322,7 +322,7 @@ function GlobalSearch() {
   });
 
   return (
-    <div ref={ref} style={{ position: 'relative', flex: 1, maxWidth: 420 }}>
+    <div ref={ref} style={{ position: 'relative', flex: 1, maxWidth: 420, minWidth: 0 }}>
       <div style={{ position: 'relative' }}>
         <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', pointerEvents: 'none' }}>
           {loading ? <span className="search-spinner" /> : <NavIcon name="search" size={16} />}
@@ -340,7 +340,7 @@ function GlobalSearch() {
         )}
       </div>
       {open && q.length >= 2 && (
-        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--card-bg, white)', border: '1px solid var(--gray-200)', borderRadius: 12, boxShadow: '0 12px 40px rgba(0,0,0,0.12)', zIndex: 1000, maxHeight: 420, overflow: 'auto', marginTop: 6, padding: '4px' }}>
+        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--card-bg, white)', border: '1px solid var(--gray-200)', borderRadius: 12, boxShadow: '0 12px 40px rgba(0,0,0,0.12)', zIndex: 1000, maxHeight: 'min(420px, 70vh)', overflow: 'auto', marginTop: 6, padding: '4px' }}>
           {loading && (
             <div style={{ padding: '16px', textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>
               <span className="search-spinner" style={{ marginRight: 8 }} />Hledám...

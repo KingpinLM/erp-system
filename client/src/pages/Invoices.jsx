@@ -8,6 +8,8 @@ import { useConfirm } from '../components/ConfirmDialog';
 import { SkeletonTable } from '../components/Skeleton';
 import EmptyState from '../components/EmptyState';
 
+const isTouchDevice = () => window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+
 const statusLabels = { draft: 'Koncept', sent: 'Odesláno', paid: 'Zaplaceno', overdue: 'Po splatnosti', cancelled: 'Zrušeno' };
 const statusColors = { draft: '#64748b', sent: '#4f46e5', paid: '#059669', overdue: '#dc2626', cancelled: '#d97706' };
 const statusBg = { draft: '#f1f5f9', sent: '#eef2ff', paid: '#ecfdf5', overdue: '#fef2f2', cancelled: '#fffbeb' };
@@ -99,6 +101,8 @@ export default function Invoices() {
   const [hoverDetail, setHoverDetail] = useState(null);
   const hoverTimer = useRef(null);
   const hoverCache = useRef({});
+  const [tapPreview, setTapPreview] = useState(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -163,6 +167,18 @@ export default function Invoices() {
     setHoverDetail(null);
   }, []);
 
+  const handleRowTap = useCallback((inv) => {
+    if (!isTouchDevice()) return;
+    if (hoverCache.current[inv.id]) {
+      setTapPreview(hoverCache.current[inv.id]);
+      return;
+    }
+    api.getInvoice(inv.id).then(detail => {
+      hoverCache.current[inv.id] = detail;
+      setTapPreview(detail);
+    }).catch(() => {});
+  }, []);
+
   const sorted = useMemo(() => {
     const arr = [...invoices];
     arr.sort((a, b) => {
@@ -222,7 +238,12 @@ export default function Invoices() {
         </div>
       )}
 
-      <div className="filters" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+      <button className="mobile-filter-toggle" onClick={() => setFiltersOpen(f => !f)}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+        Filtry a řazení {(filters.status || filters.currency) ? `(aktivní)` : ''}
+        <span style={{ marginLeft: 'auto' }}>{filtersOpen ? '▲' : '▼'}</span>
+      </button>
+      <div className={`filters filters-collapsible ${filtersOpen ? 'filters-open' : ''}`} style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
         <select className="form-select" value={filters.status} onChange={e => setFilters(f => ({ ...f, status: e.target.value }))}>
           <option value="">Všechny stavy</option>
           <option value="draft">Koncept</option>
@@ -279,6 +300,7 @@ export default function Invoices() {
                     onMouseEnter={(e) => handleRowMouseEnter(inv, e)}
                     onMouseMove={handleRowMouseMove}
                     onMouseLeave={handleRowMouseLeave}
+                    onTouchEnd={(e) => { if (e.target.closest('a, button, input')) return; handleRowTap(inv); }}
                   >
                     <td><input type="checkbox" checked={selected.has(inv.id)} onChange={e => { const s = new Set(selected); if (e.target.checked) s.add(inv.id); else s.delete(inv.id); setSelected(s); }} /></td>
                     <td><Link to={`/invoices/${inv.id}`} style={{ color: 'var(--primary)', fontWeight: 600 }}>{inv.invoice_number}</Link>{inv.invoice_type && inv.invoice_type !== 'regular' && <span style={{ fontSize: 10, color: '#94a3b8', marginLeft: 4 }}>({typeLabels[inv.invoice_type]})</span>}</td>
@@ -305,9 +327,55 @@ export default function Invoices() {
       </div>
       )}
 
-      {/* Hover preview anchored to invoice row */}
+      {/* Hover preview (desktop) */}
       {hoveredInv && hoverDetail && hoverDetail.id === hoveredInv && (
         <InvoiceHoverPreview invoice={hoverDetail} style={{ top: hoverPos.top, left: hoverPos.left }} />
+      )}
+
+      {/* Tap preview (mobile bottom sheet) */}
+      {tapPreview && (
+        <div className="tap-preview-overlay" onClick={() => setTapPreview(null)}>
+          <div className="tap-preview-sheet" onClick={e => e.stopPropagation()}>
+            <div className="tap-preview-handle" />
+            <div style={{ padding: '0 16px 16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 800, color: '#6366f1', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    {tapPreview.invoice_type === 'credit_note' ? 'Dobropis' : tapPreview.invoice_type === 'proforma' ? 'Proforma' : 'Faktura'}
+                  </div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: '#0f172a' }}>{tapPreview.invoice_number}</div>
+                </div>
+                <span style={{ padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', background: statusBg[tapPreview.status], color: statusColors[tapPreview.status] }}>
+                  {statusLabels[tapPreview.status]}
+                </span>
+              </div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: '#0f172a', marginBottom: 8 }}>{tapPreview.client_name || '—'}</div>
+              <div style={{ display: 'flex', gap: 16, marginBottom: 12, fontSize: 13, color: '#64748b' }}>
+                <div><span>Vystaveno: </span><strong>{fmtDate(tapPreview.issue_date)}</strong></div>
+                <div><span>Splatnost: </span><strong style={{ color: tapPreview.status === 'overdue' ? '#dc2626' : '#334155' }}>{fmtDate(tapPreview.due_date)}</strong></div>
+              </div>
+              {(tapPreview.items || []).length > 0 && (
+                <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: 10, marginBottom: 10 }}>
+                  {(tapPreview.items || []).slice(0, 5).map((item, i) => (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#475569', padding: '3px 0' }}>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, marginRight: 8 }}>{item.description}</span>
+                      <span style={{ fontWeight: 600, flexShrink: 0 }}>{fmt(item.total || (item.quantity * item.unit_price), tapPreview.currency)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', paddingTop: 10, borderTop: '2px solid #0f172a' }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#64748b' }}>Celkem</span>
+                <span style={{ fontSize: 20, fontWeight: 800, color: '#0f172a' }}>{fmt(tapPreview.total, tapPreview.currency)}</span>
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+                <Link to={`/invoices/${tapPreview.id}`} className="btn btn-primary btn-sm" style={{ flex: 1, justifyContent: 'center' }} onClick={() => setTapPreview(null)}>Detail</Link>
+                <Link to={`/invoices/${tapPreview.id}/edit`} className="btn btn-outline btn-sm" style={{ flex: 1, justifyContent: 'center' }} onClick={() => setTapPreview(null)}>Upravit</Link>
+                <button className="btn btn-outline btn-sm" style={{ flex: 0 }} onClick={() => setTapPreview(null)}>Zavřít</button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

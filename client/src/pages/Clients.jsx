@@ -8,6 +8,8 @@ import { useConfirm } from '../components/ConfirmDialog';
 import { SkeletonTable } from '../components/Skeleton';
 import EmptyState from '../components/EmptyState';
 
+const isTouchDevice = () => window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+
 const fmt = (n, cur = 'CZK') => new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: cur, maximumFractionDigits: 2 }).format(n);
 const fmtDate = (d) => { if (!d) return '—'; const p = d.slice(0,10).split('-'); return p.length === 3 ? `${p[2]}.${p[1]}.${p[0]}` : d; };
 const statusLabels = { draft: 'Koncept', sent: 'Odesláno', paid: 'Zaplaceno', overdue: 'Po splatnosti', cancelled: 'Zrušeno' };
@@ -127,6 +129,8 @@ export default function Clients() {
   if (form.ico && !/^\d{7,8}$/.test(form.ico)) clientErrors.ico = 'IČO musí mít 7-8 číslic';
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(20);
+  const [tapPreview, setTapPreview] = useState(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   // Hover preview state
   const [hoveredId, setHoveredId] = useState(null);
@@ -184,6 +188,20 @@ export default function Clients() {
     abortRef.current?.abort();
     setHoveredId(null);
     setHoverDetail(null);
+  }, []);
+
+  const handleRowTap = useCallback((c) => {
+    if (!isTouchDevice()) return;
+    if (hoverCache.current[c.id]) {
+      setTapPreview(hoverCache.current[c.id]);
+      return;
+    }
+    api.getClientInvoices(c.id)
+      .then(invoices => {
+        const detail = { client: c, invoices };
+        hoverCache.current[c.id] = detail;
+        setTapPreview(detail);
+      }).catch(() => {});
   }, []);
 
   const load = () => { setLoading(true); api.getClients().then(setClients).finally(() => setLoading(false)); };
@@ -267,7 +285,12 @@ export default function Clients() {
         {can('admin', 'accountant', 'manager') && <button className="btn btn-primary" onClick={openNew}>+ Nový klient</button>}
       </div>
 
-      <div className="filters" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+      <button className="mobile-filter-toggle" onClick={() => setFiltersOpen(f => !f)}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+        Řazení
+        <span style={{ marginLeft: 'auto' }}>{filtersOpen ? '▲' : '▼'}</span>
+      </button>
+      <div className={`filters filters-collapsible ${filtersOpen ? 'filters-open' : ''}`} style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
         <select className="form-select" value={sortBy} onChange={e => setSortBy(e.target.value)}>
           <option value="name">Řadit dle názvu</option>
           <option value="ico">Řadit dle IČO</option>
@@ -301,6 +324,7 @@ export default function Clients() {
                     onMouseEnter={(e) => handleRowMouseEnter(c, e)}
                     onMouseMove={handleRowMouseMove}
                     onMouseLeave={handleRowMouseLeave}
+                    onTouchEnd={(e) => { if (e.target.closest('a, button, input')) return; handleRowTap(c); }}
                   >
                     <td><Link to={`/clients/${c.id}`} style={{ color: 'var(--primary)', fontWeight: 600, textDecoration: 'none' }}>{c.name}</Link></td>
                     <td className="hide-mobile">{c.ico || '—'}</td>
@@ -327,6 +351,54 @@ export default function Clients() {
       {/* Hover preview */}
       {hoveredId && hoverDetail && hoverDetail.client?.id === hoveredId && (
         <ClientHoverPreview client={hoverDetail.client} invoices={hoverDetail.invoices} style={{ top: hoverPos.top, left: hoverPos.left }} />
+      )}
+
+      {/* Tap preview (mobile bottom sheet) */}
+      {tapPreview && (
+        <div className="tap-preview-overlay" onClick={() => setTapPreview(null)}>
+          <div className="tap-preview-sheet" onClick={e => e.stopPropagation()}>
+            <div className="tap-preview-handle" />
+            <div style={{ padding: '0 16px 16px' }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: '#6366f1', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Klient</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: '#0f172a', marginBottom: 12 }}>{tapPreview.client?.name}</div>
+              <div style={{ display: 'flex', gap: 16, marginBottom: 10 }}>
+                {tapPreview.client?.ico && <div><div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>IČO</div><div style={{ fontSize: 14, fontWeight: 600, fontFamily: 'monospace' }}>{tapPreview.client.ico}</div></div>}
+                {tapPreview.client?.dic && <div><div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>DIČ</div><div style={{ fontSize: 14, fontWeight: 600, fontFamily: 'monospace' }}>{tapPreview.client.dic}</div></div>}
+              </div>
+              {(tapPreview.client?.email || tapPreview.client?.phone) && (
+                <div style={{ marginBottom: 10, fontSize: 13, color: '#64748b' }}>
+                  {tapPreview.client.email && <div>{tapPreview.client.email}</div>}
+                  {tapPreview.client.phone && <div>{tapPreview.client.phone}</div>}
+                </div>
+              )}
+              {(tapPreview.client?.address || tapPreview.client?.city) && (
+                <div style={{ marginBottom: 12, fontSize: 13, color: '#64748b' }}>
+                  {tapPreview.client.address}{tapPreview.client.address && tapPreview.client.city ? ', ' : ''}{tapPreview.client.city}{tapPreview.client.zip ? ` ${tapPreview.client.zip}` : ''}
+                </div>
+              )}
+              {(tapPreview.invoices || []).length > 0 && (
+                <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 10 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
+                    <div><div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>Fakturováno</div><div style={{ fontSize: 15, fontWeight: 700 }}>{fmt((tapPreview.invoices || []).reduce((s, i) => s + (i.total_czk || 0), 0))}</div></div>
+                    <div><div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>Zaplaceno</div><div style={{ fontSize: 15, fontWeight: 700, color: '#059669' }}>{fmt((tapPreview.invoices || []).filter(i => i.status === 'paid').reduce((s, i) => s + (i.total_czk || 0), 0))}</div></div>
+                  </div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 4 }}>Poslední faktury</div>
+                  {(tapPreview.invoices || []).slice(0, 3).map(inv => (
+                    <div key={inv.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', fontSize: 13 }}>
+                      <span style={{ fontWeight: 600 }}>{inv.invoice_number}</span>
+                      <span style={{ padding: '1px 6px', borderRadius: 4, fontSize: 10, fontWeight: 700, background: statusBg[inv.status], color: statusColors[inv.status] }}>{statusLabels[inv.status]}</span>
+                      <span style={{ color: '#64748b', fontWeight: 600 }}>{fmt(inv.total || 0, inv.currency || 'CZK')}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+                <Link to={`/clients/${tapPreview.client?.id}`} className="btn btn-primary btn-sm" style={{ flex: 1, justifyContent: 'center' }} onClick={() => setTapPreview(null)}>Detail</Link>
+                <button className="btn btn-outline btn-sm" style={{ flex: 0 }} onClick={() => setTapPreview(null)}>Zavřít</button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {showModal && (

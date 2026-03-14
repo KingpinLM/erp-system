@@ -271,11 +271,95 @@
   .topbar-title-link { font-size: 0.88rem; }
   /* Stack all grids to single column */
   .form-row { gap: 0 !important; }
+  /* Hide global search on very small, use command palette instead */
+  .cmd-k-hint { padding: 6px 10px; }
+  .cmd-k-hint svg { width: 16px; height: 16px; }
 }
 
 /* Touch device: disable hover previews */
 @media (hover: none) and (pointer: coarse) {
   .hover-preview-mobile-hide { display: none !important; }
+}
+
+/* ─── MOBILE TAP PREVIEW MODAL ─────────────────── */
+.tap-preview-overlay {
+  position: fixed; inset: 0; z-index: 10001;
+  background: rgba(0,0,0,0.4); backdrop-filter: blur(4px);
+  display: flex; align-items: flex-end; justify-content: center;
+  animation: fadeIn 0.1s ease-out;
+}
+.tap-preview-sheet {
+  background: white; border-radius: 20px 20px 0 0;
+  width: 100%; max-width: 480px; max-height: 75vh;
+  overflow-y: auto; padding: 0;
+  animation: slideUp 0.25s ease-out;
+  box-shadow: 0 -8px 40px rgba(0,0,0,0.15);
+}
+.tap-preview-handle {
+  width: 36px; height: 4px; background: var(--gray-300);
+  border-radius: 2px; margin: 12px auto 8px;
+}
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+/* ─── MOBILE CARD ITEMS (InvoiceForm) ──────────── */
+.invoice-item-cards { display: none; }
+@media (max-width: 768px) {
+  .invoice-items-table { display: none !important; }
+  .invoice-item-cards { display: block; }
+  .invoice-item-card {
+    border: 1px solid var(--gray-200); border-radius: var(--radius-lg);
+    padding: 1rem; margin-bottom: 0.75rem; background: white;
+  }
+  .invoice-item-card .form-group { margin-bottom: 0.75rem; }
+  .invoice-item-card .item-card-row {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;
+  }
+  .invoice-item-card .item-card-total {
+    display: flex; justify-content: space-between; align-items: center;
+    padding-top: 0.75rem; border-top: 1px solid var(--gray-100);
+    font-weight: 700; font-size: 0.95rem;
+  }
+}
+
+/* ─── COLLAPSIBLE MOBILE FILTERS ───────────────── */
+.mobile-filter-toggle {
+  display: none; width: 100%; padding: 0.6rem 1rem;
+  background: white; border: 1px solid var(--gray-200);
+  border-radius: var(--radius); font-size: 0.85rem;
+  font-weight: 600; color: var(--gray-700); cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+}
+.mobile-filter-toggle svg { margin-right: 0.5rem; vertical-align: middle; }
+@media (max-width: 768px) {
+  .mobile-filter-toggle { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; }
+  .filters-collapsible { display: none; }
+  .filters-collapsible.filters-open { display: flex; flex-direction: column; gap: 0.5rem; }
+  .filters-collapsible.filters-open .form-select,
+  .filters-collapsible.filters-open .form-input { width: 100%; min-width: 0; }
+}
+
+/* ─── TABLE ACTION BUTTONS MOBILE ──────────────── */
+@media (max-width: 768px) {
+  td .btn-group { gap: 0.25rem; }
+  td .btn-group .btn-sm {
+    padding: 0.4rem 0.6rem; font-size: 0.72rem;
+    min-height: 36px; min-width: 36px;
+    justify-content: center;
+  }
+  /* Hide button text on very small action btns, show only first letter */
+  .btn-group-compact .btn-sm span.btn-label { display: none; }
+}
+
+/* ─── SIDEBAR 480px FIX ────────────────────────── */
+@media (max-width: 480px) {
+  .sidebar { width: min(80vw, 280px); }
+  .sidebar-brand svg { width: 130px; }
+  .sidebar-user { margin: 0.5rem; padding: 0.6rem 0.75rem; }
+  .sidebar-link { padding: 0.5rem 0.65rem; font-size: 0.8rem; }
 }
 
 /* ─── CARDS ─────────────────────────────────────── */

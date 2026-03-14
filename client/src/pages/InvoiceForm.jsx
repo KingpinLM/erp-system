@@ -424,7 +424,8 @@ export default function InvoiceForm() {
             <div className="card-title">Položky</div>
             <button type="button" className="btn btn-outline btn-sm" onClick={addItem}>+ Přidat položku</button>
           </div>
-          <div className="table-responsive">
+          {/* Desktop table view */}
+          <div className="table-responsive invoice-items-table">
             <table>
               <thead>
                 <tr>
@@ -497,6 +498,68 @@ export default function InvoiceForm() {
                 ))}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile card view */}
+          <div className="invoice-item-cards">
+            {form.items.map((item, idx) => (
+              <div key={idx} className="invoice-item-card">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <strong style={{ fontSize: 13, color: 'var(--gray-500)' }}>Položka {idx + 1}</strong>
+                  {form.items.length > 1 && (
+                    <button type="button" className="btn btn-danger btn-sm" onClick={() => removeItem(idx)} style={{ padding: '4px 10px' }}>×</button>
+                  )}
+                </div>
+                {products.length > 0 && (
+                  <div className="form-group">
+                    <select className="form-select" value="" onChange={e => {
+                      const p = products.find(pr => pr.id == e.target.value);
+                      if (p) {
+                        updateItem(idx, 'description', p.name);
+                        updateItem(idx, 'unit', p.unit);
+                        updateItem(idx, 'unit_price', p.unit_price);
+                        if (vatPayer) updateItem(idx, 'tax_rate', p.vat_rate);
+                      }
+                    }}>
+                      <option value="">Z ceníku...</option>
+                      {products.map(p => <option key={p.id} value={p.id}>{p.name} ({p.unit_price} Kč)</option>)}
+                    </select>
+                  </div>
+                )}
+                <div className="form-group">
+                  <label className="form-label">Popis</label>
+                  <input className="form-input" value={item.description} onChange={e => updateItem(idx, 'description', e.target.value)} placeholder="Popis položky" />
+                </div>
+                <div className="item-card-row">
+                  <div className="form-group">
+                    <label className="form-label">Množství</label>
+                    <input className="form-input" type="number" step="0.01" value={item.quantity} onChange={e => updateItem(idx, 'quantity', parseFloat(e.target.value) || 0)} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Jednotka</label>
+                    <input className="form-input" value={item.unit} onChange={e => updateItem(idx, 'unit', e.target.value)} />
+                  </div>
+                </div>
+                <div className="item-card-row">
+                  <div className="form-group">
+                    <label className="form-label">Cena/ks</label>
+                    <input className="form-input" type="number" step="0.01" value={item.unit_price} onChange={e => updateItem(idx, 'unit_price', parseFloat(e.target.value) || 0)} />
+                  </div>
+                  {vatPayer && (
+                    <div className="form-group">
+                      <label className="form-label">DPH</label>
+                      <select className="form-select" value={item.tax_rate} onChange={e => updateItem(idx, 'tax_rate', parseFloat(e.target.value))}>
+                        {vatRates.map(r => <option key={r} value={r}>{r}%</option>)}
+                      </select>
+                    </div>
+                  )}
+                </div>
+                <div className="item-card-total">
+                  <span>Celkem</span>
+                  <span>{fmtCur(itemTotals[idx].base)} {form.currency}{vatPayer ? ` (s DPH: ${fmtCur(itemTotals[idx].total)})` : ''}</span>
+                </div>
+              </div>
+            ))}
           </div>
           <div className="invoice-totals" style={{ marginTop: '1rem' }}>
             <div className="row"><span>Základ:</span><span>{fmtCur(subtotal)} {form.currency}</span></div>

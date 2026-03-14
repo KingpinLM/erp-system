@@ -24,6 +24,7 @@ export default function Evidence() {
   const [uploading, setUploading] = useState(false);
   const [uploadResults, setUploadResults] = useState(null);
   const [dragOver, setDragOver] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [categories, setCategories] = useState([]);
   const [showCategoryTab, setShowCategoryTab] = useState(false);
   const [categoryRules, setCategoryRules] = useState([]);
@@ -324,7 +325,12 @@ export default function Evidence() {
             )}
           </div>
 
-          <div className="filters" style={{ marginTop: '0.75rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <button className="mobile-filter-toggle" onClick={() => setFiltersOpen(f => !f)}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+            Filtry a řazení {categoryFilter ? '(aktivní)' : ''}
+            <span style={{ marginLeft: 'auto' }}>{filtersOpen ? '▲' : '▼'}</span>
+          </button>
+          <div className={`filters filters-collapsible ${filtersOpen ? 'filters-open' : ''}`} style={{ marginTop: '0.75rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
             <select className="form-select" value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)}>
               <option value="">Všechny kategorie</option>
               {categories.map(c => <option key={c} value={c}>{c}</option>)}

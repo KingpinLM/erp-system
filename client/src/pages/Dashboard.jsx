@@ -5,6 +5,8 @@ import { api } from '../api';
 import { useAuth } from '../App';
 import Pagination from '../components/Pagination';
 
+const isTouchDevice = () => window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+
 const fmt = (n) => new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: 'CZK', maximumFractionDigits: 0 }).format(n);
 const fmtNum = (n) => new Intl.NumberFormat('cs-CZ').format(n);
 const fmtDate = (d) => { if (!d) return '—'; const p = d.slice(0,10).split('-'); return p.length === 3 ? `${p[2]}.${p[1]}.${p[0]}` : d; };
@@ -137,6 +139,7 @@ export default function Dashboard() {
   const [clientSort, setClientSort] = useState('issued_total');
   const [clientSortDir, setClientSortDir] = useState('desc');
   const { can } = useAuth();
+  const [tapPreview, setTapPreview] = useState(null);
 
   const loadData = () => {
     setLoading(true);
@@ -560,7 +563,14 @@ export default function Dashboard() {
               </div>
               <div className="dash-invoice-list">
                 {recentInvoices.map(inv => (
-                  <Link to={`/invoices/${inv.id}`} key={inv.id} className="dash-invoice-row">
+                  <Link to={`/invoices/${inv.id}`} key={inv.id} className="dash-invoice-row"
+                    onTouchEnd={(e) => {
+                      if (isTouchDevice()) {
+                        e.preventDefault();
+                        setTapPreview(inv);
+                      }
+                    }}
+                  >
                     <div className="dash-invoice-info">
                       <span className="dash-invoice-num">{inv.invoice_number}</span>
                       <span className="dash-invoice-client">{inv.client_name || '—'}</span>

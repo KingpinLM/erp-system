@@ -20,6 +20,7 @@ export default function Accounting() {
   const [editItem, setEditItem] = useState(null);
   const [showJournalForm, setShowJournalForm] = useState(false);
   const [filter, setFilter] = useState({ from: '', to: '', status: '' });
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(20);
 
@@ -157,15 +158,18 @@ export default function Accounting() {
         <>
           <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
             {can('admin', 'accountant') && <button className="btn btn-primary" onClick={() => setShowJournalForm(true)}>+ Nový zápis</button>}
-            <input type="date" className="form-input" value={filter.from} onChange={e => setFilter(f => ({ ...f, from: e.target.value }))} placeholder="Od" />
-            <input type="date" className="form-input" value={filter.to} onChange={e => setFilter(f => ({ ...f, to: e.target.value }))} placeholder="Do" />
-            <select className="form-input" value={filter.status} onChange={e => setFilter(f => ({ ...f, status: e.target.value }))}>
-              <option value="">Vše</option>
-              <option value="draft">Koncept</option>
-              <option value="posted">Zaúčtováno</option>
-              <option value="cancelled">Stornováno</option>
-            </select>
-            <button className="btn btn-secondary" onClick={load}>Filtrovat</button>
+            <button className="btn btn-secondary mobile-filter-toggle" onClick={() => setFiltersOpen(f => !f)}>Filtry {filtersOpen ? '▲' : '▼'}</button>
+            <div className={`filters-collapsible${filtersOpen ? ' filters-open' : ''}`} style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+              <input type="date" className="form-input" value={filter.from} onChange={e => setFilter(f => ({ ...f, from: e.target.value }))} placeholder="Od" />
+              <input type="date" className="form-input" value={filter.to} onChange={e => setFilter(f => ({ ...f, to: e.target.value }))} placeholder="Do" />
+              <select className="form-input" value={filter.status} onChange={e => setFilter(f => ({ ...f, status: e.target.value }))}>
+                <option value="">Vše</option>
+                <option value="draft">Koncept</option>
+                <option value="posted">Zaúčtováno</option>
+                <option value="cancelled">Stornováno</option>
+              </select>
+              <button className="btn btn-secondary" onClick={load}>Filtrovat</button>
+            </div>
           </div>
 
           {showJournalForm && <JournalEntryForm accounts={accounts.length ? accounts : null} onClose={() => setShowJournalForm(false)} onSave={() => { setShowJournalForm(false); load(); }} />}
@@ -207,10 +211,13 @@ export default function Accounting() {
       {/* PŘEDVAHA */}
       {tab === 'ledger' && (
         <>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'center' }}>
-            <input type="date" className="form-input" value={filter.from} onChange={e => setFilter(f => ({ ...f, from: e.target.value }))} />
-            <input type="date" className="form-input" value={filter.to} onChange={e => setFilter(f => ({ ...f, to: e.target.value }))} />
-            <button className="btn btn-secondary" onClick={load}>Zobrazit</button>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+            <button className="btn btn-secondary mobile-filter-toggle" onClick={() => setFiltersOpen(f => !f)}>Filtry {filtersOpen ? '▲' : '▼'}</button>
+            <div className={`filters-collapsible${filtersOpen ? ' filters-open' : ''}`} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <input type="date" className="form-input" value={filter.from} onChange={e => setFilter(f => ({ ...f, from: e.target.value }))} />
+              <input type="date" className="form-input" value={filter.to} onChange={e => setFilter(f => ({ ...f, to: e.target.value }))} />
+              <button className="btn btn-secondary" onClick={load}>Zobrazit</button>
+            </div>
           </div>
           {loading ? <p>Načítání...</p> : (
             <table className="table">
@@ -283,31 +290,58 @@ function JournalEntryForm({ onClose, onSave }) {
             <label>Datum *<input type="date" className="form-input" value={date} onChange={e => setDate(e.target.value)} required /></label>
             <label>Popis *<input className="form-input" value={description} onChange={e => setDescription(e.target.value)} required /></label>
           </div>
-          <table className="table" style={{ marginTop: 12 }}>
-            <thead><tr><th>Účet</th><th>MD (Kč)</th><th>D (Kč)</th><th>Popis</th><th></th></tr></thead>
-            <tbody>
-              {lines.map((l, i) => (
-                <tr key={i}>
-                  <td>
-                    <select className="form-input" value={l.account_id} onChange={e => updateLine(i, 'account_id', e.target.value)} required style={{ width: '100%', minWidth: 0 }}>
-                      <option value="">Vyberte účet</option>
-                      {accounts.map(a => <option key={a.id} value={a.id}>{a.account_number} – {a.name}</option>)}
-                    </select>
-                  </td>
-                  <td><input type="number" step="0.01" className="form-input" value={l.debit} onChange={e => updateLine(i, 'debit', e.target.value)} style={{ width: 100 }} /></td>
-                  <td><input type="number" step="0.01" className="form-input" value={l.credit} onChange={e => updateLine(i, 'credit', e.target.value)} style={{ width: 100 }} /></td>
-                  <td><input className="form-input" value={l.description} onChange={e => updateLine(i, 'description', e.target.value)} /></td>
-                  <td><button type="button" className="btn btn-sm btn-danger" onClick={() => removeLine(i)}>×</button></td>
+          <div className="journal-lines-desktop" style={{ marginTop: 12 }}>
+            <table className="table">
+              <thead><tr><th>Účet</th><th>MD (Kč)</th><th>D (Kč)</th><th>Popis</th><th></th></tr></thead>
+              <tbody>
+                {lines.map((l, i) => (
+                  <tr key={i}>
+                    <td>
+                      <select className="form-input" value={l.account_id} onChange={e => updateLine(i, 'account_id', e.target.value)} required style={{ width: '100%', minWidth: 0 }}>
+                        <option value="">Vyberte účet</option>
+                        {accounts.map(a => <option key={a.id} value={a.id}>{a.account_number} – {a.name}</option>)}
+                      </select>
+                    </td>
+                    <td><input type="number" step="0.01" className="form-input" value={l.debit} onChange={e => updateLine(i, 'debit', e.target.value)} style={{ width: 100 }} /></td>
+                    <td><input type="number" step="0.01" className="form-input" value={l.credit} onChange={e => updateLine(i, 'credit', e.target.value)} style={{ width: 100 }} /></td>
+                    <td><input className="form-input" value={l.description} onChange={e => updateLine(i, 'description', e.target.value)} /></td>
+                    <td><button type="button" className="btn btn-sm btn-danger" onClick={() => removeLine(i)}>×</button></td>
+                  </tr>
+                ))}
+                <tr style={{ fontWeight: 700 }}>
+                  <td>Celkem</td>
+                  <td style={{ color: balanced ? '#22c55e' : '#ef4444' }}>{totalDebit.toFixed(2)}</td>
+                  <td style={{ color: balanced ? '#22c55e' : '#ef4444' }}>{totalCredit.toFixed(2)}</td>
+                  <td colSpan={2}>{!balanced && <span style={{ color: '#ef4444', fontSize: 12 }}>Rozdíl: {(totalDebit - totalCredit).toFixed(2)}</span>}</td>
                 </tr>
-              ))}
-              <tr style={{ fontWeight: 700 }}>
-                <td>Celkem</td>
-                <td style={{ color: balanced ? '#22c55e' : '#ef4444' }}>{totalDebit.toFixed(2)}</td>
-                <td style={{ color: balanced ? '#22c55e' : '#ef4444' }}>{totalCredit.toFixed(2)}</td>
-                <td colSpan={2}>{!balanced && <span style={{ color: '#ef4444', fontSize: 12 }}>Rozdíl: {(totalDebit - totalCredit).toFixed(2)}</span>}</td>
-              </tr>
-            </tbody>
-          </table>
+              </tbody>
+            </table>
+          </div>
+          <div className="journal-lines-mobile" style={{ marginTop: 12 }}>
+            {lines.map((l, i) => (
+              <div key={i} className="journal-line-card">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <strong>Řádek {i + 1}</strong>
+                  <button type="button" className="btn btn-sm btn-danger" onClick={() => removeLine(i)}>×</button>
+                </div>
+                <label>Účet
+                  <select className="form-input" value={l.account_id} onChange={e => updateLine(i, 'account_id', e.target.value)} required style={{ width: '100%' }}>
+                    <option value="">Vyberte účet</option>
+                    {accounts.map(a => <option key={a.id} value={a.id}>{a.account_number} – {a.name}</option>)}
+                  </select>
+                </label>
+                <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                  <label style={{ flex: 1 }}>MD (Kč)<input type="number" step="0.01" className="form-input" value={l.debit} onChange={e => updateLine(i, 'debit', e.target.value)} style={{ width: '100%' }} /></label>
+                  <label style={{ flex: 1 }}>D (Kč)<input type="number" step="0.01" className="form-input" value={l.credit} onChange={e => updateLine(i, 'credit', e.target.value)} style={{ width: '100%' }} /></label>
+                </div>
+                <label style={{ marginTop: 8, display: 'block' }}>Popis<input className="form-input" value={l.description} onChange={e => updateLine(i, 'description', e.target.value)} style={{ width: '100%' }} /></label>
+              </div>
+            ))}
+            <div className="journal-line-card" style={{ fontWeight: 700, display: 'flex', justifyContent: 'space-between' }}>
+              <span>Celkem: MD {totalDebit.toFixed(2)} | D {totalCredit.toFixed(2)}</span>
+              {!balanced && <span style={{ color: '#ef4444', fontSize: 12 }}>Rozdíl: {(totalDebit - totalCredit).toFixed(2)}</span>}
+            </div>
+          </div>
           <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
             <button type="button" className="btn btn-secondary" onClick={addLine}>+ Řádek</button>
             <div style={{ flex: 1 }} />

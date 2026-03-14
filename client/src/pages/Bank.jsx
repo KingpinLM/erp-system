@@ -18,6 +18,7 @@ export default function Bank() {
   const [editAccount, setEditAccount] = useState(null);
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(20);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   useEffect(() => { loadAccounts(); }, []);
   useEffect(() => { if (tab === 'transactions') loadTransactions(); }, [tab, selectedAccount]);
@@ -159,7 +160,12 @@ export default function Bank() {
 
       {tab === 'transactions' && (
         <>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+          <button className="mobile-filter-toggle" onClick={() => setFiltersOpen(f => !f)}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+            Filtry a řazení
+            <span style={{ marginLeft: 'auto' }}>{filtersOpen ? '▲' : '▼'}</span>
+          </button>
+          <div className={`filters-collapsible ${filtersOpen ? 'filters-open' : ''}`} style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
             {can('admin', 'accountant') && <>
               <button className="btn btn-primary" onClick={() => setShowImport(true)}>Import výpisu</button>
               <button className="btn btn-secondary" onClick={autoMatch}>Auto-párování</button>
