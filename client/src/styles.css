@@ -1947,3 +1947,17 @@ a.dash-rank-item:hover { background: var(--gray-50); }
   background: linear-gradient(90deg, var(--gray-800) 25%, var(--gray-700) 50%, var(--gray-800) 75%) !important;
   background-size: 200% 100% !important;
 }
+
+/* ─── JOURNAL ENTRY FORM MOBILE ───────────────── */
+.journal-lines-mobile { display: none; }
+.journal-line-card {
+  background: var(--gray-50);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius);
+  padding: 12px;
+  margin-bottom: 8px;
+}
+@media (max-width: 768px) {
+  .journal-lines-desktop { display: none; }
+  .journal-lines-mobile { display: block; }
+}

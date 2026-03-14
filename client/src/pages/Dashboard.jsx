@@ -1061,6 +1061,29 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
+      {tapPreview && (
+        <div className="tap-preview-overlay" onClick={() => setTapPreview(null)}>
+          <div className="tap-preview-sheet" onClick={e => e.stopPropagation()}>
+            <div className="tap-preview-handle" />
+            <div style={{ padding: '0 16px 16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <div style={{ fontSize: 18, fontWeight: 800, color: '#0f172a' }}>{tapPreview.invoice_number}</div>
+                <span className={`badge badge-${tapPreview.status}`}>{tapPreview.status}</span>
+              </div>
+              <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>{tapPreview.client_name}</div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 10, borderTop: '2px solid #0f172a' }}>
+                <span style={{ fontWeight: 700, color: '#64748b' }}>Celkem</span>
+                <span style={{ fontSize: 20, fontWeight: 800 }}>{fmt(tapPreview.total)}</span>
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+                <a href={`/invoices/${tapPreview.id}`} className="btn btn-primary btn-sm" style={{ flex: 1, justifyContent: 'center', textDecoration: 'none' }}>Detail</a>
+                <button className="btn btn-outline btn-sm" onClick={() => setTapPreview(null)}>Zavřít</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
