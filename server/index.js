@@ -1533,6 +1533,17 @@ function getDynamicAnswer(q, tenantId, userId, isEn) {
 
   // === REAL-TIME DATA QUERIES ===
 
+  // Draft invoices (must come before general invoice count)
+  if (has('koncept', 'draft', 'rozpracovan', 'nedokončen', 'rozepsán')) {
+    const drafts = db.prepare(`SELECT i.invoice_number, i.total, i.currency, c.name as client_name FROM invoices i LEFT JOIN clients c ON i.client_id = c.id WHERE i.tenant_id = ? AND i.status = 'draft' ORDER BY i.created_at DESC LIMIT 5`).all(tenantId);
+    if (drafts.length === 0) return { answer: isEn ? 'You have no draft invoices.' : 'Nemáte žádné rozpracované faktury.', link: '/invoices' };
+    const list = drafts.map(d => `• ${d.invoice_number} — ${d.client_name || '?'} (${Math.round(d.total)} ${d.currency})`).join('\n');
+    return {
+      answer: isEn ? `Draft invoices:\n${list}` : `Rozpracované faktury:\n${list}`,
+      link: '/invoices'
+    };
+  }
+
   // "How many invoices?" / "Kolik mám faktur?"
   if (has('kolik', 'počet', 'count', 'how many', 'celkem') && has('faktur', 'invoice', 'faktura', 'doklad')) {
     const stats = db.prepare(`SELECT COUNT(*) as total, COALESCE(SUM(CASE WHEN status='draft' THEN 1 ELSE 0 END),0) as drafts, COALESCE(SUM(CASE WHEN status='sent' THEN 1 ELSE 0 END),0) as sent, COALESCE(SUM(CASE WHEN status='paid' THEN 1 ELSE 0 END),0) as paid, COALESCE(SUM(CASE WHEN status='overdue' THEN 1 ELSE 0 END),0) as overdue FROM invoices WHERE tenant_id = ?`).get(tenantId);
@@ -1606,7 +1617,7 @@ function getDynamicAnswer(q, tenantId, userId, isEn) {
   }
 
   // Current user info / můj účet
-  if (has('můj', 'my', 'account', 'kdo jsem', 'profil', 'who am i', 'role', 'oprávnění')) {
+  if (has('kdo jsem', 'who am i', 'můj účet', 'můj profil', 'my account', 'my profile') || (has('můj', 'my') && has('role', 'oprávnění', 'jméno', 'email'))) {
     const user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
     const roleLabels = { admin: 'Administrátor', accountant: 'Účetní', manager: 'Manažer', viewer: 'Náhled' };
     if (user) {
@@ -1670,6 +1681,76 @@ function getDynamicAnswer(q, tenantId, userId, isEn) {
     return {
       answer: isEn ? `Current exchange rates:\n${list}` : `Aktuální kurzy:\n${list}`,
       link: '/currencies'
+    };
+  }
+
+  // Top clients by revenue
+  if (has('top', 'nejlepší', 'nejvíce', 'největší', 'best') && has('klient', 'client', 'zákazník', 'odběratel')) {
+    const top = db.prepare(`SELECT c.name, COUNT(i.id) as cnt, COALESCE(SUM(i.total_czk),0) as total FROM clients c LEFT JOIN invoices i ON i.client_id = c.id AND i.tenant_id = c.tenant_id WHERE c.tenant_id = ? GROUP BY c.id ORDER BY total DESC LIMIT 5`).all(tenantId);
+    if (top.length === 0) return { answer: isEn ? 'No clients found.' : 'Žádní klienti nenalezeni.', link: '/clients' };
+    const fmt = (n) => Math.round(n || 0).toLocaleString('cs-CZ');
+    const list = top.map(t => `• ${t.name} — ${t.cnt} faktur, ${fmt(t.total)} Kč`).join('\n');
+    return {
+      answer: isEn ? `Top 5 clients by revenue:\n${list}` : `Top 5 klientů podle obratu:\n${list}`,
+      link: '/clients'
+    };
+  }
+
+  // Paid invoices summary
+  if (has('zaplacen', 'uhrazen', 'paid') && has('faktur', 'invoice', 'celk', 'kolik')) {
+    const paid = db.prepare(`SELECT COUNT(*) as c, COALESCE(SUM(total_czk),0) as total FROM invoices WHERE tenant_id = ? AND status = 'paid'`).get(tenantId);
+    const fmt = (n) => Math.round(n || 0).toLocaleString('cs-CZ');
+    return {
+      answer: isEn ? `You have ${paid.c} paid invoices totaling ${fmt(paid.total)} CZK.` : `Máte ${paid.c} zaplacených faktur v celkové hodnotě ${fmt(paid.total)} Kč.`,
+      link: '/invoices'
+    };
+  }
+
+  // Largest invoice
+  if (has('největší', 'highest', 'maximum', 'max', 'nejdražší', 'biggest') && has('faktur', 'invoice')) {
+    const biggest = db.prepare(`SELECT i.invoice_number, i.total, i.currency, i.status, c.name as client_name FROM invoices i LEFT JOIN clients c ON i.client_id = c.id WHERE i.tenant_id = ? ORDER BY i.total_czk DESC LIMIT 1`).get(tenantId);
+    if (!biggest) return { answer: isEn ? 'No invoices found.' : 'Žádné faktury nenalezeny.', link: '/invoices' };
+    const statusLabels = { draft: 'koncept', sent: 'odeslaná', paid: 'zaplacená', overdue: 'po splatnosti', cancelled: 'stornovaná' };
+    return {
+      answer: isEn
+        ? `Largest invoice: ${biggest.invoice_number} — ${biggest.client_name || '?'} — ${Math.round(biggest.total)} ${biggest.currency} (${biggest.status})`
+        : `Největší faktura: ${biggest.invoice_number} — ${biggest.client_name || '?'} — ${Math.round(biggest.total)} ${biggest.currency} (${statusLabels[biggest.status] || biggest.status})`,
+      link: '/invoices'
+    };
+  }
+
+  // Monthly invoices / this month
+  if (has('tento měsíc', 'this month', 'měsíční', 'aktuální měsíc', 'letos') && has('faktur', 'invoice', 'příjem', 'obrat')) {
+    const now = new Date();
+    const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const stats = db.prepare(`SELECT COUNT(*) as c, COALESCE(SUM(total_czk),0) as total FROM invoices WHERE tenant_id = ? AND issue_date LIKE ?`).get(tenantId, yearMonth + '%');
+    const fmt = (n) => Math.round(n || 0).toLocaleString('cs-CZ');
+    return {
+      answer: isEn
+        ? `This month: ${stats.c} invoices totaling ${fmt(stats.total)} CZK.`
+        : `Tento měsíc: ${stats.c} faktur v celkové hodnotě ${fmt(stats.total)} Kč.`,
+      link: '/invoices'
+    };
+  }
+
+  // Products/services count
+  if (has('kolik', 'počet', 'count', 'how many') && has('produkt', 'product', 'služb', 'service', 'zboží', 'polož')) {
+    const cnt = db.prepare('SELECT COUNT(*) as c FROM products WHERE tenant_id = ?').get(tenantId);
+    return {
+      answer: isEn ? `You have ${cnt.c} products/services in your catalog.` : `V katalogu máte ${cnt.c} produktů/služeb.`,
+      link: '/bank'
+    };
+  }
+
+  // Bank accounts summary
+  if (has('kolik', 'jaké', 'účet', 'account') && has('bank', 'bankovní') && !has('spojení', 'nastavit', 'kde')) {
+    const accounts = db.prepare('SELECT name, currency, COALESCE(initial_balance,0) as balance FROM bank_accounts WHERE tenant_id = ?').all(tenantId);
+    if (accounts.length === 0) return { answer: isEn ? 'No bank accounts found.' : 'Žádné bankovní účty nenalezeny.', link: '/bank' };
+    const fmt = (n) => Math.round(n || 0).toLocaleString('cs-CZ');
+    const list = accounts.map(a => `• ${a.name}: ${fmt(a.balance)} ${a.currency}`).join('\n');
+    return {
+      answer: isEn ? `Your bank accounts:\n${list}` : `Vaše bankovní účty:\n${list}`,
+      link: '/bank'
     };
   }
 
@@ -1743,11 +1824,28 @@ app.post('/api/chatbot/message', ...tenanted, (req, res) => {
       answer = isEn ? (bestMatch.answer_en || bestMatch.answer_cs) : bestMatch.answer_cs;
       link = bestMatch.link;
     } else {
-      // 3) Log unanswered question for self-learning
-      db.prepare('INSERT INTO chatbot_unanswered (tenant_id, user_id, question) VALUES (?, ?, ?)').run(req.tenant_id, req.user.id, message.trim());
-      answer = isEn
-        ? "I'm sorry, I don't know the answer to that yet. Your question has been logged and an administrator will add an answer soon! Try asking about invoices, clients, payments, or navigation."
-        : 'Omlouvám se, na tuto otázku zatím neznám odpověď. Váš dotaz byl zaznamenán a administrátor brzy doplní odpověď! Zkuste se zeptat na faktury, klienty, platby nebo navigaci.';
+      // 3) Smart fallback — try to detect intent before giving up
+      const greetings = /^(ahoj|čau|nazdar|dobrý den|zdravím|hello|hi|hey|good morning|good afternoon)\b/i;
+      const thanks = /^(děkuji|díky|dík|thanks|thank you|díky moc)\b/i;
+      const bye = /^(na shledanou|bye|sbohem|nashle|goodbye|čau|zatím)\b/i;
+
+      if (greetings.test(q)) {
+        answer = isEn
+          ? 'Hello! I am Hyňa, your smart ERP assistant. How can I help you today?'
+          : 'Ahoj! Jsem Hyňa, váš chytrý asistent. Jak vám mohu dnes pomoci?';
+      } else if (thanks.test(q)) {
+        answer = isEn ? "You're welcome! Anything else I can help with?" : 'Nemáte zač! Mohu ještě s něčím pomoct?';
+      } else if (bye.test(q)) {
+        answer = isEn ? 'Goodbye! I am here whenever you need help.' : 'Na shledanou! Jsem tu, kdykoliv budete potřebovat.';
+      } else if (q.length < 3) {
+        answer = isEn ? 'Could you please be more specific? Try asking about invoices, clients, or navigation.' : 'Můžete být konkrétnější? Zkuste se zeptat na faktury, klienty nebo navigaci.';
+      } else {
+        // Log unanswered question for self-learning
+        db.prepare('INSERT INTO chatbot_unanswered (tenant_id, user_id, question) VALUES (?, ?, ?)').run(req.tenant_id, req.user.id, message.trim());
+        answer = isEn
+          ? "I'm sorry, I don't know the answer to that yet. Your question has been logged and an administrator will add an answer soon! Try asking about invoices, clients, payments, or navigation."
+          : 'Omlouvám se, na tuto otázku zatím neznám odpověď. Váš dotaz byl zaznamenán a administrátor brzy doplní odpověď! Zkuste se zeptat na faktury, klienty, platby nebo navigaci.';
+      }
       link = null;
     }
   }
