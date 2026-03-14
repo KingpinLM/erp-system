@@ -40,7 +40,7 @@ const invoiceLayouts = [
   },
 ];
 
-// Realistic invoice preview renderer
+// Realistic invoice preview renderer - each layout has distinct structure
 function InvoicePreview({ layout, companyName }) {
   const name = companyName || 'Firma s.r.o.';
   const items = [
@@ -60,24 +60,123 @@ function InvoicePreview({ layout, companyName }) {
 
   const fs = isComp ? 0.85 : 1;
   const pad = isComp ? 14 : 20;
-  const bg = 'white';
   const text = '#1e293b';
   const muted = '#94a3b8';
-  const border = isEleg ? '#e9d5ff' : isMin ? '#e2e8f0' : '#e2e8f0';
+  const border = isEleg ? '#e9d5ff' : '#e2e8f0';
 
-  return (
-    <div style={{ padding: pad, background: bg, fontSize: 10 * fs, color: text, fontFamily: "'Inter', sans-serif", lineHeight: 1.5 }}>
-      {/* Top accent */}
-      {layout.accentGrad && !isKorp && (
-        <div style={{ height: isEleg ? 1.5 : 3, background: layout.accentGrad, borderRadius: 2, marginBottom: 14 }} />
-      )}
-      {isComp && (
-        <div style={{ height: 2, background: layout.accent, marginBottom: 10 }} />
-      )}
+  // Shared: items table rows
+  const itemsTable = (headerBg, headerColor, rowBorder) => (
+    <div style={{ marginBottom: isComp ? 6 : 10 }}>
+      <div style={{
+        display: 'grid', gridTemplateColumns: '1fr 32px 50px 55px', gap: 0, padding: '3px 6px', fontSize: 6,
+        fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em',
+        background: headerBg, color: headerColor,
+        borderBottom: isMin ? '1.5px solid #1e293b' : `1px solid ${border}`,
+      }}>
+        <span>Popis</span><span style={{ textAlign: 'right' }}>Ks</span><span style={{ textAlign: 'right' }}>Cena</span><span style={{ textAlign: 'right' }}>Celkem</span>
+      </div>
+      {items.map((item, i) => (
+        <div key={i} style={{
+          display: 'grid', gridTemplateColumns: '1fr 32px 50px 55px', gap: 0, padding: '3px 6px', fontSize: 7 * fs,
+          color: '#475569', borderBottom: `1px solid ${rowBorder}`,
+        }}>
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.desc}</span>
+          <span style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{item.qty}</span>
+          <span style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{fmtN(item.price)}</span>
+          <span style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>{fmtN(item.qty * item.price)}</span>
+        </div>
+      ))}
+    </div>
+  );
 
-      {/* Corporate dark header */}
-      {isKorp && (
-        <div style={{ background: '#0f172a', margin: `-${pad}px -${pad}px 12px`, padding: `14px ${pad}px 10px` }}>
+  // Shared: totals
+  const totalsBlock = (totalColor, borderColor, justify) => (
+    <div style={{ display: 'flex', justifyContent: justify || 'flex-end' }}>
+      <div style={{ width: '55%' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 7 * fs, color: muted, marginBottom: 2 }}>
+          <span>Základ</span><span style={{ fontVariantNumeric: 'tabular-nums' }}>{fmtN(subtotal)} Kč</span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 7 * fs, color: muted, marginBottom: 3 }}>
+          <span>DPH 21%</span><span style={{ fontVariantNumeric: 'tabular-nums' }}>{fmtN(vat)} Kč</span>
+        </div>
+        <div style={{
+          display: 'flex', justifyContent: 'space-between', fontSize: isComp ? 10 : 12, fontWeight: 800,
+          color: totalColor, borderTop: `2px solid ${borderColor}`, paddingTop: 4, marginTop: 2,
+        }}>
+          <span>Celkem</span><span style={{ fontVariantNumeric: 'tabular-nums' }}>{fmtN(total)} Kč</span>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Shared: party block
+  const partyBlock = (label, partyName, addr, ico, labelColor, padStyle) => (
+    <div style={padStyle}>
+      <div style={{ fontSize: 6, fontWeight: 700, color: labelColor, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>{label}</div>
+      <div style={{ fontSize: 8 * fs, fontWeight: 700, color: text }}>{partyName}</div>
+      <div style={{ fontSize: 6, color: muted }}>{addr}</div>
+      <div style={{ fontSize: 6, color: muted }}>{ico}</div>
+    </div>
+  );
+
+  // --- KLASICKY: accent → header → parties → meta → items → totals → payment ---
+  if (!isKorp && !isMin && !isEleg && !isComp) {
+    return (
+      <div style={{ padding: pad, background: 'white', fontSize: 10, color: text, fontFamily: "'Inter', sans-serif", lineHeight: 1.5 }}>
+        <div style={{ height: 3, background: layout.accentGrad, borderRadius: 2, marginBottom: 14 }} />
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
+          <div>
+            <div style={{ fontSize: 7, fontWeight: 800, color: layout.accent, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Faktura</div>
+            <div style={{ fontSize: 17, fontWeight: 800, color: text, letterSpacing: '-0.02em' }}>FV-2026-001</div>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: 9, fontWeight: 700, color: text }}>{name}</div>
+            <div style={{ fontSize: 7, color: muted }}>IČ: 12345678</div>
+          </div>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0, marginBottom: 12, border: `1px solid ${border}`, borderRadius: 6, overflow: 'hidden' }}>
+          {partyBlock('Dodavatel', name, 'Ulice 123, Praha', 'IČ: 12345678', muted, { padding: '8px 10px', borderRight: `1px solid ${border}` })}
+          {partyBlock('Odběratel', 'Klient a.s.', 'Firemní 456, Brno', 'IČ: 87654321', muted, { padding: '8px 10px' })}
+        </div>
+        <div style={{ display: 'flex', gap: 10, marginBottom: 10, padding: '6px 8px', background: '#f8fafc', borderRadius: 4, border: '1px solid #f1f5f9' }}>
+          {[{ l: 'Vystaveno', v: '01.03.2026' }, { l: 'Splatnost', v: '15.03.2026' }].map((m, i) => (
+            <div key={i} style={{ flex: 1 }}><div style={{ fontSize: 5, fontWeight: 700, color: muted, textTransform: 'uppercase' }}>{m.l}</div><div style={{ fontSize: 7, fontWeight: 600, color: text }}>{m.v}</div></div>
+          ))}
+        </div>
+        {itemsTable('#f8fafc', muted, '#f1f5f9')}
+        {totalsBlock(text, text)}
+        <div style={{ height: 2, background: layout.accentGrad, borderRadius: 1, marginTop: 12, opacity: 0.4 }} />
+      </div>
+    );
+  }
+
+  // --- MINIMALISTICKY: centered header, HR dividers, no accents, no boxes ---
+  if (isMin) {
+    return (
+      <div style={{ padding: 24, background: 'white', fontSize: 10, color: text, fontFamily: "'Inter', sans-serif", lineHeight: 1.5 }}>
+        <div style={{ textAlign: 'center', marginBottom: 4 }}>
+          <div style={{ fontSize: 6, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.18em' }}>Faktura</div>
+          <div style={{ fontSize: 22, fontWeight: 300, color: text, letterSpacing: '0.02em' }}>FV-2026-001</div>
+          <div style={{ fontSize: 7, color: muted, marginTop: 4 }}>{name} · IČ: 12345678</div>
+        </div>
+        <hr style={{ border: 'none', borderTop: '1px solid #cbd5e1', margin: '12px 0' }} />
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0, marginBottom: 0 }}>
+          {partyBlock('Dodavatel', name, 'Ulice 123, Praha', 'IČ: 12345678', muted, { padding: '6px 10px 6px 0' })}
+          {partyBlock('Odběratel', 'Klient a.s.', 'Firemní 456, Brno', 'IČ: 87654321', muted, { padding: '6px 0 6px 10px' })}
+        </div>
+        <hr style={{ border: 'none', borderTop: '1px solid #cbd5e1', margin: '12px 0' }} />
+        {itemsTable('transparent', '#1e293b', '#f1f5f9')}
+        {totalsBlock(text, '#1e293b')}
+        <hr style={{ border: 'none', borderTop: '1px solid #cbd5e1', margin: '12px 0 0' }} />
+      </div>
+    );
+  }
+
+  // --- KORPORATNI: dark header, payment first, dark table ---
+  if (isKorp) {
+    return (
+      <div style={{ padding: 0, background: 'white', fontSize: 10, color: text, fontFamily: "'Inter', sans-serif", lineHeight: 1.5 }}>
+        <div style={{ background: '#0f172a', padding: '14px 20px 10px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
               <div style={{ fontSize: 7, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Faktura</div>
@@ -89,122 +188,84 @@ function InvoicePreview({ layout, companyName }) {
             </div>
           </div>
         </div>
-      )}
-
-      {/* Elegant centered header */}
-      {isEleg && (
-        <div style={{ textAlign: 'center', marginBottom: 14 }}>
-          <div style={{ fontSize: 7, fontWeight: 600, color: layout.accent, textTransform: 'uppercase', letterSpacing: '0.15em' }}>Faktura</div>
-          <div style={{ fontSize: 20, fontWeight: 300, color: '#1e1b4b', letterSpacing: '-0.01em' }}>FV-2026-001</div>
-          <div style={{ fontSize: 7, color: muted, marginTop: 2 }}>{name}</div>
+        <div style={{ padding: '12px 20px' }}>
+          {/* Payment first */}
+          <div style={{ padding: '6px 8px', marginBottom: 10, border: '1.5px solid #0f172a', borderRadius: 4 }}>
+            <div style={{ fontSize: 6, fontWeight: 700, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 3 }}>Platební údaje</div>
+            <div style={{ fontSize: 7, color: text }}>123456789/0800 · VS: 20260001</div>
+            <div style={{ fontSize: 9, fontWeight: 800, color: '#0f172a', marginTop: 2 }}>{fmtN(total)} Kč</div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0, marginBottom: 10, border: `1px solid #334155`, borderRadius: 4, overflow: 'hidden' }}>
+            {partyBlock('Dodavatel', name, 'Ulice 123, Praha', 'IČ: 12345678', muted, { padding: '6px 8px', borderRight: '1px solid #334155' })}
+            {partyBlock('Odběratel', 'Klient a.s.', 'Firemní 456, Brno', 'IČ: 87654321', muted, { padding: '6px 8px' })}
+          </div>
+          {itemsTable('#0f172a', '#e2e8f0', '#1e293b')}
+          {totalsBlock(text, '#0f172a')}
         </div>
-      )}
+      </div>
+    );
+  }
 
-      {/* Standard / Minimal / Compact header */}
-      {!isKorp && !isEleg && (
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: isComp ? 8 : 14 }}>
+  // --- ELEGANTNI: centered header, purple theme, centered totals, rounded cards ---
+  if (isEleg) {
+    return (
+      <div style={{ padding: pad, background: 'white', fontSize: 10, color: text, fontFamily: "'Inter', sans-serif", lineHeight: 1.5 }}>
+        <div style={{ height: 1.5, background: layout.accentGrad, borderRadius: 2, marginBottom: 14 }} />
+        <div style={{ textAlign: 'center', marginBottom: 14 }}>
+          <div style={{ fontSize: 7, fontWeight: 600, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.15em' }}>Faktura</div>
+          <div style={{ fontSize: 20, fontWeight: 300, color: '#1e1b4b', letterSpacing: '-0.01em' }}>FV-2026-001</div>
+          <div style={{ fontSize: 7, color: '#a78bfa', marginTop: 2 }}>{name}</div>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0, marginBottom: 12, border: `1px solid #e9d5ff`, borderRadius: 8, overflow: 'hidden' }}>
+          {partyBlock('Dodavatel', name, 'Ulice 123, Praha', 'IČ: 12345678', '#7c3aed', { padding: '8px 10px', borderRight: '1px solid #e9d5ff', background: '#faf5ff' })}
+          {partyBlock('Odběratel', 'Klient a.s.', 'Firemní 456, Brno', 'IČ: 87654321', '#7c3aed', { padding: '8px 10px', background: '#faf5ff' })}
+        </div>
+        {itemsTable('#faf5ff', '#7c3aed', '#f3e8ff')}
+        {totalsBlock('#1e1b4b', '#7c3aed', 'center')}
+        <div style={{ height: 1, background: layout.accentGrad, borderRadius: 1, marginTop: 12, opacity: 0.4 }} />
+      </div>
+    );
+  }
+
+  // --- KOMPAKTNI: 3-column grid (supplier|client|payment), inline dates, dense ---
+  if (isComp) {
+    return (
+      <div style={{ padding: 14, background: 'white', fontSize: 8.5, color: text, fontFamily: "'Inter', sans-serif", lineHeight: 1.5 }}>
+        <div style={{ height: 2, background: '#059669', marginBottom: 8 }} />
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
           <div>
-            <div style={{ fontSize: isMin ? 6 : 7, fontWeight: isMin ? 600 : 800, color: isMin ? text : layout.accent, textTransform: 'uppercase', letterSpacing: isMin ? '0.15em' : '0.08em' }}>Faktura</div>
-            <div style={{ fontSize: isComp ? 14 : 17, fontWeight: isMin ? 400 : 800, color: text, letterSpacing: '-0.02em' }}>FV-2026-001</div>
+            <div style={{ fontSize: 6, fontWeight: 800, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Faktura</div>
+            <div style={{ fontSize: 14, fontWeight: 800, color: text }}>FV-2026-001</div>
           </div>
           <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: 9 * fs, fontWeight: 700, color: text }}>{name}</div>
-            <div style={{ fontSize: 7 * fs, color: muted }}>IČ: 12345678</div>
+            <div style={{ fontSize: 8, fontWeight: 700, color: text }}>{name}</div>
+            <div style={{ fontSize: 6, color: muted }}>IČ: 12345678</div>
           </div>
         </div>
-      )}
-
-      {/* Parties */}
-      <div style={{
-        display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0, marginBottom: isComp ? 8 : 12,
-        border: `1px solid ${border}`, borderRadius: isEleg ? 8 : isComp ? 4 : 6, overflow: 'hidden',
-        ...(isMin ? { borderLeft: 'none', borderRight: 'none', borderRadius: 0 } : {}),
-      }}>
-        <div style={{ padding: isComp ? '5px 8px' : '8px 10px', borderRight: `1px solid ${border}` }}>
-          <div style={{ fontSize: 6, fontWeight: 700, color: isEleg ? layout.accent : muted, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>Dodavatel</div>
-          <div style={{ fontSize: 8 * fs, fontWeight: 700, color: text }}>{name}</div>
-          <div style={{ fontSize: 6, color: muted }}>Ulice 123, Praha</div>
-          <div style={{ fontSize: 6, color: muted }}>IČ: 12345678</div>
+        {/* 3-column: supplier | client | payment */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 8, border: '1px solid #e2e8f0', borderRadius: 4, padding: 8 }}>
+          {partyBlock('Dodavatel', name, 'Ulice 123, Praha', 'IČ: 12345678', muted, { })}
+          {partyBlock('Odběratel', 'Klient a.s.', 'Firemní 456, Brno', 'IČ: 87654321', muted, { })}
+          <div>
+            <div style={{ fontSize: 6, fontWeight: 700, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>Platba</div>
+            <div style={{ fontSize: 6, color: muted }}>123456789/0800</div>
+            <div style={{ fontSize: 8, fontWeight: 800, color: '#059669', marginTop: 2 }}>{fmtN(total)} Kč</div>
+          </div>
         </div>
-        <div style={{ padding: isComp ? '5px 8px' : '8px 10px' }}>
-          <div style={{ fontSize: 6, fontWeight: 700, color: isEleg ? layout.accent : muted, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>Odběratel</div>
-          <div style={{ fontSize: 8 * fs, fontWeight: 700, color: text }}>Klient a.s.</div>
-          <div style={{ fontSize: 6, color: muted }}>Firemní 456, Brno</div>
-          <div style={{ fontSize: 6, color: muted }}>IČ: 87654321</div>
+        {/* Inline dates */}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 8, padding: '4px 6px', background: '#f0fdf4', borderRadius: 4, border: '1px solid #d1fae5' }}>
+          {[{ l: 'Vystaveno', v: '01.03.2026' }, { l: 'Splatnost', v: '15.03.2026' }, { l: 'Způsob', v: 'Převodem' }].map((m, i) => (
+            <div key={i} style={{ flex: 1 }}><div style={{ fontSize: 5, fontWeight: 700, color: '#059669', textTransform: 'uppercase' }}>{m.l}</div><div style={{ fontSize: 6, fontWeight: 600, color: text }}>{m.v}</div></div>
+          ))}
         </div>
+        {itemsTable('#f8fafc', muted, '#f1f5f9')}
+        {totalsBlock(text, text)}
+        <div style={{ height: 1.5, background: '#059669', marginTop: 8, opacity: 0.4 }} />
       </div>
+    );
+  }
 
-      {/* Meta row */}
-      <div style={{ display: 'flex', gap: isComp ? 6 : 10, marginBottom: isComp ? 6 : 10, padding: isComp ? '4px 6px' : '6px 8px', background: '#f8fafc', borderRadius: 4, border: '1px solid #f1f5f9' }}>
-        {[{ l: 'Vystaveno', v: '01.03.2026' }, { l: 'Splatnost', v: '15.03.2026' }, { l: 'Způsob', v: 'Převodem' }].map((m, i) => (
-          <div key={i} style={{ flex: 1 }}>
-            <div style={{ fontSize: 5, fontWeight: 700, color: muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{m.l}</div>
-            <div style={{ fontSize: 7 * fs, fontWeight: 600, color: text }}>{m.v}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Items table */}
-      <div style={{ marginBottom: isComp ? 6 : 10 }}>
-        <div style={{
-          display: 'grid', gridTemplateColumns: '1fr 32px 50px 55px', gap: 0, padding: '3px 6px', fontSize: 6,
-          fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em',
-          background: isKorp ? '#0f172a' : isEleg ? '#faf5ff' : isComp ? '#ecfdf5' : '#f8fafc',
-          color: isKorp ? '#e2e8f0' : isEleg ? '#7c3aed' : isComp ? '#059669' : muted,
-          borderBottom: isMin ? '1.5px solid #1e293b' : `1px solid ${border}`,
-        }}>
-          <span>Popis</span><span style={{ textAlign: 'right' }}>Ks</span><span style={{ textAlign: 'right' }}>Cena</span><span style={{ textAlign: 'right' }}>Celkem</span>
-        </div>
-        {items.map((item, i) => (
-          <div key={i} style={{
-            display: 'grid', gridTemplateColumns: '1fr 32px 50px 55px', gap: 0, padding: '3px 6px', fontSize: 7 * fs,
-            color: '#475569', borderBottom: `1px solid ${isEleg ? '#f3e8ff' : isKorp ? '#1e293b' : '#f1f5f9'}`,
-          }}>
-            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.desc}</span>
-            <span style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{item.qty}</span>
-            <span style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{fmtN(item.price)}</span>
-            <span style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>{fmtN(item.qty * item.price)}</span>
-          </div>
-        ))}
-      </div>
-
-      {/* Totals */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-        <div style={{ width: '55%' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 7 * fs, color: muted, marginBottom: 2 }}>
-            <span>Základ</span><span style={{ fontVariantNumeric: 'tabular-nums' }}>{fmtN(subtotal)} Kč</span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 7 * fs, color: muted, marginBottom: 3 }}>
-            <span>DPH 21%</span><span style={{ fontVariantNumeric: 'tabular-nums' }}>{fmtN(vat)} Kč</span>
-          </div>
-          <div style={{
-            display: 'flex', justifyContent: 'space-between', fontSize: isComp ? 10 : 12, fontWeight: 800,
-            color: isEleg ? '#1e1b4b' : text,
-            borderTop: `2px solid ${isEleg ? '#7c3aed' : isMin ? '#1e293b' : isKorp ? '#475569' : text}`,
-            paddingTop: 4, marginTop: 2,
-          }}>
-            <span>Celkem</span><span style={{ fontVariantNumeric: 'tabular-nums' }}>{fmtN(total)} Kč</span>
-          </div>
-        </div>
-      </div>
-
-      {/* QR / payment info */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: isComp ? 8 : 12, padding: '6px 8px', background: '#f8fafc', borderRadius: 4, border: '1px solid #f1f5f9' }}>
-        <div style={{ width: 28, height: 28, background: '#e2e8f0', borderRadius: 3, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="3" height="3"/><rect x="18" y="18" width="3" height="3"/></svg>
-        </div>
-        <div>
-          <div style={{ fontSize: 6, fontWeight: 700, color: muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Platební údaje</div>
-          <div style={{ fontSize: 7, color: text }}>123456789/0800</div>
-        </div>
-      </div>
-
-      {/* Bottom accent */}
-      {layout.accentGrad && !isKorp && (
-        <div style={{ height: isEleg ? 1 : 2, background: layout.accentGrad, borderRadius: 1, marginTop: isComp ? 8 : 12, opacity: 0.4 }} />
-      )}
-    </div>
-  );
+  return null;
 }
 
 const formatTemplates = [

@@ -1,14 +1,81 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api';
 import { useAuth } from '../App';
 import Pagination, { usePagination } from '../components/Pagination';
 
 const statusLabels = { draft: 'Koncept', sent: 'Odesláno', paid: 'Zaplaceno', overdue: 'Po splatnosti', cancelled: 'Zrušeno' };
+const statusColors = { draft: '#64748b', sent: '#4f46e5', paid: '#059669', overdue: '#dc2626', cancelled: '#d97706' };
+const statusBg = { draft: '#f1f5f9', sent: '#eef2ff', paid: '#ecfdf5', overdue: '#fef2f2', cancelled: '#fffbeb' };
 const fmt = (n, cur = 'CZK') => new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: cur, maximumFractionDigits: 2 }).format(n);
 const fmtDate = (d) => { if (!d) return '—'; const p = d.slice(0,10).split('-'); return p.length === 3 ? `${p[2]}.${p[1]}.${p[0]}` : d; };
 
 const typeLabels = { regular: 'Faktura', proforma: 'Proforma', credit_note: 'Dobropis' };
+
+function InvoiceHoverPreview({ invoice, style }) {
+  if (!invoice) return null;
+  const items = invoice.items || [];
+  return (
+    <div style={{
+      position: 'fixed', zIndex: 9999, pointerEvents: 'none',
+      width: 320, background: 'white', borderRadius: 12,
+      border: '1px solid #e2e8f0', boxShadow: '0 20px 50px rgba(0,0,0,0.15), 0 4px 12px rgba(0,0,0,0.08)',
+      overflow: 'hidden', animation: 'fadeIn 0.12s ease-out',
+      ...style,
+    }}>
+      {/* Header */}
+      <div style={{ padding: '12px 16px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 800, color: '#6366f1', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            {invoice.invoice_type === 'credit_note' ? 'Dobropis' : invoice.invoice_type === 'proforma' ? 'Proforma' : 'Faktura'}
+          </div>
+          <div style={{ fontSize: 16, fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em' }}>{invoice.invoice_number}</div>
+        </div>
+        <span style={{ padding: '3px 8px', borderRadius: 4, fontSize: 9, fontWeight: 700, textTransform: 'uppercase', background: statusBg[invoice.status], color: statusColors[invoice.status] }}>
+          {statusLabels[invoice.status]}
+        </span>
+      </div>
+
+      <div style={{ padding: '12px 16px' }}>
+        {/* Client */}
+        <div style={{ marginBottom: 10 }}>
+          <div style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>Odběratel</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>{invoice.client_name || '—'}</div>
+        </div>
+
+        {/* Dates row */}
+        <div style={{ display: 'flex', gap: 12, marginBottom: 10, fontSize: 11 }}>
+          <div><span style={{ color: '#94a3b8' }}>Vystaveno: </span><span style={{ fontWeight: 600, color: '#334155' }}>{fmtDate(invoice.issue_date)}</span></div>
+          <div><span style={{ color: '#94a3b8' }}>Splatnost: </span><span style={{ fontWeight: 600, color: invoice.status === 'overdue' ? '#dc2626' : '#334155' }}>{fmtDate(invoice.due_date)}</span></div>
+        </div>
+
+        {/* Items preview */}
+        {items.length > 0 && (
+          <div style={{ marginBottom: 10, borderTop: '1px solid #f1f5f9', paddingTop: 8 }}>
+            {items.slice(0, 3).map((item, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#475569', padding: '2px 0' }}>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 200 }}>{item.description}</span>
+                <span style={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums', flexShrink: 0, marginLeft: 8 }}>{fmt(item.total || (item.quantity * item.unit_price), invoice.currency)}</span>
+              </div>
+            ))}
+            {items.length > 3 && <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 2 }}>+{items.length - 3} dalších položek</div>}
+          </div>
+        )}
+
+        {/* Total */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', paddingTop: 8, borderTop: '2px solid #0f172a' }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: '#64748b' }}>Celkem</span>
+          <span style={{ fontSize: 18, fontWeight: 800, color: '#0f172a', fontVariantNumeric: 'tabular-nums' }}>{fmt(invoice.total, invoice.currency)}</span>
+        </div>
+        {invoice.currency !== 'CZK' && (
+          <div style={{ display: 'flex', justifyContent: 'flex-end', fontSize: 10, color: '#94a3b8', marginTop: 2 }}>
+            {fmt(invoice.total_czk, 'CZK')}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function Invoices() {
   const [invoices, setInvoices] = useState([]);
@@ -20,6 +87,11 @@ export default function Invoices() {
   const { can } = useAuth();
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(20);
+  const [hoveredInv, setHoveredInv] = useState(null);
+  const [hoverPos, setHoverPos] = useState({ top: 0, left: 0 });
+  const [hoverDetail, setHoverDetail] = useState(null);
+  const hoverTimer = useRef(null);
+  const hoverCache = useRef({});
 
   const load = () => {
     setLoading(true);
@@ -30,6 +102,39 @@ export default function Invoices() {
   };
 
   useEffect(() => { setPage(1); load(); }, [filters]);
+
+  const handleRowMouseEnter = useCallback((inv, e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const top = rect.top;
+    const left = rect.right + 12;
+    // Adjust if would go off-screen right
+    const adjustedLeft = left + 320 > window.innerWidth ? rect.left - 332 : left;
+    // Adjust if would go off-screen bottom
+    const adjustedTop = Math.min(top, window.innerHeight - 300);
+    setHoverPos({ top: adjustedTop, left: adjustedLeft });
+    setHoveredInv(inv.id);
+
+    // Check cache first
+    if (hoverCache.current[inv.id]) {
+      setHoverDetail(hoverCache.current[inv.id]);
+      return;
+    }
+
+    // Fetch full invoice after short delay
+    clearTimeout(hoverTimer.current);
+    hoverTimer.current = setTimeout(() => {
+      api.getInvoice(inv.id).then(detail => {
+        hoverCache.current[inv.id] = detail;
+        setHoverDetail(prev => detail);
+      }).catch(() => {});
+    }, 150);
+  }, []);
+
+  const handleRowMouseLeave = useCallback(() => {
+    clearTimeout(hoverTimer.current);
+    setHoveredInv(null);
+    setHoverDetail(null);
+  }, []);
 
   const sorted = useMemo(() => {
     const arr = [...invoices];
@@ -135,7 +240,11 @@ export default function Invoices() {
               </thead>
               <tbody>
                 {sorted.slice((page - 1) * perPage, page * perPage).map(inv => (
-                  <tr key={inv.id} style={{ background: selected.has(inv.id) ? '#eff6ff' : '' }}>
+                  <tr key={inv.id}
+                    style={{ background: selected.has(inv.id) ? '#eff6ff' : '' }}
+                    onMouseEnter={(e) => handleRowMouseEnter(inv, e)}
+                    onMouseLeave={handleRowMouseLeave}
+                  >
                     <td><input type="checkbox" checked={selected.has(inv.id)} onChange={e => { const s = new Set(selected); if (e.target.checked) s.add(inv.id); else s.delete(inv.id); setSelected(s); }} /></td>
                     <td><Link to={`/invoices/${inv.id}`} style={{ color: 'var(--primary)', fontWeight: 600 }}>{inv.invoice_number}</Link>{inv.invoice_type && inv.invoice_type !== 'regular' && <span style={{ fontSize: 10, color: '#94a3b8', marginLeft: 4 }}>({typeLabels[inv.invoice_type]})</span>}</td>
                     <td>{inv.client_name}</td>
@@ -160,6 +269,11 @@ export default function Invoices() {
         )}
         <Pagination total={sorted.length} page={page} perPage={perPage} onPageChange={setPage} onPerPageChange={v => { setPerPage(v); setPage(1); }} />
       </div>
+
+      {/* Hover preview anchored to invoice row */}
+      {hoveredInv && hoverDetail && hoverDetail.id === hoveredInv && (
+        <InvoiceHoverPreview invoice={hoverDetail} style={{ top: hoverPos.top, left: hoverPos.left }} />
+      )}
     </div>
   );
 }
