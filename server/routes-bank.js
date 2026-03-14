@@ -17,15 +17,21 @@ router.get('/api/bank-accounts', ...tenanted, (req, res) => {
 
 router.post('/api/bank-accounts', ...tenanted, authorize('admin', 'accountant'), (req, res) => {
   const { name, account_number, iban, currency, initial_balance } = req.body;
+  const cur = currency || 'CZK';
+  const existing = db.prepare('SELECT id FROM bank_accounts WHERE tenant_id = ? AND currency = ?').get(req.tenant_id, cur);
+  if (existing) return res.status(400).json({ error: `Pro měnu ${cur} již existuje bankovní účet. Každá měna může mít pouze jeden účet.` });
   const result = db.prepare('INSERT INTO bank_accounts (tenant_id, name, account_number, iban, currency, initial_balance) VALUES (?,?,?,?,?,?)')
-    .run(req.tenant_id, name, account_number || null, iban || null, currency || 'CZK', initial_balance || 0);
+    .run(req.tenant_id, name, account_number || null, iban || null, cur, initial_balance || 0);
   res.json({ id: result.lastInsertRowid });
 });
 
 router.put('/api/bank-accounts/:id', ...tenanted, authorize('admin', 'accountant'), (req, res) => {
   const { name, account_number, iban, currency, initial_balance, active } = req.body;
+  const cur = currency || 'CZK';
+  const existing = db.prepare('SELECT id FROM bank_accounts WHERE tenant_id = ? AND currency = ? AND id != ?').get(req.tenant_id, cur, req.params.id);
+  if (existing) return res.status(400).json({ error: `Pro měnu ${cur} již existuje jiný bankovní účet. Každá měna může mít pouze jeden účet.` });
   db.prepare('UPDATE bank_accounts SET name=?, account_number=?, iban=?, currency=?, initial_balance=?, active=? WHERE id=? AND tenant_id=?')
-    .run(name, account_number || null, iban || null, currency || 'CZK', initial_balance || 0, active ?? 1, req.params.id, req.tenant_id);
+    .run(name, account_number || null, iban || null, cur, initial_balance || 0, active ?? 1, req.params.id, req.tenant_id);
   res.json({ ok: true });
 });
 

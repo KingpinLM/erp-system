@@ -103,21 +103,54 @@ export default function Bank() {
             </div>
           )}
 
-          <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
-            {accounts.map(a => (
-              <div key={a.id} className="card" style={{ cursor: 'pointer' }} onClick={() => { setSelectedAccount(a.id); setTab('transactions'); }}>
-                <h3>{a.name}</h3>
-                <div style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>{a.account_number || a.iban || '—'}</div>
-                <div style={{ fontSize: 24, fontWeight: 700, color: a.balance >= 0 ? '#22c55e' : '#ef4444' }}>
-                  {a.balance.toLocaleString('cs', { minimumFractionDigits: 2 })} {a.currency}
+          {(() => {
+            const byCurrency = {};
+            accounts.forEach(a => {
+              const cur = a.currency || 'CZK';
+              if (!byCurrency[cur]) byCurrency[cur] = [];
+              byCurrency[cur].push(a);
+            });
+            const CURRENCY_META = {
+              CZK: { label: 'Korunové účty (CZK)', flag: '🇨🇿' },
+              EUR: { label: 'Eurové účty (EUR)', flag: '🇪🇺' },
+              USD: { label: 'Dolarové účty (USD)', flag: '🇺🇸' },
+              GBP: { label: 'Librové účty (GBP)', flag: '🇬🇧' },
+              PLN: { label: 'Zlotové účty (PLN)', flag: '🇵🇱' },
+            };
+            const currencyOrder = ['CZK', 'EUR', 'USD', 'GBP', 'PLN'];
+            const sortedCurrencies = Object.keys(byCurrency).sort((a, b) => {
+              const ia = currencyOrder.indexOf(a), ib = currencyOrder.indexOf(b);
+              return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+            });
+
+            return sortedCurrencies.map(cur => {
+              const meta = CURRENCY_META[cur] || { label: `Účty (${cur})`, flag: '💱' };
+              const curAccounts = byCurrency[cur];
+              return (
+                <div key={cur} style={{ marginBottom: 24 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                    <span style={{ fontSize: '1.3rem' }}>{meta.flag}</span>
+                    <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: 'var(--gray-700, #334155)' }}>{meta.label}</h3>
+                  </div>
+                  <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
+                    {curAccounts.map(a => (
+                      <div key={a.id} className="card" style={{ cursor: 'pointer' }} onClick={() => { setSelectedAccount(a.id); setTab('transactions'); }}>
+                        <h3>{a.name}</h3>
+                        <div style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>{a.account_number || a.iban || '—'}</div>
+                        <div style={{ fontSize: 24, fontWeight: 700, color: a.balance >= 0 ? '#22c55e' : '#ef4444' }}>
+                          {a.balance.toLocaleString('cs', { minimumFractionDigits: 2 })} {a.currency}
+                        </div>
+                        <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>{a.transaction_count} transakcí</div>
+                        {can('admin', 'accountant') && (
+                          <button className="btn btn-sm" style={{ marginTop: 8 }} onClick={(e) => { e.stopPropagation(); setEditAccount(a); setShowForm(true); }}>Upravit</button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>{a.transaction_count} transakcí</div>
-                {can('admin', 'accountant') && (
-                  <button className="btn btn-sm" style={{ marginTop: 8 }} onClick={(e) => { e.stopPropagation(); setEditAccount(a); setShowForm(true); }}>Upravit</button>
-                )}
-              </div>
-            ))}
-          </div>
+              );
+            });
+          })()}
         </>
       )}
 

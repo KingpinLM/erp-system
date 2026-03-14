@@ -254,7 +254,8 @@ db.exec(`
     currency TEXT DEFAULT 'CZK',
     initial_balance REAL DEFAULT 0,
     active INTEGER DEFAULT 1,
-    created_at TEXT DEFAULT (datetime('now'))
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(tenant_id, currency)
   );
 
   CREATE TABLE IF NOT EXISTS bank_transactions (
