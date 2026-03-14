@@ -135,7 +135,7 @@ export default function Bank() {
                     <span style={{ fontSize: '1.3rem' }}>{meta.flag}</span>
                     <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: 'var(--gray-700, #334155)' }}>{meta.label}</h3>
                   </div>
-                  <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
+                  <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 16 }}>
                     {curAccounts.map(a => (
                       <div key={a.id} className="card" style={{ cursor: 'pointer' }} onClick={() => { setSelectedAccount(a.id); setTab('transactions'); }}>
                         <h3>{a.name}</h3>
@@ -181,7 +181,7 @@ export default function Bank() {
 
           {loading ? <p>Načítání...</p> : (
             <table className="table">
-              <thead><tr><th>Datum</th><th>Částka</th><th>Protiúčet</th><th>VS</th><th>Popis</th><th>Stav</th><th>Faktura</th><th>Akce</th></tr></thead>
+              <thead><tr><th>Datum</th><th>Částka</th><th>Protiúčet</th><th className="hide-mobile">VS</th><th className="hide-mobile">Popis</th><th className="hide-mobile">Stav</th><th>Faktura</th><th>Akce</th></tr></thead>
               <tbody>
                 {transactions.slice((page - 1) * perPage, page * perPage).map(t => (
                   <tr key={t.id}>
@@ -190,9 +190,9 @@ export default function Bank() {
                       {t.amount.toLocaleString('cs', { minimumFractionDigits: 2 })} {t.currency}
                     </td>
                     <td style={{ fontSize: 12 }}>{t.counterparty_name || t.counterparty_account || '—'}</td>
-                    <td>{t.variable_symbol || '—'}</td>
-                    <td style={{ fontSize: 12, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.description || '—'}</td>
-                    <td><span className={`badge badge-${t.status === 'matched' ? 'paid' : t.status === 'ignored' ? 'cancelled' : 'draft'}`}>
+                    <td className="hide-mobile">{t.variable_symbol || '—'}</td>
+                    <td className="hide-mobile" style={{ fontSize: 12, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.description || '—'}</td>
+                    <td className="hide-mobile"><span className={`badge badge-${t.status === 'matched' ? 'paid' : t.status === 'ignored' ? 'cancelled' : 'draft'}`}>
                       {t.status === 'matched' ? 'Spárováno' : t.status === 'ignored' ? 'Ignorováno' : 'Nespárováno'}
                     </span></td>
                     <td>{t.matched_invoice_number || '—'}</td>

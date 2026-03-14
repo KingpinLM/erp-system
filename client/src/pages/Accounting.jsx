@@ -157,9 +157,9 @@ export default function Accounting() {
         <>
           <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
             {can('admin', 'accountant') && <button className="btn btn-primary" onClick={() => setShowJournalForm(true)}>+ Nový zápis</button>}
-            <input type="date" className="form-input" style={{ width: 140 }} value={filter.from} onChange={e => setFilter(f => ({ ...f, from: e.target.value }))} placeholder="Od" />
-            <input type="date" className="form-input" style={{ width: 140 }} value={filter.to} onChange={e => setFilter(f => ({ ...f, to: e.target.value }))} placeholder="Do" />
-            <select className="form-input" style={{ width: 120 }} value={filter.status} onChange={e => setFilter(f => ({ ...f, status: e.target.value }))}>
+            <input type="date" className="form-input" value={filter.from} onChange={e => setFilter(f => ({ ...f, from: e.target.value }))} placeholder="Od" />
+            <input type="date" className="form-input" value={filter.to} onChange={e => setFilter(f => ({ ...f, to: e.target.value }))} placeholder="Do" />
+            <select className="form-input" value={filter.status} onChange={e => setFilter(f => ({ ...f, status: e.target.value }))}>
               <option value="">Vše</option>
               <option value="draft">Koncept</option>
               <option value="posted">Zaúčtováno</option>
@@ -172,7 +172,7 @@ export default function Accounting() {
 
           {loading ? <p>Načítání...</p> : (
             <table className="table">
-              <thead><tr><th>Číslo</th><th>Datum</th><th>Popis</th><th>MD</th><th>D</th><th>Stav</th><th>Akce</th></tr></thead>
+              <thead><tr><th>Číslo</th><th>Datum</th><th>Popis</th><th className="hide-mobile">MD</th><th className="hide-mobile">D</th><th>Stav</th><th>Akce</th></tr></thead>
               <tbody>
                 {journal.slice((page - 1) * perPage, page * perPage).map(j => {
                   const totalDebit = j.lines?.reduce((s, l) => s + l.debit, 0) || 0;
@@ -182,8 +182,8 @@ export default function Accounting() {
                       <td><strong>{j.entry_number}</strong></td>
                       <td>{new Date(j.date).toLocaleDateString('cs')}</td>
                       <td>{j.description}</td>
-                      <td style={{ textAlign: 'right' }}>{totalDebit.toLocaleString('cs', { minimumFractionDigits: 2 })}</td>
-                      <td style={{ textAlign: 'right' }}>{totalCredit.toLocaleString('cs', { minimumFractionDigits: 2 })}</td>
+                      <td className="hide-mobile" style={{ textAlign: 'right' }}>{totalDebit.toLocaleString('cs', { minimumFractionDigits: 2 })}</td>
+                      <td className="hide-mobile" style={{ textAlign: 'right' }}>{totalCredit.toLocaleString('cs', { minimumFractionDigits: 2 })}</td>
                       <td><span className={`badge badge-${j.status === 'posted' ? 'paid' : j.status === 'cancelled' ? 'cancelled' : 'draft'}`}>
                         {j.status === 'posted' ? 'Zaúčtováno' : j.status === 'cancelled' ? 'Stornováno' : 'Koncept'}
                       </span></td>
@@ -208,8 +208,8 @@ export default function Accounting() {
       {tab === 'ledger' && (
         <>
           <div style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'center' }}>
-            <input type="date" className="form-input" style={{ width: 140 }} value={filter.from} onChange={e => setFilter(f => ({ ...f, from: e.target.value }))} />
-            <input type="date" className="form-input" style={{ width: 140 }} value={filter.to} onChange={e => setFilter(f => ({ ...f, to: e.target.value }))} />
+            <input type="date" className="form-input" value={filter.from} onChange={e => setFilter(f => ({ ...f, from: e.target.value }))} />
+            <input type="date" className="form-input" value={filter.to} onChange={e => setFilter(f => ({ ...f, to: e.target.value }))} />
             <button className="btn btn-secondary" onClick={load}>Zobrazit</button>
           </div>
           {loading ? <p>Načítání...</p> : (
@@ -275,7 +275,7 @@ function JournalEntryForm({ onClose, onSave }) {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 700 }}>
+      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 'min(700px, 95vw)' }}>
         <h3>Nový účetní zápis</h3>
         {error && <div className="alert alert-error">{error}</div>}
         <form onSubmit={handleSubmit}>
@@ -289,7 +289,7 @@ function JournalEntryForm({ onClose, onSave }) {
               {lines.map((l, i) => (
                 <tr key={i}>
                   <td>
-                    <select className="form-input" value={l.account_id} onChange={e => updateLine(i, 'account_id', e.target.value)} required style={{ minWidth: 180 }}>
+                    <select className="form-input" value={l.account_id} onChange={e => updateLine(i, 'account_id', e.target.value)} required style={{ width: '100%', minWidth: 0 }}>
                       <option value="">Vyberte účet</option>
                       {accounts.map(a => <option key={a.id} value={a.id}>{a.account_number} – {a.name}</option>)}
                     </select>

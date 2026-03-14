@@ -729,14 +729,14 @@ export default function Users() {
               <div className="card-title" style={{ marginBottom: '0.75rem', color: 'var(--warning)' }}>Čekající na schválení ({pending.length})</div>
               <div className="table-responsive">
                 <table>
-                  <thead><tr><th>Jméno</th><th>Uživatel</th><th>Email</th><th>Registrován</th><th>Akce</th></tr></thead>
+                  <thead><tr><th>Jméno</th><th className="hide-mobile">Uživatel</th><th className="hide-mobile">Email</th><th className="hide-mobile">Registrován</th><th>Akce</th></tr></thead>
                   <tbody>
                     {pending.map(u => (
                       <tr key={u.id}>
                         <td><strong>{u.full_name}</strong></td>
-                        <td>{u.username}</td>
-                        <td>{u.email}</td>
-                        <td>{u.created_at?.slice(0, 10)}</td>
+                        <td className="hide-mobile">{u.username}</td>
+                        <td className="hide-mobile">{u.email}</td>
+                        <td className="hide-mobile">{u.created_at?.slice(0, 10)}</td>
                         <td>
                           <div className="btn-group">
                             <select className="form-select" id={`role-${u.id}`} defaultValue="viewer" style={{ width: 130, display: 'inline-block', marginRight: 8 }}>
@@ -767,13 +767,13 @@ export default function Users() {
             {loading ? <div className="loading">Načítání...</div> : (
               <div className="table-responsive">
                 <table>
-                  <thead><tr><th>Jméno</th><th>Uživatel</th><th>Email</th><th>Role</th><th>Status</th><th>Vytvořen</th><th>Akce</th></tr></thead>
+                  <thead><tr><th>Jméno</th><th className="hide-mobile">Uživatel</th><th className="hide-mobile">Email</th><th>Role</th><th className="hide-mobile">Status</th><th className="hide-mobile">Vytvořen</th><th>Akce</th></tr></thead>
                   <tbody>
                     {users.map(u => (
                       <tr key={u.id}>
                         <td><Link to={`/users/${u.id}`} style={{ color: 'var(--primary)', fontWeight: 600 }}>{u.full_name}</Link></td>
-                        <td>{u.username}</td>
-                        <td>{u.email}</td>
+                        <td className="hide-mobile">{u.username}</td>
+                        <td className="hide-mobile">{u.email}</td>
                         <td>
                           {can('admin') && roleAssignUser === u.id ? (
                             <select className="form-select" value={u.role} onChange={async (e) => {
@@ -797,7 +797,7 @@ export default function Users() {
                             </span>
                           )}
                         </td>
-                        <td>
+                        <td className="hide-mobile">
                           {can('admin') ? (() => {
                             const currentVal = pendingStatus.hasOwnProperty(u.id) ? pendingStatus[u.id] : u.active;
                             const changed = pendingStatus.hasOwnProperty(u.id) && pendingStatus[u.id] !== u.active;
@@ -829,7 +829,7 @@ export default function Users() {
                             <span className={`badge ${u.active ? 'badge-paid' : 'badge-cancelled'}`}>{u.active ? 'Aktivní' : 'Neaktivní'}</span>
                           )}
                         </td>
-                        <td>{u.created_at?.slice(0, 10)}</td>
+                        <td className="hide-mobile">{u.created_at?.slice(0, 10)}</td>
                         <td>
                           <div className="btn-group">
                             <Link to={`/users/${u.id}`} className="btn btn-outline btn-sm">Detail</Link>

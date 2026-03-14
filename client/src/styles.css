@@ -207,8 +207,15 @@
 .content { padding: 1.5rem; max-width: 1440px; margin: 0 auto; }
 
 /* ─── RESPONSIVE ────────────────────────────────── */
+
+/* Tablet breakpoint */
+@media (max-width: 1024px) {
+  .kpi-grid { grid-template-columns: repeat(2, 1fr) !important; }
+}
+
+/* Mobile breakpoint */
 @media (max-width: 768px) {
-  .sidebar { transform: translateX(-100%); width: 280px; }
+  .sidebar { transform: translateX(-100%); width: min(85vw, 320px); }
   .sidebar.open { transform: translateX(0); }
   .sidebar-overlay { display: block; position: fixed; inset: 0; background: rgba(0,0,0,0.4); backdrop-filter: blur(4px); z-index: 99; }
   .sidebar-close { display: block; }
@@ -223,22 +230,52 @@
   .inv-meta { grid-template-columns: 1fr 1fr !important; }
   /* Touch-friendly targets — minimum 44px tap targets */
   .btn, .form-input, .form-select, .form-textarea { min-height: 44px; }
-  .btn-sm { min-height: 38px; }
+  .btn-sm { min-height: 38px; min-width: 38px; }
   /* Hide non-essential columns on mobile */
   .hide-mobile { display: none !important; }
   /* Stack button groups */
   .btn-group { flex-wrap: wrap; }
   .page-header { flex-direction: column; align-items: flex-start !important; gap: 0.75rem; }
   .page-title { font-size: 1.25rem; }
-  .modal { width: 95vw; max-height: 90vh; margin: 5vh auto; }
+  .modal { width: 95vw; max-width: 95vw; max-height: 90vh; margin: 5vh auto; padding: 1rem !important; overflow-y: auto; }
+  .modal-close { width: 40px; height: 40px; font-size: 24px; }
+  .card { padding: 1rem; }
+  .card-title { font-size: 0.88rem; }
+  .topbar-subtitle { display: none; }
+  .topbar-title-link { font-size: 0.95rem; }
+  .topbar-section-title { max-width: 50vw; overflow: hidden; text-overflow: ellipsis; }
+  /* Disable hover previews on touch devices */
+  .hover-preview-mobile-hide { display: none !important; }
+  /* Filters wrap properly */
+  .filters { gap: 0.4rem !important; }
+  .filters .form-select, .filters .form-input { font-size: 13px; }
+  /* Pagination touch-friendly */
+  .pagination-btn { min-width: 40px; min-height: 40px; }
+  /* Empty state compact */
+  .empty-state { padding: 1.5rem 1rem; }
 }
+
+/* Small phone breakpoint */
 @media (max-width: 480px) {
   .kpi-grid { grid-template-columns: 1fr !important; }
   .inv-meta { grid-template-columns: 1fr !important; }
   /* Larger touch targets on small phones */
   .btn, .form-input, .form-select, .form-textarea { min-height: 48px; font-size: 16px; }
+  .btn-sm { min-height: 42px; font-size: 13px; }
   .content { padding: 0.75rem; }
   table th, table td { padding: 0.5rem 0.4rem; font-size: 0.78rem; }
+  .card { padding: 0.75rem; }
+  .modal { margin: 0.5rem; width: auto; max-width: none; padding: 0.75rem !important; }
+  .topbar-section-link { display: none; }
+  .topbar-sep { display: none; }
+  .topbar-title-link { font-size: 0.88rem; }
+  /* Stack all grids to single column */
+  .form-row { gap: 0 !important; }
+}
+
+/* Touch device: disable hover previews */
+@media (hover: none) and (pointer: coarse) {
+  .hover-preview-mobile-hide { display: none !important; }
 }
 
 /* ─── CARDS ─────────────────────────────────────── */

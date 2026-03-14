@@ -20,9 +20,9 @@ function InvoiceHoverPreview({ invoice, style }) {
   if (!invoice) return null;
   const items = invoice.items || [];
   return (
-    <div style={{
+    <div className="hover-preview-mobile-hide" style={{
       position: 'fixed', zIndex: 9999, pointerEvents: 'none',
-      width: 320, background: 'white', borderRadius: 12,
+      width: Math.min(320, window.innerWidth - 32), background: 'white', borderRadius: 12,
       border: '1px solid #e2e8f0', boxShadow: '0 20px 50px rgba(0,0,0,0.15), 0 4px 12px rgba(0,0,0,0.08)',
       overflow: 'hidden', animation: 'fadeIn 0.12s ease-out',
       ...style,
@@ -263,11 +263,11 @@ export default function Invoices() {
                   <th style={{ width: 32 }}><input type="checkbox" onChange={e => { if (e.target.checked) setSelected(new Set(sorted.slice((page - 1) * perPage, page * perPage).map(i => i.id))); else setSelected(new Set()); }} checked={selected.size > 0 && sorted.slice((page - 1) * perPage, page * perPage).every(i => selected.has(i.id))} /></th>
                   <th style={{ cursor: 'pointer' }} onClick={() => toggleSort('invoice_number')}>Číslo<SortIcon col="invoice_number" /></th>
                   <th style={{ cursor: 'pointer' }} onClick={() => toggleSort('client_name')}>Klient<SortIcon col="client_name" /></th>
-                  <th style={{ cursor: 'pointer' }} onClick={() => toggleSort('issue_date')}>Datum vystavení<SortIcon col="issue_date" /></th>
+                  <th className="hide-mobile" style={{ cursor: 'pointer' }} onClick={() => toggleSort('issue_date')}>Datum vystavení<SortIcon col="issue_date" /></th>
                   <th style={{ cursor: 'pointer' }} onClick={() => toggleSort('due_date')}>Splatnost<SortIcon col="due_date" /></th>
                   <th className="text-right" style={{ cursor: 'pointer' }} onClick={() => toggleSort('total')}>Částka<SortIcon col="total" /></th>
-                  <th>Měna</th>
-                  <th className="text-right" style={{ cursor: 'pointer' }} onClick={() => toggleSort('total_czk')}>CZK<SortIcon col="total_czk" /></th>
+                  <th className="hide-mobile">Měna</th>
+                  <th className="text-right hide-mobile" style={{ cursor: 'pointer' }} onClick={() => toggleSort('total_czk')}>CZK<SortIcon col="total_czk" /></th>
                   <th style={{ cursor: 'pointer' }} onClick={() => toggleSort('status')}>Stav<SortIcon col="status" /></th>
                   <th>Akce</th>
                 </tr>
@@ -283,11 +283,11 @@ export default function Invoices() {
                     <td><input type="checkbox" checked={selected.has(inv.id)} onChange={e => { const s = new Set(selected); if (e.target.checked) s.add(inv.id); else s.delete(inv.id); setSelected(s); }} /></td>
                     <td><Link to={`/invoices/${inv.id}`} style={{ color: 'var(--primary)', fontWeight: 600 }}>{inv.invoice_number}</Link>{inv.invoice_type && inv.invoice_type !== 'regular' && <span style={{ fontSize: 10, color: '#94a3b8', marginLeft: 4 }}>({typeLabels[inv.invoice_type]})</span>}</td>
                     <td>{inv.client_name}</td>
-                    <td>{fmtDate(inv.issue_date)}</td>
+                    <td className="hide-mobile">{fmtDate(inv.issue_date)}</td>
                     <td>{fmtDate(inv.due_date)}</td>
                     <td className="text-right">{fmt(inv.total, inv.currency)}</td>
-                    <td>{inv.currency}</td>
-                    <td className="text-right">{fmt(inv.total_czk, 'CZK')}</td>
+                    <td className="hide-mobile">{inv.currency}</td>
+                    <td className="text-right hide-mobile">{fmt(inv.total_czk, 'CZK')}</td>
                     <td><span className={`badge badge-${inv.status}`}>{statusLabels[inv.status]}</span></td>
                     <td>
                       <div className="btn-group">

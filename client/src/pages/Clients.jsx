@@ -20,9 +20,9 @@ function ClientHoverPreview({ client, invoices, style }) {
   const totalPaid = (invoices || []).filter(i => i.status === 'paid').reduce((s, i) => s + (i.total_czk || 0), 0);
   const unpaidCount = (invoices || []).filter(i => ['sent', 'overdue'].includes(i.status)).length;
   return (
-    <div style={{
+    <div className="hover-preview-mobile-hide" style={{
       position: 'fixed', zIndex: 9999, pointerEvents: 'none',
-      width: 300, background: 'white', borderRadius: 12,
+      width: Math.min(300, window.innerWidth - 32), background: 'white', borderRadius: 12,
       border: '1px solid #e2e8f0', boxShadow: '0 20px 50px rgba(0,0,0,0.15), 0 4px 12px rgba(0,0,0,0.08)',
       overflow: 'hidden', animation: 'fadeIn 0.12s ease-out',
       ...style,
@@ -287,12 +287,12 @@ export default function Clients() {
             <table>
               <thead><tr>
                 <th style={{ cursor: 'pointer' }} onClick={() => toggleSort('name')}>Název<SortIcon col="name" /></th>
-                <th style={{ cursor: 'pointer' }} onClick={() => toggleSort('ico')}>IČO<SortIcon col="ico" /></th>
-                <th>DIČ</th>
+                <th className="hide-mobile" style={{ cursor: 'pointer' }} onClick={() => toggleSort('ico')}>IČO<SortIcon col="ico" /></th>
+                <th className="hide-mobile">DIČ</th>
                 <th style={{ cursor: 'pointer' }} onClick={() => toggleSort('email')}>Email<SortIcon col="email" /></th>
-                <th>Telefon</th>
-                <th style={{ cursor: 'pointer' }} onClick={() => toggleSort('city')}>Město<SortIcon col="city" /></th>
-                <th style={{ cursor: 'pointer' }} onClick={() => toggleSort('country')}>Země<SortIcon col="country" /></th>
+                <th className="hide-mobile">Telefon</th>
+                <th className="hide-mobile" style={{ cursor: 'pointer' }} onClick={() => toggleSort('city')}>Město<SortIcon col="city" /></th>
+                <th className="hide-mobile" style={{ cursor: 'pointer' }} onClick={() => toggleSort('country')}>Země<SortIcon col="country" /></th>
                 <th>Akce</th>
               </tr></thead>
               <tbody>
@@ -303,12 +303,12 @@ export default function Clients() {
                     onMouseLeave={handleRowMouseLeave}
                   >
                     <td><Link to={`/clients/${c.id}`} style={{ color: 'var(--primary)', fontWeight: 600, textDecoration: 'none' }}>{c.name}</Link></td>
-                    <td>{c.ico || '—'}</td>
-                    <td>{c.dic || '—'}</td>
+                    <td className="hide-mobile">{c.ico || '—'}</td>
+                    <td className="hide-mobile">{c.dic || '—'}</td>
                     <td>{c.email || '—'}</td>
-                    <td>{c.phone || '—'}</td>
-                    <td>{c.city || '—'}</td>
-                    <td>{c.country}</td>
+                    <td className="hide-mobile">{c.phone || '—'}</td>
+                    <td className="hide-mobile">{c.city || '—'}</td>
+                    <td className="hide-mobile">{c.country}</td>
                     <td>
                       <div className="btn-group">
                         {can('admin', 'accountant', 'manager') && <button className="btn btn-outline btn-sm" onClick={() => openEdit(c)}>Upravit</button>}

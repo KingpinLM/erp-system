@@ -42,8 +42,8 @@ function KontrolniHlaseniTab() {
             <thead>
               <tr>
                 <th>DIČ odběratele</th>
-                <th>Číslo dokladu</th>
-                <th>Datum</th>
+                <th className="hide-mobile">Číslo dokladu</th>
+                <th className="hide-mobile">Datum</th>
                 <th style={{ textAlign: 'right' }}>Základ</th>
                 <th style={{ textAlign: 'right' }}>DPH</th>
               </tr>
@@ -52,8 +52,8 @@ function KontrolniHlaseniTab() {
               {records.map((r, i) => (
                 <tr key={i}>
                   <td>{r.dic || r.client_dic || '—'}</td>
-                  <td>{r.invoice_number || r.evidence_number || '—'}</td>
-                  <td>{r.date || r.issue_date || '—'}</td>
+                  <td className="hide-mobile">{r.invoice_number || r.evidence_number || '—'}</td>
+                  <td className="hide-mobile">{r.date || r.issue_date || '—'}</td>
                   <td style={{ textAlign: 'right' }}>{fmt(r.base)}</td>
                   <td style={{ textAlign: 'right' }}>{fmt(r.vat)}</td>
                 </tr>
@@ -69,10 +69,10 @@ function KontrolniHlaseniTab() {
     <div>
       {error && <div className="alert alert-error" onClick={() => setError('')}>{error}</div>}
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
-        <select className="form-input" style={{ width: 100 }} value={year} onChange={e => setYear(parseInt(e.target.value))}>
+        <select className="form-input" style={{ minWidth: 80, maxWidth: 120, flex: '0 1 auto' }} value={year} onChange={e => setYear(parseInt(e.target.value))}>
           {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
         </select>
-        <select className="form-input" style={{ width: 140 }} value={month} onChange={e => setMonth(parseInt(e.target.value))}>
+        <select className="form-input" style={{ minWidth: 100, maxWidth: 160, flex: '0 1 auto' }} value={month} onChange={e => setMonth(parseInt(e.target.value))}>
           {months.map((m, i) => <option key={i+1} value={i+1}>{m}</option>)}
         </select>
         <button className="btn btn-primary" onClick={load} disabled={loading}>
@@ -135,10 +135,10 @@ function SouhrnneHlaseniTab() {
     <div>
       {error && <div className="alert alert-error" onClick={() => setError('')}>{error}</div>}
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
-        <select className="form-input" style={{ width: 100 }} value={year} onChange={e => setYear(parseInt(e.target.value))}>
+        <select className="form-input" style={{ minWidth: 80, maxWidth: 120, flex: '0 1 auto' }} value={year} onChange={e => setYear(parseInt(e.target.value))}>
           {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
         </select>
-        <select className="form-input" style={{ width: 140 }} value={quarter} onChange={e => setQuarter(parseInt(e.target.value))}>
+        <select className="form-input" style={{ minWidth: 100, maxWidth: 200, flex: '0 1 auto' }} value={quarter} onChange={e => setQuarter(parseInt(e.target.value))}>
           <option value={1}>Q1 (leden–březen)</option>
           <option value={2}>Q2 (duben–červen)</option>
           <option value={3}>Q3 (červenec–září)</option>
@@ -169,8 +169,8 @@ function SouhrnneHlaseniTab() {
                   <tr>
                     <th>DIČ partnera</th>
                     <th>Název</th>
-                    <th>Kód plnění</th>
-                    <th>Počet dokladů</th>
+                    <th className="hide-mobile">Kód plnění</th>
+                    <th className="hide-mobile">Počet dokladů</th>
                     <th style={{ textAlign: 'right' }}>Celkem (CZK)</th>
                   </tr>
                 </thead>
@@ -179,15 +179,17 @@ function SouhrnneHlaseniTab() {
                     <tr key={i}>
                       <td style={{ fontFamily: 'monospace' }}>{p.dic}</td>
                       <td>{p.name || '—'}</td>
-                      <td>{p.code || '0'}</td>
-                      <td>{p.count}</td>
+                      <td className="hide-mobile">{p.code || '0'}</td>
+                      <td className="hide-mobile">{p.count}</td>
                       <td style={{ textAlign: 'right', fontWeight: 600 }}>{fmt(p.total)}</td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot>
                   <tr style={{ fontWeight: 700 }}>
-                    <td colSpan={4}>Celkem</td>
+                    <td colSpan={2}>Celkem</td>
+                    <td className="hide-mobile"></td>
+                    <td className="hide-mobile"></td>
                     <td style={{ textAlign: 'right' }}>{fmt(total)}</td>
                   </tr>
                 </tfoot>
@@ -227,7 +229,7 @@ function DanovePriznaniTab() {
     <div>
       {error && <div className="alert alert-error" onClick={() => setError('')}>{error}</div>}
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
-        <select className="form-input" style={{ width: 100 }} value={year} onChange={e => setYear(parseInt(e.target.value))}>
+        <select className="form-input" style={{ minWidth: 80, maxWidth: 120, flex: '0 1 auto' }} value={year} onChange={e => setYear(parseInt(e.target.value))}>
           {[2023, 2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
         </select>
         <button className="btn btn-primary" onClick={load} disabled={loading}>
@@ -399,7 +401,7 @@ export default function FinancniUrad() {
     <div>
       <h2 style={{ marginBottom: 16 }}>Finanční úřad</h2>
 
-      <div style={{ display: 'flex', gap: 0, borderBottom: '2px solid #e2e8f0', marginBottom: 20 }}>
+      <div style={{ display: 'flex', gap: 0, borderBottom: '2px solid #e2e8f0', marginBottom: 20, flexWrap: 'wrap', overflowX: 'auto' }}>
         {tabs.map(t => (
           <button
             key={t.id}

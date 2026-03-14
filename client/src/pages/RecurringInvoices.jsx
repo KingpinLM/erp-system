@@ -64,15 +64,15 @@ export default function RecurringInvoices() {
         {loading ? <div className="loading">Načítání...</div> : items.length === 0 ? <div className="empty-state">Žádné opakované faktury</div> : (
           <div className="table-responsive">
             <table>
-              <thead><tr><th>Klient</th><th>Interval</th><th>Další datum</th><th>Konec</th><th>Měna</th><th>Stav</th><th>Akce</th></tr></thead>
+              <thead><tr><th>Klient</th><th>Interval</th><th className="hide-mobile">Další datum</th><th className="hide-mobile">Konec</th><th className="hide-mobile">Měna</th><th>Stav</th><th>Akce</th></tr></thead>
               <tbody>
                 {items.map(r => (
                   <tr key={r.id} style={{ opacity: r.active ? 1 : 0.5 }}>
                     <td style={{ fontWeight: 600 }}>{r.client_name || '—'}</td>
                     <td>{intervalLabels[r.interval]}</td>
-                    <td>{fmtDate(r.next_date)}</td>
-                    <td>{fmtDate(r.end_date)}</td>
-                    <td>{r.currency}</td>
+                    <td className="hide-mobile">{fmtDate(r.next_date)}</td>
+                    <td className="hide-mobile">{fmtDate(r.end_date)}</td>
+                    <td className="hide-mobile">{r.currency}</td>
                     <td><span className={`badge ${r.active ? 'badge-paid' : 'badge-cancelled'}`}>{r.active ? 'Aktivní' : 'Pozastaveno'}</span></td>
                     <td>
                       <div className="btn-group">
@@ -91,7 +91,7 @@ export default function RecurringInvoices() {
 
       {showModal && (
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 700 }}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 'min(700px, 95vw)' }}>
             <div className="modal-header">
               <h3 className="modal-title">{editing ? 'Upravit opakovanou fakturu' : 'Nová opakovaná faktura'}</h3>
               <button className="modal-close" onClick={() => setShowModal(false)}>&times;</button>

@@ -347,20 +347,20 @@ export default function Evidence() {
                 <table>
                   <thead><tr>
                     <th style={{ cursor: 'pointer' }} onClick={() => toggleSort('title')}>Název<SortIcon col="title" /></th>
-                    <th style={{ cursor: 'pointer' }} onClick={() => toggleSort('category')}>Kategorie<SortIcon col="category" /></th>
+                    <th className="hide-mobile" style={{ cursor: 'pointer' }} onClick={() => toggleSort('category')}>Kategorie<SortIcon col="category" /></th>
                     <th style={{ cursor: 'pointer' }} onClick={() => toggleSort('date')}>Datum<SortIcon col="date" /></th>
                     <th className="text-right" style={{ cursor: 'pointer' }} onClick={() => toggleSort('amount')}>Částka<SortIcon col="amount" /></th>
-                    <th>Měna</th><th>Vytvořil</th><th>Akce</th>
+                    <th className="hide-mobile">Měna</th><th className="hide-mobile">Vytvořil</th><th>Akce</th>
                   </tr></thead>
                   <tbody>
                     {sorted.slice((page - 1) * perPage, page * perPage).map(r => (
                       <tr key={r.id}>
                         <td><strong>{r.title}</strong>{r.description && <div className="text-muted" style={{ fontSize: '0.8rem' }}>{r.description}</div>}</td>
-                        <td>{r.category ? <span className="badge">{r.category}</span> : '—'}</td>
+                        <td className="hide-mobile">{r.category ? <span className="badge">{r.category}</span> : '—'}</td>
                         <td>{fmtDate(r.date)}</td>
                         <td className="text-right" style={{ fontWeight: 600, color: tab === 'income' ? 'var(--success)' : 'var(--danger)' }}>{fmt(r.amount, r.currency)}</td>
-                        <td>{r.currency}</td>
-                        <td>{r.created_by_name}</td>
+                        <td className="hide-mobile">{r.currency}</td>
+                        <td className="hide-mobile">{r.created_by_name}</td>
                         <td>
                           <div className="btn-group">
                             {can('admin', 'accountant') && <button className="btn btn-outline btn-sm" onClick={() => openEdit(r)}>Upravit</button>}

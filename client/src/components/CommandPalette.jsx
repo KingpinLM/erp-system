@@ -136,7 +136,7 @@ export default function CommandPalette() {
         position: 'fixed', inset: 0, zIndex: 10002,
         background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)',
         display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
-        paddingTop: '15vh',
+        paddingTop: 'max(3vh, 16px)',
         animation: 'fadeIn 0.1s ease-out',
       }}
       onClick={() => setOpen(false)}
@@ -146,7 +146,7 @@ export default function CommandPalette() {
         style={{
           background: 'var(--card-bg, white)', borderRadius: 16,
           boxShadow: '0 24px 80px rgba(0,0,0,0.25)',
-          width: '100%', maxWidth: 560,
+          width: '100%', maxWidth: 560, margin: '0 12px',
           overflow: 'hidden',
           animation: 'scaleIn 0.15s ease-out',
         }}

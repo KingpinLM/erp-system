@@ -62,7 +62,7 @@ export default function VatReport() {
       </div>
 
       {loading ? <p>Načítání...</p> : report && (
-        <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 16 }}>
           <div className="card">
             <h3 style={{ marginBottom: 12 }}>DPH na výstupu (vydané faktury)</h3>
             <table className="table">
@@ -107,7 +107,7 @@ export default function VatReport() {
 
           <div className="card" style={{ gridColumn: '1 / -1' }}>
             <h3 style={{ marginBottom: 12 }}>Výsledek</h3>
-            <div className="kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+            <div className="kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
               <div className="kpi-card">
                 <div className="kpi-label">DPH na výstupu</div>
                 <div className="kpi-value" style={{ color: '#ef4444' }}>{report.totalOutput.toLocaleString('cs', { minimumFractionDigits: 2 })} Kč</div>

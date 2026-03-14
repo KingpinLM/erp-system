@@ -173,16 +173,16 @@ export default function Products() {
           </div>
           {loading ? <p>Načítání...</p> : (
             <table className="table">
-              <thead><tr><th>Název</th><th>SKU</th><th>Typ</th><th>Jednotka</th><th style={{ textAlign: 'right' }}>Cena</th><th style={{ textAlign: 'right' }}>DPH</th><th style={{ textAlign: 'right' }}>Skladem</th><th>Akce</th></tr></thead>
+              <thead><tr><th>Název</th><th className="hide-mobile">SKU</th><th className="hide-mobile">Typ</th><th className="hide-mobile">Jednotka</th><th style={{ textAlign: 'right' }}>Cena</th><th className="hide-mobile" style={{ textAlign: 'right' }}>DPH</th><th style={{ textAlign: 'right' }}>Skladem</th><th>Akce</th></tr></thead>
               <tbody>
                 {products.slice((page - 1) * perPage, page * perPage).map(p => (
                   <tr key={p.id} style={{ opacity: p.active ? 1 : 0.5 }}>
                     <td><strong>{p.name}</strong>{p.description && <div style={{ fontSize: 11, color: '#64748b' }}>{p.description.slice(0, 50)}</div>}</td>
-                    <td>{p.sku || '—'}</td>
-                    <td><span className={`badge badge-${p.type === 'product' ? 'sent' : 'draft'}`}>{p.type === 'product' ? 'Produkt' : 'Služba'}</span></td>
-                    <td>{p.unit}</td>
+                    <td className="hide-mobile">{p.sku || '—'}</td>
+                    <td className="hide-mobile"><span className={`badge badge-${p.type === 'product' ? 'sent' : 'draft'}`}>{p.type === 'product' ? 'Produkt' : 'Služba'}</span></td>
+                    <td className="hide-mobile">{p.unit}</td>
                     <td style={{ textAlign: 'right' }}>{p.unit_price.toLocaleString('cs', { minimumFractionDigits: 2 })} Kč</td>
-                    <td style={{ textAlign: 'right' }}>{p.vat_rate}%</td>
+                    <td className="hide-mobile" style={{ textAlign: 'right' }}>{p.vat_rate}%</td>
                     <td style={{ textAlign: 'right', fontWeight: p.type === 'product' ? 600 : 400, color: p.type === 'product' && p.stock_quantity <= p.min_stock ? '#ef4444' : undefined }}>
                       {p.type === 'product' ? `${p.stock_quantity} ${p.unit}` : '—'}
                     </td>
@@ -231,7 +231,7 @@ export default function Products() {
       {/* Stock report */}
       {tab === 'report' && stockReport && (
         <>
-          <div className="kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>
+          <div className="kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 16 }}>
             <div className="kpi-card"><div className="kpi-label">Celková hodnota skladu</div><div className="kpi-value">{stockReport.totalValue.toLocaleString('cs', { minimumFractionDigits: 2 })} Kč</div></div>
             <div className="kpi-card"><div className="kpi-label">Produktů celkem</div><div className="kpi-value">{stockReport.products.length}</div></div>
             <div className="kpi-card"><div className="kpi-label" style={{ color: '#ef4444' }}>Pod minimem</div><div className="kpi-value" style={{ color: '#ef4444' }}>{stockReport.lowStock.length}</div></div>
