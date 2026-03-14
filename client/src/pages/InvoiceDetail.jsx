@@ -507,7 +507,10 @@ ${layoutStyles[co?.invoice_layout] || ''}
               ))}
               <div className="inv-sum-total"><span>Celkem</span><span>{fmt(invoice.total, invoice.currency)}</span></div>
               {invoice.currency !== 'CZK' && (
-                <div className="inv-sum-czk"><span>V CZK</span><span>{fmt(invoice.total_czk, 'CZK')}</span></div>
+                <>
+                  <div className="inv-sum-czk"><span>Kurz {invoice.currency}/CZK</span><span>{(invoice.exchange_rate || (invoice.total ? invoice.total_czk / invoice.total : 1)).toFixed(4)}</span></div>
+                  <div className="inv-sum-czk"><span>V CZK</span><span>{fmt(invoice.total_czk, 'CZK')}</span></div>
+                </>
               )}
             </div>
           </div>

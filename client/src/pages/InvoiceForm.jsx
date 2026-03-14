@@ -265,6 +265,10 @@ export default function InvoiceForm() {
               <select className="form-select" value={form.currency} onChange={e => updateField('currency', e.target.value)}>
                 {currencies.map(c => <option key={c.code} value={c.code}>{c.code} - {c.name} ({c.symbol})</option>)}
               </select>
+              {form.currency && form.currency !== 'CZK' && (() => {
+                const cur = currencies.find(c => c.code === form.currency);
+                return cur ? <div style={{ fontSize: '0.8rem', color: 'var(--gray-500)', marginTop: '0.25rem' }}>Kurz: 1 {form.currency} = {cur.rate_to_czk?.toFixed(2)} Kč (aktuální kurz ČNB, uloží se při vystavení)</div> : null;
+              })()}
             </div>
             <div className="form-group">
               <label className="form-label">Způsob úhrady</label>
@@ -369,6 +373,11 @@ export default function InvoiceForm() {
             <div className="row"><span>Základ:</span><span>{fmtCur(subtotal)} {form.currency}</span></div>
             {vatPayer && <div className="row"><span>DPH celkem:</span><span>{fmtCur(totalTax)} {form.currency}</span></div>}
             <div className="row total"><span>Celkem:</span><span>{fmtCur(total)} {form.currency}</span></div>
+            {form.currency && form.currency !== 'CZK' && (() => {
+              const cur = currencies.find(c => c.code === form.currency);
+              const rate = cur?.rate_to_czk || 1;
+              return <div className="row" style={{ color: 'var(--gray-500)', fontSize: '0.9rem' }}><span>V CZK (kurz {rate.toFixed(2)}):</span><span>{fmtCur(total * rate)} Kč</span></div>;
+            })()}
           </div>
         </div>
 

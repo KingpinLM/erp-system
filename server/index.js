@@ -889,7 +889,7 @@ app.get('/api/invoices/:id', ...tenanted, (req, res) => {
 app.post('/api/invoices', ...tenanted, authorize('admin', 'accountant'), (req, res) => {
   const { invoice_number, client_id, issue_date, due_date, supply_date, payment_method, status, currency, note, items, variable_symbol, invoice_type } = req.body;
   const curr = db.prepare('SELECT rate_to_czk FROM currencies WHERE code = ?').get(currency || 'CZK');
-  const rate = curr ? curr.rate_to_czk : 1;
+  const rate = curr ? curr.rate_to_czk : 1; // kurz platný při vystavení faktury
 
   let finalNumber = invoice_number;
   let finalVS = variable_symbol;
@@ -917,9 +917,9 @@ app.post('/api/invoices', ...tenanted, authorize('admin', 'accountant'), (req, r
   const totalCzk = total * rate;
 
   const result = db.prepare(`
-    INSERT INTO invoices (tenant_id, invoice_number, type, client_id, issue_date, due_date, supply_date, payment_method, status, currency, subtotal, tax_rate, tax_amount, total, total_czk, note, created_by, variable_symbol, invoice_type)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-  `).run(req.tenant_id, finalNumber, 'issued', client_id, issue_date, due_date, supply_date || issue_date, payment_method || 'bank_transfer', status || 'draft', currency || 'CZK', subtotal, 0, totalTax, total, totalCzk, note || null, req.user.id, finalVS, invoice_type || 'regular');
+    INSERT INTO invoices (tenant_id, invoice_number, type, client_id, issue_date, due_date, supply_date, payment_method, status, currency, exchange_rate, subtotal, tax_rate, tax_amount, total, total_czk, note, created_by, variable_symbol, invoice_type)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+  `).run(req.tenant_id, finalNumber, 'issued', client_id, issue_date, due_date, supply_date || issue_date, payment_method || 'bank_transfer', status || 'draft', currency || 'CZK', rate, subtotal, 0, totalTax, total, totalCzk, note || null, req.user.id, finalVS, invoice_type || 'regular');
 
   const invoiceId = result.lastInsertRowid;
   const insertItem = db.prepare('INSERT INTO invoice_items (invoice_id, description, quantity, unit, unit_price, total, tax_rate, tax_amount, total_with_tax) VALUES (?,?,?,?,?,?,?,?,?)');
@@ -938,8 +938,16 @@ app.post('/api/invoices', ...tenanted, authorize('admin', 'accountant'), (req, r
 
 app.put('/api/invoices/:id', ...tenanted, authorize('admin', 'accountant'), (req, res) => {
   const { invoice_number, client_id, issue_date, due_date, supply_date, payment_method, paid_date, status, currency, note, items } = req.body;
-  const curr = db.prepare('SELECT rate_to_czk FROM currencies WHERE code = ?').get(currency || 'CZK');
-  const rate = curr ? curr.rate_to_czk : 1;
+
+  // Použij uložený kurz z faktury; nový kurz jen pokud se změní měna
+  const existing = db.prepare('SELECT currency, exchange_rate FROM invoices WHERE id = ? AND tenant_id = ?').get(req.params.id, req.tenant_id);
+  let rate;
+  if (existing && existing.currency === (currency || 'CZK') && existing.exchange_rate) {
+    rate = existing.exchange_rate; // zachováme historický kurz
+  } else {
+    const curr = db.prepare('SELECT rate_to_czk FROM currencies WHERE code = ?').get(currency || 'CZK');
+    rate = curr ? curr.rate_to_czk : 1;
+  }
 
   let subtotal = 0;
   let totalTax = 0;
@@ -952,8 +960,8 @@ app.put('/api/invoices/:id', ...tenanted, authorize('admin', 'accountant'), (req
   const total = subtotal + totalTax;
   const totalCzk = total * rate;
 
-  const baseFields = 'client_id=?, issue_date=?, due_date=?, supply_date=?, payment_method=?, paid_date=?, status=?, currency=?, subtotal=?, tax_rate=?, tax_amount=?, total=?, total_czk=?, note=?, updated_at=datetime(\'now\')';
-  const baseParams = [client_id, issue_date, due_date, supply_date || issue_date, payment_method || 'bank_transfer', paid_date || null, status, currency || 'CZK', subtotal, 0, totalTax, total, totalCzk, note || null];
+  const baseFields = 'client_id=?, issue_date=?, due_date=?, supply_date=?, payment_method=?, paid_date=?, status=?, currency=?, exchange_rate=?, subtotal=?, tax_rate=?, tax_amount=?, total=?, total_czk=?, note=?, updated_at=datetime(\'now\')';
+  const baseParams = [client_id, issue_date, due_date, supply_date || issue_date, payment_method || 'bank_transfer', paid_date || null, status, currency || 'CZK', rate, subtotal, 0, totalTax, total, totalCzk, note || null];
 
   if (invoice_number && req.user.role === 'admin') {
     db.prepare(`UPDATE invoices SET invoice_number=?, ${baseFields} WHERE id=? AND tenant_id=?`).run(invoice_number, ...baseParams, req.params.id, req.tenant_id);
@@ -1302,8 +1310,8 @@ app.post('/api/invoices/:id/duplicate', ...tenanted, authorize('admin', 'account
   const dueDays = comp?.default_due_days || 14;
   const due = new Date(); due.setDate(due.getDate() + dueDays);
   const dueDate = due.toISOString().slice(0, 10);
-  const result = db.prepare(`INSERT INTO invoices (tenant_id, invoice_number, type, client_id, issue_date, due_date, supply_date, payment_method, status, currency, subtotal, tax_rate, tax_amount, total, total_czk, note, created_by, variable_symbol, invoice_type)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(req.tenant_id, newNumber, orig.type, orig.client_id, today, dueDate, today, orig.payment_method, 'draft', orig.currency, orig.subtotal, orig.tax_rate, orig.tax_amount, orig.total, orig.total_czk, orig.note, req.user.id, newVS, 'regular');
+  const result = db.prepare(`INSERT INTO invoices (tenant_id, invoice_number, type, client_id, issue_date, due_date, supply_date, payment_method, status, currency, exchange_rate, subtotal, tax_rate, tax_amount, total, total_czk, note, created_by, variable_symbol, invoice_type)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(req.tenant_id, newNumber, orig.type, orig.client_id, today, dueDate, today, orig.payment_method, 'draft', orig.currency, orig.exchange_rate || 1, orig.subtotal, orig.tax_rate, orig.tax_amount, orig.total, orig.total_czk, orig.note, req.user.id, newVS, 'regular');
   const newId = result.lastInsertRowid;
   const items = db.prepare('SELECT * FROM invoice_items WHERE invoice_id = ?').all(req.params.id);
   const ins = db.prepare('INSERT INTO invoice_items (invoice_id, description, quantity, unit, unit_price, total, tax_rate, tax_amount, total_with_tax) VALUES (?,?,?,?,?,?,?,?,?)');
@@ -1321,8 +1329,8 @@ app.post('/api/invoices/:id/credit-note', ...tenanted, authorize('admin', 'accou
   const newVS = generateVariableSymbol(comp);
   db.prepare('UPDATE company SET invoice_counter = ? WHERE tenant_id = ?').run((comp?.invoice_counter || 1) + 1, req.tenant_id);
   const today = new Date().toISOString().slice(0, 10);
-  const result = db.prepare(`INSERT INTO invoices (tenant_id, invoice_number, type, client_id, issue_date, due_date, supply_date, payment_method, status, currency, subtotal, tax_rate, tax_amount, total, total_czk, note, created_by, variable_symbol, invoice_type, related_invoice_id)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(req.tenant_id, newNumber, orig.type, orig.client_id, today, today, today, orig.payment_method, 'draft', orig.currency, -orig.subtotal, orig.tax_rate, -orig.tax_amount, -orig.total, -orig.total_czk, `Dobropis k faktuře ${orig.invoice_number}`, req.user.id, newVS, 'credit_note', req.params.id);
+  const result = db.prepare(`INSERT INTO invoices (tenant_id, invoice_number, type, client_id, issue_date, due_date, supply_date, payment_method, status, currency, exchange_rate, subtotal, tax_rate, tax_amount, total, total_czk, note, created_by, variable_symbol, invoice_type, related_invoice_id)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(req.tenant_id, newNumber, orig.type, orig.client_id, today, today, today, orig.payment_method, 'draft', orig.currency, orig.exchange_rate || 1, -orig.subtotal, orig.tax_rate, -orig.tax_amount, -orig.total, -orig.total_czk, `Dobropis k faktuře ${orig.invoice_number}`, req.user.id, newVS, 'credit_note', req.params.id);
   const newId = result.lastInsertRowid;
   const items = db.prepare('SELECT * FROM invoice_items WHERE invoice_id = ?').all(req.params.id);
   const ins = db.prepare('INSERT INTO invoice_items (invoice_id, description, quantity, unit, unit_price, total, tax_rate, tax_amount, total_with_tax) VALUES (?,?,?,?,?,?,?,?,?)');
@@ -1342,8 +1350,8 @@ app.post('/api/invoices/:id/to-invoice', ...tenanted, authorize('admin', 'accoun
   const today = new Date().toISOString().slice(0, 10);
   const dueDays = comp?.default_due_days || 14;
   const due = new Date(); due.setDate(due.getDate() + dueDays);
-  const result = db.prepare(`INSERT INTO invoices (tenant_id, invoice_number, type, client_id, issue_date, due_date, supply_date, payment_method, status, currency, subtotal, tax_rate, tax_amount, total, total_czk, note, created_by, variable_symbol, invoice_type, related_invoice_id)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(req.tenant_id, newNumber, proforma.type, proforma.client_id, today, due.toISOString().slice(0,10), today, proforma.payment_method, 'draft', proforma.currency, proforma.subtotal, proforma.tax_rate, proforma.tax_amount, proforma.total, proforma.total_czk, proforma.note, req.user.id, newVS, 'regular', req.params.id);
+  const result = db.prepare(`INSERT INTO invoices (tenant_id, invoice_number, type, client_id, issue_date, due_date, supply_date, payment_method, status, currency, exchange_rate, subtotal, tax_rate, tax_amount, total, total_czk, note, created_by, variable_symbol, invoice_type, related_invoice_id)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(req.tenant_id, newNumber, proforma.type, proforma.client_id, today, due.toISOString().slice(0,10), today, proforma.payment_method, 'draft', proforma.currency, proforma.exchange_rate || 1, proforma.subtotal, proforma.tax_rate, proforma.tax_amount, proforma.total, proforma.total_czk, proforma.note, req.user.id, newVS, 'regular', req.params.id);
   const newId = result.lastInsertRowid;
   const items = db.prepare('SELECT * FROM invoice_items WHERE invoice_id = ?').all(req.params.id);
   const ins = db.prepare('INSERT INTO invoice_items (invoice_id, description, quantity, unit, unit_price, total, tax_rate, tax_amount, total_with_tax) VALUES (?,?,?,?,?,?,?,?,?)');
@@ -1452,7 +1460,7 @@ app.get('/api/invoices/:id/isdoc', ...tenanted, (req, res) => {
   <Note>${(invoice.note || '').replace(/&/g,'&amp;').replace(/</g,'&lt;')}</Note>
   <LocalCurrencyCode>CZK</LocalCurrencyCode>
   <ForeignCurrencyCode>${invoice.currency}</ForeignCurrencyCode>
-  <CurrRate>${invoice.total_czk && invoice.total ? (invoice.total_czk / invoice.total).toFixed(4) : '1.0000'}</CurrRate>
+  <CurrRate>${(invoice.exchange_rate || (invoice.total_czk && invoice.total ? invoice.total_czk / invoice.total : 1)).toFixed(4)}</CurrRate>
   <RefCurrRate>1</RefCurrRate>
   <AccountingSupplierParty>
     <Party>
@@ -1552,8 +1560,8 @@ function processRecurringInvoices() {
     db.prepare('UPDATE company SET invoice_counter = ? WHERE tenant_id = ?').run((comp.invoice_counter||1)+1, rec.tenant_id);
     const dueDays = comp.default_due_days || 14;
     const dueDate = new Date(rec.next_date); dueDate.setDate(dueDate.getDate()+dueDays);
-    const result = db.prepare(`INSERT INTO invoices (tenant_id, invoice_number, type, client_id, issue_date, due_date, supply_date, payment_method, status, currency, subtotal, tax_rate, tax_amount, total, total_czk, note, created_by, variable_symbol) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
-      .run(rec.tenant_id, newNumber, 'issued', rec.client_id, rec.next_date, dueDate.toISOString().slice(0,10), rec.next_date, rec.payment_method, 'draft', rec.currency, subtotal, 0, totalTax, total, total*rate, rec.note, rec.created_by, newVS);
+    const result = db.prepare(`INSERT INTO invoices (tenant_id, invoice_number, type, client_id, issue_date, due_date, supply_date, payment_method, status, currency, exchange_rate, subtotal, tax_rate, tax_amount, total, total_czk, note, created_by, variable_symbol) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+      .run(rec.tenant_id, newNumber, 'issued', rec.client_id, rec.next_date, dueDate.toISOString().slice(0,10), rec.next_date, rec.payment_method, 'draft', rec.currency, rate, subtotal, 0, totalTax, total, total*rate, rec.note, rec.created_by, newVS);
     const invoiceId = result.lastInsertRowid;
     const ins = db.prepare('INSERT INTO invoice_items (invoice_id, description, quantity, unit, unit_price, total, tax_rate, tax_amount, total_with_tax) VALUES (?,?,?,?,?,?,?,?,?)');
     items.forEach(i => { const lt=(i.quantity||1)*(i.unit_price||0); const tr=i.tax_rate??0; const tx=lt*(tr/100); ins.run(invoiceId,i.description,i.quantity||1,i.unit||'ks',i.unit_price||0,lt,tr,tx,lt+tx); });

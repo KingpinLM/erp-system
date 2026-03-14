@@ -494,6 +494,8 @@ safeAlter('ALTER TABLE invoices ADD COLUMN paid_amount REAL DEFAULT 0');
 safeAlter('ALTER TABLE company ADD COLUMN logo TEXT'); // base64 logo
 safeAlter('ALTER TABLE company ADD COLUMN reminder_days TEXT'); // JSON array e.g. [3,7,14]
 
+safeAlter('ALTER TABLE invoices ADD COLUMN exchange_rate REAL DEFAULT 1.0');
+
 safeAlter('ALTER TABLE company ADD COLUMN order_prefix TEXT DEFAULT \'OBJ\'');
 safeAlter('ALTER TABLE company ADD COLUMN order_counter INTEGER DEFAULT 1');
 safeAlter('ALTER TABLE company ADD COLUMN cash_prefix TEXT DEFAULT \'PPD\'');
@@ -524,6 +526,11 @@ try {
 try {
   db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_bank_accounts_tenant_currency ON bank_accounts(tenant_id, currency)`);
 } catch (e) { /* already exists */ }
+
+// Backfill exchange_rate for existing invoices (compute from total_czk / total)
+try {
+  db.exec(`UPDATE invoices SET exchange_rate = CASE WHEN total > 0 THEN total_czk / total ELSE 1.0 END WHERE exchange_rate IS NULL OR exchange_rate = 1.0 AND currency != 'CZK'`);
+} catch (e) { /* ok */ }
 
 // Set invoice counter based on existing invoices
 try {
