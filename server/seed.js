@@ -41,6 +41,9 @@ insertCurrency.run('GBP', 'British Pound', '£', 29.80);
 insertCurrency.run('PLN', 'Polský zlotý', 'zł', 5.85);
 
 // ─── CLIENTS (tenant-scoped) ────────────────────────────────
+// Clean up duplicate clients (keep lowest id per name per tenant)
+db.prepare(`DELETE FROM clients WHERE id NOT IN (SELECT MIN(id) FROM clients GROUP BY tenant_id, name)`).run();
+
 const insertClient = db.prepare(`INSERT OR IGNORE INTO clients (tenant_id, name, ico, dic, email, phone, address, city, zip, country) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
 const clients = [
   ['TechSoft s.r.o.', '12345678', 'CZ12345678', 'info@techsoft.cz', '+420 111 222 333', 'Vinohradská 10', 'Praha', '12000', 'CZ'],

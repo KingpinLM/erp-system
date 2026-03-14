@@ -11,6 +11,9 @@ export default function Clients() {
   const [form, setForm] = useState({ name: '', ico: '', dic: '', email: '', phone: '', address: '', city: '', zip: '', country: 'CZ' });
   const [sortBy, setSortBy] = useState('name');
   const [sortDir, setSortDir] = useState('asc');
+  const [duplicateWarnings, setDuplicateWarnings] = useState([]);
+  const [error, setError] = useState('');
+  const dupTimerRef = React.useRef(null);
   const { can } = useAuth();
 
   const load = () => { setLoading(true); api.getClients().then(setClients).finally(() => setLoading(false)); };
@@ -43,14 +46,38 @@ export default function Clients() {
     return <span> {sortDir === 'asc' ? '↑' : '↓'}</span>;
   };
 
-  const openNew = () => { setEditing(null); setForm({ name: '', ico: '', dic: '', email: '', phone: '', address: '', city: '', zip: '', country: 'CZ' }); setShowModal(true); };
-  const openEdit = (c) => { setEditing(c); setForm({ name: c.name, ico: c.ico || '', dic: c.dic || '', email: c.email || '', phone: c.phone || '', address: c.address || '', city: c.city || '', zip: c.zip || '', country: c.country || 'CZ' }); setShowModal(true); };
+  const checkDuplicates = (formData, excludeId) => {
+    clearTimeout(dupTimerRef.current);
+    dupTimerRef.current = setTimeout(async () => {
+      const params = { name: formData.name, ico: formData.ico, dic: formData.dic, email: formData.email };
+      if (excludeId) params.exclude_id = excludeId;
+      if (!params.name && !params.ico && !params.dic && !params.email) { setDuplicateWarnings([]); return; }
+      try {
+        const matches = await api.checkDuplicateClient(params);
+        setDuplicateWarnings(matches);
+      } catch { setDuplicateWarnings([]); }
+    }, 400);
+  };
+
+  const updateForm = (updates, excludeId) => {
+    setForm(f => {
+      const next = { ...f, ...updates };
+      checkDuplicates(next, excludeId);
+      return next;
+    });
+  };
+
+  const openNew = () => { setEditing(null); setForm({ name: '', ico: '', dic: '', email: '', phone: '', address: '', city: '', zip: '', country: 'CZ' }); setDuplicateWarnings([]); setError(''); setShowModal(true); };
+  const openEdit = (c) => { setEditing(c); setForm({ name: c.name, ico: c.ico || '', dic: c.dic || '', email: c.email || '', phone: c.phone || '', address: c.address || '', city: c.city || '', zip: c.zip || '', country: c.country || 'CZ' }); setDuplicateWarnings([]); setError(''); setShowModal(true); };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (editing) { await api.updateClient(editing.id, form); } else { await api.createClient(form); }
-    setShowModal(false);
-    load();
+    setError('');
+    try {
+      if (editing) { await api.updateClient(editing.id, form); } else { await api.createClient(form); }
+      setShowModal(false);
+      load();
+    } catch (err) { setError(err.message); }
   };
 
   const handleDelete = async (id) => {
@@ -126,28 +153,44 @@ export default function Clients() {
               <button className="modal-close" onClick={() => setShowModal(false)}>&times;</button>
             </div>
             <form onSubmit={handleSubmit}>
+              {error && (
+                <div className="alert alert-error" style={{ marginBottom: '0.75rem' }} onClick={() => setError('')}>{error}</div>
+              )}
+              {duplicateWarnings.length > 0 && (
+                <div style={{ marginBottom: '0.75rem', padding: '0.6rem 0.75rem', background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: 'var(--radius)', fontSize: '0.82rem', color: '#92400e' }}>
+                  <strong style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 2 }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                    Možný duplicitní klient
+                  </strong>
+                  {duplicateWarnings.map(d => {
+                    const matchLabels = { name: 'název', ico: 'IČO', dic: 'DIČ', email: 'email' };
+                    return <div key={d.id}>Shoda v poli <strong>{matchLabels[d.match] || d.match}</strong>: {d.name}{d.ico ? ` (IČO: ${d.ico})` : ''}</div>;
+                  })}
+                </div>
+              )}
               <div className="form-group">
                 <label className="form-label">Název firmy *</label>
-                <input className="form-input" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required />
+                <input className="form-input" value={form.name} onChange={e => updateForm({ name: e.target.value }, editing?.id)} required />
               </div>
               <div className="form-row">
                 <div className="form-group">
                   <label className="form-label">IČO</label>
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <input className="form-input" value={form.ico} onChange={e => setForm(f => ({ ...f, ico: e.target.value }))} />
+                    <input className="form-input" value={form.ico} onChange={e => updateForm({ ico: e.target.value }, editing?.id)} />
                     <button type="button" className="btn btn-outline btn-sm" style={{ whiteSpace: 'nowrap' }} onClick={async () => {
                       if (!form.ico) return;
                       try {
                         const data = await api.aresLookup(form.ico);
-                        setForm(f => ({ ...f, name: data.name || f.name, dic: data.dic || f.dic, address: data.address || f.address, city: data.city || f.city, zip: data.zip || f.zip, country: data.country || f.country }));
+                        const updates = { name: data.name || form.name, dic: data.dic || form.dic, address: data.address || form.address, city: data.city || form.city, zip: data.zip || form.zip, country: data.country || form.country };
+                        updateForm(updates, editing?.id);
                       } catch (e) { alert(e.message); }
                     }}>ARES</button>
                   </div>
                 </div>
-                <div className="form-group"><label className="form-label">DIČ</label><input className="form-input" value={form.dic} onChange={e => setForm(f => ({ ...f, dic: e.target.value }))} /></div>
+                <div className="form-group"><label className="form-label">DIČ</label><input className="form-input" value={form.dic} onChange={e => updateForm({ dic: e.target.value }, editing?.id)} /></div>
               </div>
               <div className="form-row">
-                <div className="form-group"><label className="form-label">Email</label><input className="form-input" type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} /></div>
+                <div className="form-group"><label className="form-label">Email</label><input className="form-input" type="email" value={form.email} onChange={e => updateForm({ email: e.target.value }, editing?.id)} /></div>
                 <div className="form-group"><label className="form-label">Telefon</label><input className="form-input" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} /></div>
               </div>
               <div className="form-group"><label className="form-label">Adresa</label><input className="form-input" value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} /></div>

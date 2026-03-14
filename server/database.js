@@ -64,7 +64,8 @@ db.exec(`
     zip TEXT,
     country TEXT DEFAULT 'CZ',
     note TEXT,
-    created_at TEXT DEFAULT (datetime('now'))
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(tenant_id, name)
   );
 
   CREATE TABLE IF NOT EXISTS invoices (

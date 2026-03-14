@@ -722,16 +722,57 @@ app.get('/api/clients', ...tenanted, (req, res) => {
 
 app.post('/api/clients', ...tenanted, authorize('admin', 'accountant', 'manager'), (req, res) => {
   const { name, ico, dic, email, phone, address, city, zip, country } = req.body;
+  if (!name || !name.trim()) return res.status(400).json({ error: 'Název klienta je povinný' });
+  const existingName = db.prepare('SELECT id, name FROM clients WHERE tenant_id = ? AND name = ?').get(req.tenant_id, name.trim());
+  if (existingName) return res.status(400).json({ error: `Klient s názvem "${name}" již existuje.` });
+  if (ico) {
+    const existingIco = db.prepare('SELECT id, name FROM clients WHERE tenant_id = ? AND ico = ?').get(req.tenant_id, ico);
+    if (existingIco) return res.status(400).json({ error: `Klient s IČO "${ico}" již existuje (${existingIco.name}).` });
+  }
   const result = db.prepare('INSERT INTO clients (tenant_id, name, ico, dic, email, phone, address, city, zip, country) VALUES (?,?,?,?,?,?,?,?,?,?)')
-    .run(req.tenant_id, name, ico || null, dic || null, email || null, phone || null, address || null, city || null, zip || null, country || 'CZ');
+    .run(req.tenant_id, name.trim(), ico || null, dic || null, email || null, phone || null, address || null, city || null, zip || null, country || 'CZ');
   res.json({ id: result.lastInsertRowid });
 });
 
 app.put('/api/clients/:id', ...tenanted, authorize('admin', 'accountant', 'manager'), (req, res) => {
   const { name, ico, dic, email, phone, address, city, zip, country } = req.body;
+  if (!name || !name.trim()) return res.status(400).json({ error: 'Název klienta je povinný' });
+  const existingName = db.prepare('SELECT id, name FROM clients WHERE tenant_id = ? AND name = ? AND id != ?').get(req.tenant_id, name.trim(), req.params.id);
+  if (existingName) return res.status(400).json({ error: `Klient s názvem "${name}" již existuje.` });
+  if (ico) {
+    const existingIco = db.prepare('SELECT id, name FROM clients WHERE tenant_id = ? AND ico = ? AND id != ?').get(req.tenant_id, ico, req.params.id);
+    if (existingIco) return res.status(400).json({ error: `Klient s IČO "${ico}" již existuje (${existingIco.name}).` });
+  }
   db.prepare('UPDATE clients SET name=?, ico=?, dic=?, email=?, phone=?, address=?, city=?, zip=?, country=? WHERE id=? AND tenant_id=?')
-    .run(name, ico, dic, email, phone, address, city, zip, country, req.params.id, req.tenant_id);
+    .run(name.trim(), ico, dic, email, phone, address, city, zip, country, req.params.id, req.tenant_id);
   res.json({ ok: true });
+});
+
+// Duplicate check for clients (used by frontend for live warnings)
+app.get('/api/clients/check-duplicate', ...tenanted, (req, res) => {
+  const { name, ico, dic, email, exclude_id } = req.query;
+  const matches = [];
+  if (name && name.trim()) {
+    const byName = db.prepare('SELECT id, name, ico FROM clients WHERE tenant_id = ? AND name = ?' + (exclude_id ? ' AND id != ?' : ''))
+      .all(...[req.tenant_id, name.trim(), ...(exclude_id ? [exclude_id] : [])]);
+    byName.forEach(c => matches.push({ ...c, match: 'name' }));
+  }
+  if (ico && ico.trim()) {
+    const byIco = db.prepare('SELECT id, name, ico FROM clients WHERE tenant_id = ? AND ico = ?' + (exclude_id ? ' AND id != ?' : ''))
+      .all(...[req.tenant_id, ico.trim(), ...(exclude_id ? [exclude_id] : [])]);
+    byIco.forEach(c => { if (!matches.find(m => m.id === c.id)) matches.push({ ...c, match: 'ico' }); });
+  }
+  if (dic && dic.trim()) {
+    const byDic = db.prepare('SELECT id, name, ico FROM clients WHERE tenant_id = ? AND dic = ?' + (exclude_id ? ' AND id != ?' : ''))
+      .all(...[req.tenant_id, dic.trim(), ...(exclude_id ? [exclude_id] : [])]);
+    byDic.forEach(c => { if (!matches.find(m => m.id === c.id)) matches.push({ ...c, match: 'dic' }); });
+  }
+  if (email && email.trim()) {
+    const byEmail = db.prepare('SELECT id, name, ico FROM clients WHERE tenant_id = ? AND email = ?' + (exclude_id ? ' AND id != ?' : ''))
+      .all(...[req.tenant_id, email.trim(), ...(exclude_id ? [exclude_id] : [])]);
+    byEmail.forEach(c => { if (!matches.find(m => m.id === c.id)) matches.push({ ...c, match: 'email' }); });
+  }
+  res.json(matches);
 });
 
 app.get('/api/clients/:id', ...tenanted, (req, res) => {

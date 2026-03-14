@@ -58,6 +58,7 @@ export const api = {
   getClient: (id) => request(`/clients/${id}`),
   getClientInvoices: (id) => request(`/clients/${id}/invoices`),
   deleteClient: (id) => request(`/clients/${id}`, { method: 'DELETE' }),
+  checkDuplicateClient: (params) => { const qs = new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([,v]) => v))).toString(); return request(`/clients/check-duplicate?${qs}`); },
 
   // Invoices
   getNextInvoiceNumber: () => request('/invoices/next-number'),
