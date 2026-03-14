@@ -134,6 +134,8 @@ export default function Clients() {
   const [hoverDetail, setHoverDetail] = useState(null);
   const hoverTimer = useRef(null);
   const hoverCache = useRef({});
+  const abortRef = useRef(null);
+  const moveThrottle = useRef(0);
 
   const calcPreviewPos = useCallback((clientX, clientY) => {
     const pw = 300, ph = 360, gap = 16;
@@ -154,22 +156,31 @@ export default function Clients() {
       return;
     }
     clearTimeout(hoverTimer.current);
+    abortRef.current?.abort();
     hoverTimer.current = setTimeout(() => {
+      const ctrl = new AbortController();
+      abortRef.current = ctrl;
       Promise.all([api.getClient(c.id), api.getClientInvoices(c.id)])
         .then(([client, invoices]) => {
-          const detail = { client, invoices };
-          hoverCache.current[c.id] = detail;
-          setHoverDetail(detail);
+          if (!ctrl.signal.aborted) {
+            const detail = { client, invoices };
+            hoverCache.current[c.id] = detail;
+            setHoverDetail(detail);
+          }
         }).catch(() => {});
-    }, 150);
+    }, 300);
   }, [calcPreviewPos]);
 
   const handleRowMouseMove = useCallback((e) => {
+    const now = Date.now();
+    if (now - moveThrottle.current < 32) return;
+    moveThrottle.current = now;
     setHoverPos(calcPreviewPos(e.clientX, e.clientY));
   }, [calcPreviewPos]);
 
   const handleRowMouseLeave = useCallback(() => {
     clearTimeout(hoverTimer.current);
+    abortRef.current?.abort();
     setHoveredId(null);
     setHoverDetail(null);
   }, []);

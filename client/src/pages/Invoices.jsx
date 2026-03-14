@@ -123,32 +123,42 @@ export default function Invoices() {
     return { top, left };
   }, []);
 
+  const abortRef = useRef(null);
+  const moveThrottle = useRef(0);
+
   const handleRowMouseEnter = useCallback((inv, e) => {
     setHoverPos(calcPreviewPos(e.clientX, e.clientY));
     setHoveredInv(inv.id);
 
-    // Check cache first
     if (hoverCache.current[inv.id]) {
       setHoverDetail(hoverCache.current[inv.id]);
       return;
     }
 
-    // Fetch full invoice after short delay
     clearTimeout(hoverTimer.current);
+    abortRef.current?.abort();
     hoverTimer.current = setTimeout(() => {
+      const ctrl = new AbortController();
+      abortRef.current = ctrl;
       api.getInvoice(inv.id).then(detail => {
-        hoverCache.current[inv.id] = detail;
-        setHoverDetail(prev => detail);
+        if (!ctrl.signal.aborted) {
+          hoverCache.current[inv.id] = detail;
+          setHoverDetail(detail);
+        }
       }).catch(() => {});
-    }, 150);
+    }, 300);
   }, [calcPreviewPos]);
 
   const handleRowMouseMove = useCallback((e) => {
+    const now = Date.now();
+    if (now - moveThrottle.current < 32) return;
+    moveThrottle.current = now;
     setHoverPos(calcPreviewPos(e.clientX, e.clientY));
   }, [calcPreviewPos]);
 
   const handleRowMouseLeave = useCallback(() => {
     clearTimeout(hoverTimer.current);
+    abortRef.current?.abort();
     setHoveredInv(null);
     setHoverDetail(null);
   }, []);
