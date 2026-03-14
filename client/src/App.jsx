@@ -29,6 +29,7 @@ import FinancniUrad from './pages/FinancniUrad';
 import { ToastProvider } from './components/Toast';
 import { ConfirmProvider } from './components/ConfirmDialog';
 import { useKeyboardShortcuts, ShortcutsHelp } from './components/KeyboardShortcuts';
+import CommandPalette from './components/CommandPalette';
 import './styles.css';
 
 export const AuthContext = createContext(null);
@@ -430,7 +431,9 @@ const routeSections = [
   { match: /^\/users\/(\d+)/, title: 'Detail uživatele', section: 'Uživatelé', home: '/users' },
   { match: /^\/users/, title: 'Uživatelé', sub: 'Správa uživatelů a rolí', home: '/users' },
   { match: /^\/profile/, title: 'Můj profil', sub: 'Osobní nastavení', home: '/profile' },
+  { match: /^\/financni-urad/, title: 'Finanční úřad', section: 'Účetnictví', home: '/financni-urad' },
   { match: /^\/search/, title: 'Výsledky hledání', home: '/' },
+  { match: /^\/chatbot/, title: 'Chatbot Hyňa', section: 'Správa', home: '/chatbot' },
 ];
 
 function ShortcutsHelpWrapper() {
@@ -467,6 +470,15 @@ function Layout({ children }) {
             {section.sub && !subtitle && <span className="topbar-subtitle">{section.sub}</span>}
           </div>
           <div style={{ flex: 1 }} />
+          <button
+            className="cmd-k-hint"
+            onClick={() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }))}
+            title="Příkazová paleta (Ctrl+K)"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <span>Hledat...</span>
+            <kbd>⌘K</kbd>
+          </button>
           <GlobalSearch />
           <button className="dark-toggle" aria-label="Přepnout tmavý/světlý režim" onClick={() => {
             const html = document.documentElement;
@@ -479,6 +491,7 @@ function Layout({ children }) {
         </header>
         <main id="main-content" className="content">{children}</main>
         <ChatWidget />
+        <CommandPalette />
         <ShortcutsHelpWrapper />
       </div>
     </div>

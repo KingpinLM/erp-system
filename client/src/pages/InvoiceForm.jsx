@@ -39,6 +39,17 @@ export default function InvoiceForm() {
   const savedRef = useRef(false); // track if form was saved successfully
   const toast = useToast();
 
+  // Inline validation
+  const [touched, setTouched] = useState({});
+  const markTouched = (field) => setTouched(t => ({ ...t, [field]: true }));
+  const fieldErrors = {};
+  if (!form.issue_date) fieldErrors.issue_date = 'Datum vystavení je povinné';
+  if (!form.due_date) fieldErrors.due_date = 'Datum splatnosti je povinné';
+  if (form.due_date && form.issue_date && form.due_date < form.issue_date) fieldErrors.due_date = 'Splatnost musí být po datu vystavení';
+  if (form.items.every(i => !i.description?.trim())) fieldErrors.items = 'Alespoň jedna položka musí mít popis';
+  if (form.items.some(i => i.unit_price < 0)) fieldErrors.unit_price = 'Cena nemůže být záporná';
+  if (form.items.some(i => i.quantity <= 0)) fieldErrors.quantity = 'Množství musí být kladné';
+
   // Drag & drop state
   const [dragIdx, setDragIdx] = useState(null);
   const [dragOverIdx, setDragOverIdx] = useState(null);
@@ -387,7 +398,8 @@ export default function InvoiceForm() {
           <div className="form-row">
             <div className="form-group">
               <label className="form-label">Datum vystavení *</label>
-              <input className="form-input" type="date" value={form.issue_date} onChange={e => updateField('issue_date', e.target.value)} required />
+              <input className={`form-input ${touched.issue_date && fieldErrors.issue_date ? 'is-invalid' : ''}`} type="date" value={form.issue_date} onChange={e => updateField('issue_date', e.target.value)} onBlur={() => markTouched('issue_date')} required />
+              {touched.issue_date && fieldErrors.issue_date && <div className="field-error">{fieldErrors.issue_date}</div>}
             </div>
             {vatPayer && (
               <div className="form-group">
@@ -397,7 +409,8 @@ export default function InvoiceForm() {
             )}
             <div className="form-group">
               <label className="form-label">Datum splatnosti *</label>
-              <input className="form-input" type="date" value={form.due_date} onChange={e => updateField('due_date', e.target.value)} required />
+              <input className={`form-input ${touched.due_date && fieldErrors.due_date ? 'is-invalid' : ''}`} type="date" value={form.due_date} onChange={e => updateField('due_date', e.target.value)} onBlur={() => markTouched('due_date')} required />
+              {touched.due_date && fieldErrors.due_date && <div className="field-error">{fieldErrors.due_date}</div>}
             </div>
           </div>
           <div className="form-group">
@@ -463,9 +476,9 @@ export default function InvoiceForm() {
                       )}
                       <input className="form-input" value={item.description} onChange={e => updateItem(idx, 'description', e.target.value)} placeholder="Popis položky" />
                     </td>
-                    <td><input className="form-input" type="number" step="0.01" value={item.quantity} onChange={e => updateItem(idx, 'quantity', parseFloat(e.target.value) || 0)} /></td>
+                    <td><input className={`form-input ${item.quantity <= 0 && touched.quantity ? 'is-invalid' : ''}`} type="number" step="0.01" value={item.quantity} onChange={e => updateItem(idx, 'quantity', parseFloat(e.target.value) || 0)} onBlur={() => markTouched('quantity')} /></td>
                     <td><input className="form-input" value={item.unit} onChange={e => updateItem(idx, 'unit', e.target.value)} /></td>
-                    <td><input className="form-input" type="number" step="0.01" value={item.unit_price} onChange={e => updateItem(idx, 'unit_price', parseFloat(e.target.value) || 0)} /></td>
+                    <td><input className={`form-input ${item.unit_price < 0 && touched.unit_price ? 'is-invalid' : ''}`} type="number" step="0.01" value={item.unit_price} onChange={e => updateItem(idx, 'unit_price', parseFloat(e.target.value) || 0)} onBlur={() => markTouched('unit_price')} /></td>
                     {vatPayer && (
                       <td>
                         <select className="form-select" value={item.tax_rate} onChange={e => updateItem(idx, 'tax_rate', parseFloat(e.target.value))}>

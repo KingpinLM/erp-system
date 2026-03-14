@@ -185,11 +185,12 @@ export default function Invoices() {
   const handleDelete = async (id) => {
     const ok = await confirm({ title: 'Smazat fakturu', message: 'Opravdu chcete smazat tuto fakturu? Tato akce je nevratná.', type: 'danger', confirmText: 'Smazat', cancelText: 'Zrušit' });
     if (!ok) return;
+    const prev = invoices;
+    setInvoices(inv => inv.filter(i => i.id !== id));
+    toast.success('Faktura byla smazána');
     try {
       await api.deleteInvoice(id);
-      toast.success('Faktura byla smazána');
-      load();
-    } catch (e) { toast.error(e.message); }
+    } catch (e) { setInvoices(prev); toast.error('Smazání selhalo: ' + e.message); }
   };
 
   return (
@@ -204,9 +205,9 @@ export default function Invoices() {
       {selected.size > 0 && can('admin', 'accountant', 'manager') && (
         <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem', alignItems: 'center', background: '#eff6ff', padding: '0.5rem 1rem', borderRadius: 'var(--radius)' }}>
           <strong style={{ fontSize: '0.85rem' }}>{selected.size} vybráno</strong>
-          <button className="btn btn-sm btn-outline" onClick={async () => { await api.bulkStatus([...selected], 'sent'); toast.success(`${selected.size} faktur označeno jako odesláno`); setSelected(new Set()); load(); }}>Odeslat</button>
-          <button className="btn btn-sm btn-success" onClick={async () => { await api.bulkStatus([...selected], 'paid'); toast.success(`${selected.size} faktur označeno jako zaplaceno`); setSelected(new Set()); load(); }}>Zaplaceno</button>
-          <button className="btn btn-sm btn-warning" onClick={async () => { await api.bulkStatus([...selected], 'cancelled'); setSelected(new Set()); load(); }}>Zrušit</button>
+          <button className="btn btn-sm btn-outline" onClick={async () => { const ids = [...selected]; const prev = invoices; setInvoices(inv => inv.map(i => ids.includes(i.id) ? { ...i, status: 'sent' } : i)); toast.success(`${ids.length} faktur označeno jako odesláno`); setSelected(new Set()); try { await api.bulkStatus(ids, 'sent'); } catch (e) { setInvoices(prev); toast.error(e.message); } }}>Odeslat</button>
+          <button className="btn btn-sm btn-success" onClick={async () => { const ids = [...selected]; const prev = invoices; setInvoices(inv => inv.map(i => ids.includes(i.id) ? { ...i, status: 'paid' } : i)); toast.success(`${ids.length} faktur označeno jako zaplaceno`); setSelected(new Set()); try { await api.bulkStatus(ids, 'paid'); } catch (e) { setInvoices(prev); toast.error(e.message); } }}>Zaplaceno</button>
+          <button className="btn btn-sm btn-warning" onClick={async () => { const ids = [...selected]; const prev = invoices; setInvoices(inv => inv.map(i => ids.includes(i.id) ? { ...i, status: 'cancelled' } : i)); setSelected(new Set()); try { await api.bulkStatus(ids, 'cancelled'); } catch (e) { setInvoices(prev); toast.error(e.message); } }}>Zrušit</button>
           <button className="btn btn-sm btn-outline" onClick={() => setSelected(new Set())}>Zrušit výběr</button>
         </div>
       )}

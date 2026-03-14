@@ -18,10 +18,16 @@ export default function Clients() {
   const [sortDir, setSortDir] = useState('asc');
   const [duplicateWarnings, setDuplicateWarnings] = useState([]);
   const [error, setError] = useState('');
+  const [clientTouched, setClientTouched] = useState({});
   const dupTimerRef = React.useRef(null);
   const { can } = useAuth();
   const toast = useToast();
   const confirm = useConfirm();
+  const markClientTouched = (f) => setClientTouched(t => ({ ...t, [f]: true }));
+  const clientErrors = {};
+  if (!form.name?.trim()) clientErrors.name = 'Název je povinný';
+  if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) clientErrors.email = 'Neplatný formát e-mailu';
+  if (form.ico && !/^\d{7,8}$/.test(form.ico)) clientErrors.ico = 'IČO musí mít 7-8 číslic';
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(20);
 
@@ -76,8 +82,8 @@ export default function Clients() {
     });
   };
 
-  const openNew = () => { setEditing(null); setForm({ name: '', ico: '', dic: '', email: '', phone: '', address: '', city: '', zip: '', country: 'CZ' }); setDuplicateWarnings([]); setError(''); setShowModal(true); };
-  const openEdit = (c) => { setEditing(c); setForm({ name: c.name, ico: c.ico || '', dic: c.dic || '', email: c.email || '', phone: c.phone || '', address: c.address || '', city: c.city || '', zip: c.zip || '', country: c.country || 'CZ' }); setDuplicateWarnings([]); setError(''); setShowModal(true); };
+  const openNew = () => { setEditing(null); setForm({ name: '', ico: '', dic: '', email: '', phone: '', address: '', city: '', zip: '', country: 'CZ' }); setDuplicateWarnings([]); setError(''); setClientTouched({}); setShowModal(true); };
+  const openEdit = (c) => { setEditing(c); setForm({ name: c.name, ico: c.ico || '', dic: c.dic || '', email: c.email || '', phone: c.phone || '', address: c.address || '', city: c.city || '', zip: c.zip || '', country: c.country || 'CZ' }); setDuplicateWarnings([]); setError(''); setClientTouched({}); setShowModal(true); };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -92,8 +98,11 @@ export default function Clients() {
   const handleDelete = async (id) => {
     const ok = await confirm({ title: 'Smazat klienta', message: 'Opravdu chcete smazat tohoto klienta? Všechny jeho faktury zůstanou zachovány.', type: 'danger', confirmText: 'Smazat' });
     if (!ok) return;
-    try { await api.deleteClient(id); toast.success('Klient byl smazán'); load(); }
-    catch (e) { toast.error(e.message); }
+    const prev = clients;
+    setClients(c => c.filter(cl => cl.id !== id));
+    toast.success('Klient byl smazán');
+    try { await api.deleteClient(id); }
+    catch (e) { setClients(prev); toast.error('Smazání selhalo: ' + e.message); }
   };
 
   return (
@@ -181,13 +190,14 @@ export default function Clients() {
               )}
               <div className="form-group">
                 <label className="form-label">Název firmy *</label>
-                <input className="form-input" value={form.name} onChange={e => updateForm({ name: e.target.value }, editing?.id)} required />
+                <input className={`form-input ${clientTouched.name && clientErrors.name ? 'is-invalid' : ''}`} value={form.name} onChange={e => updateForm({ name: e.target.value }, editing?.id)} onBlur={() => markClientTouched('name')} required />
+                {clientTouched.name && clientErrors.name && <div className="field-error">{clientErrors.name}</div>}
               </div>
               <div className="form-row">
                 <div className="form-group">
                   <label className="form-label">IČO</label>
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <input className="form-input" value={form.ico} onChange={e => updateForm({ ico: e.target.value }, editing?.id)} />
+                    <input className={`form-input ${clientTouched.ico && clientErrors.ico ? 'is-invalid' : ''}`} value={form.ico} onChange={e => updateForm({ ico: e.target.value }, editing?.id)} onBlur={() => markClientTouched('ico')} />
                     <button type="button" className="btn btn-outline btn-sm" style={{ whiteSpace: 'nowrap' }} onClick={async () => {
                       if (!form.ico) return;
                       try {
@@ -197,11 +207,12 @@ export default function Clients() {
                       } catch (e) { toast.error(e.message); }
                     }}>ARES</button>
                   </div>
+                  {clientTouched.ico && clientErrors.ico && <div className="field-error">{clientErrors.ico}</div>}
                 </div>
                 <div className="form-group"><label className="form-label">DIČ</label><input className="form-input" value={form.dic} onChange={e => updateForm({ dic: e.target.value }, editing?.id)} /></div>
               </div>
               <div className="form-row">
-                <div className="form-group"><label className="form-label">Email</label><input className="form-input" type="email" value={form.email} onChange={e => updateForm({ email: e.target.value }, editing?.id)} /></div>
+                <div className="form-group"><label className="form-label">Email</label><input className={`form-input ${clientTouched.email && clientErrors.email ? 'is-invalid' : ''}`} type="email" value={form.email} onChange={e => updateForm({ email: e.target.value }, editing?.id)} onBlur={() => markClientTouched('email')} />{clientTouched.email && clientErrors.email && <div className="field-error">{clientErrors.email}</div>}</div>
                 <div className="form-group"><label className="form-label">Telefon</label><input className="form-input" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} /></div>
               </div>
               <div className="form-group"><label className="form-label">Adresa</label><input className="form-input" value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} /></div>

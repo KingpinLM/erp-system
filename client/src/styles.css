@@ -55,6 +55,41 @@
 }
 .skip-to-content:focus { top: 0; }
 
+/* ─── COMMAND PALETTE HINT ──────────────────────── */
+.cmd-k-hint {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 12px; border-radius: 8px;
+  border: 1px solid var(--gray-200);
+  background: var(--gray-50, #f8fafc);
+  color: var(--gray-500); font-size: 13px;
+  cursor: pointer; transition: all 0.15s;
+  white-space: nowrap;
+}
+.cmd-k-hint:hover { border-color: var(--primary); color: var(--primary); }
+.cmd-k-hint kbd {
+  padding: 1px 6px; border-radius: 4px;
+  background: var(--gray-100); border: 1px solid var(--gray-200);
+  font-size: 10px; font-weight: 700; font-family: monospace;
+  color: var(--gray-400);
+}
+.cmd-k-hint span { color: var(--gray-400); }
+@media (max-width: 768px) { .cmd-k-hint span, .cmd-k-hint kbd { display: none; } }
+
+/* ─── INLINE VALIDATION ────────────────────────── */
+.form-input.is-invalid, .form-select.is-invalid, .form-textarea.is-invalid {
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.12);
+}
+.form-input.is-invalid:focus, .form-select.is-invalid:focus {
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15);
+}
+.field-error {
+  font-size: 12px; color: #ef4444; margin-top: 3px;
+  display: flex; align-items: center; gap: 4px;
+  animation: fadeIn 0.15s ease-out;
+}
+
 /* ─── LAYOUT ────────────────────────────────────── */
 .layout { display: flex; min-height: 100vh; }
 
