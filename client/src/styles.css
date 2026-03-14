@@ -152,7 +152,7 @@
 .topbar::after { display: none; }
 .menu-btn { display: none; background: none; border: none; font-size: 1.25rem; cursor: pointer; color: var(--gray-600); padding: 0.25rem; }
 .topbar-title { font-size: 1.05rem; font-weight: 700; color: var(--gray-800); letter-spacing: -0.01em; }
-.topbar-section-title { display: flex; align-items: baseline; gap: 0.4rem; min-width: 0; }
+.topbar-section-title { display: flex; align-items: baseline; gap: 0.4rem; min-width: 0; cursor: pointer; }
 .topbar-section-link { font-size: 0.82rem; font-weight: 500; color: var(--gray-400); text-decoration: none; white-space: nowrap; transition: color 0.15s; }
 .topbar-section-link:hover { color: var(--primary); }
 .topbar-sep { color: var(--gray-300); font-size: 0.9rem; font-weight: 400; }

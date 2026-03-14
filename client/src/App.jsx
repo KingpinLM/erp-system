@@ -433,12 +433,14 @@ function Layout({ children }) {
           <button className="menu-btn" onClick={() => setSidebarOpen(true)}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
           </button>
-          <div className="topbar-section-title">
+          <div className="topbar-section-title" onClick={() => { window.scrollTo({ top: 0, behavior: 'smooth' }); }}>
             {section.section && (
               <Link to={section.home} className="topbar-section-link">{section.section}</Link>
             )}
             {section.section && <span className="topbar-sep">/</span>}
-            <Link to={section.home} className="topbar-title-link">{subtitle || section.title}</Link>
+            <Link to={section.home} className="topbar-title-link" onClick={(e) => {
+              if (location.pathname === section.home) { e.preventDefault(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+            }}>{subtitle || section.title}</Link>
             {section.sub && !subtitle && <span className="topbar-subtitle">{section.sub}</span>}
           </div>
           <div style={{ flex: 1 }} />
