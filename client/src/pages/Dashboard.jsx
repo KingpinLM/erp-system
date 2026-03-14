@@ -303,9 +303,48 @@ export default function Dashboard() {
     );
   };
 
-  // Handle bar click for selection
+  // Handle bar click — drill down into that period
   const handleBarClick = (data, index) => {
-    setSelectedBar(prev => prev === index ? null : index);
+    if (selectedBar === index) {
+      // Second click on same bar = deselect, revert to original period
+      setSelectedBar(null);
+      return;
+    }
+    setSelectedBar(index);
+
+    // Compute date range for the clicked bar
+    const bar = chartDisplayData[index];
+    if (!bar) return;
+    let from, to;
+    if (periodCategory === 'year') {
+      // bar.name = "2026"
+      const y = bar.name;
+      from = `${y}-01-01`;
+      to = `${y}-12-31`;
+    } else if (periodCategory === 'quarter') {
+      // bar.name = "Q1 2026"
+      const match = bar.name.match(/Q(\d)\s+(\d{4})/);
+      if (match) {
+        const q = parseInt(match[1]), y = match[2];
+        const sm = (q - 1) * 3 + 1;
+        const em = q * 3;
+        const lastDay = new Date(parseInt(y), em, 0).getDate();
+        from = `${y}-${String(sm).padStart(2, '0')}-01`;
+        to = `${y}-${String(em).padStart(2, '0')}-${lastDay}`;
+      }
+    } else {
+      // Monthly — bar.name = "Led", "Úno", etc. index = month index (0=Jan)
+      const y = chartYear || String(new Date().getFullYear());
+      const m = index + 1;
+      const lastDay = new Date(parseInt(y), m, 0).getDate();
+      from = `${y}-${String(m).padStart(2, '0')}-01`;
+      to = `${y}-${String(m).padStart(2, '0')}-${lastDay}`;
+    }
+    if (from && to) {
+      setCustomFrom(from);
+      setCustomTo(to);
+      setPeriod('custom');
+    }
   };
 
   const selectedBarData = selectedBar !== null ? chartDisplayData[selectedBar] : null;
