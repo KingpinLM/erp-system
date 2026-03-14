@@ -194,6 +194,9 @@ export const api = {
   getVatRecords: (params = {}) => { const qs = new URLSearchParams(params).toString(); return request(`/vat/records${qs ? '?' + qs : ''}`); },
   getVatReport: (year, month) => request(`/vat/report?year=${year}&month=${month}`),
   generateVatRecords: (year, month) => request('/vat/generate', { method: 'POST', body: JSON.stringify({ year, month }) }),
+  getKontrolniHlaseni: (year, month) => request(`/vat/kontrolni-hlaseni?year=${year}&month=${month}`),
+  getSouhrnneHlaseni: (year, quarter) => request(`/vat/souhrnne-hlaseni?year=${year}&quarter=${quarter}`),
+  getIncomeReport: (year) => request(`/tax/income-report?year=${year}`),
 
   // Bank
   getBankAccounts: () => request('/bank-accounts'),
