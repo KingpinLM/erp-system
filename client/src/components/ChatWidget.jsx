@@ -51,7 +51,7 @@ export default function ChatWidget() {
     try {
       const res = await api.chatbotMessage(text, convId);
       setConvId(res.conversation_id);
-      setMessages(m => [...m, { role: 'bot', text: res.answer, link: res.link }]);
+      setMessages(m => [...m, { role: 'bot', text: res.answer, link: res.link, suggestions: res.suggestions }]);
     } catch {
       setMessages(m => [...m, { role: 'bot', text: 'Omlouvám se, nastala chyba. Zkuste to prosím znovu.' }]);
     }
@@ -106,6 +106,15 @@ export default function ChatWidget() {
                     <button className="chatbot-link" onClick={() => handleLink(m.link)}>
                       Přejít na stránku →
                     </button>
+                  )}
+                  {m.suggestions && m.suggestions.length > 0 && (
+                    <div className="chatbot-suggestions">
+                      {m.suggestions.map((s, j) => (
+                        <button key={j} className="chatbot-quick-btn" onClick={() => sendMessage(s.label)}>
+                          <span>{s.icon}</span> {s.label}
+                        </button>
+                      ))}
+                    </div>
                   )}
                 </div>
               </div>

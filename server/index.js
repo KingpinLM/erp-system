@@ -2463,7 +2463,7 @@ app.post('/api/chatbot/message', ...tenanted, (req, res) => {
   // 1) Try dynamic handlers first (real-time data queries with specific patterns)
   const dynamicResult = getDynamicAnswer(q, req.tenant_id, req.user.id, isEn);
 
-  let answer, link;
+  let answer, link, suggestions;
   if (dynamicResult) {
     answer = dynamicResult.answer;
     link = dynamicResult.link;
@@ -2486,8 +2486,25 @@ app.post('/api/chatbot/message', ...tenanted, (req, res) => {
         // Log unanswered question for self-learning
         db.prepare('INSERT INTO chatbot_unanswered (tenant_id, user_id, question) VALUES (?, ?, ?)').run(req.tenant_id, req.user.id, message.trim());
         answer = isEn
-          ? "I'm sorry, I don't know the answer to that yet. Your question has been logged and an administrator will add an answer soon! Try asking about invoices, clients, payments, or navigation."
-          : 'Omlouvám se, na tuto otázku zatím neznám odpověď. Váš dotaz byl zaznamenán a administrátor brzy doplní odpověď! Zkuste se zeptat na faktury, klienty, platby nebo navigaci.';
+          ? "I'm sorry, I don't know the answer to that yet. Your question has been logged and an administrator will add an answer soon!\n\nHere are some topics I can help you with:"
+          : 'Omlouvám se, na tuto otázku zatím neznám odpověď. Váš dotaz byl zaznamenán a administrátor brzy doplní odpověď!\n\nZde jsou témata, se kterými vám mohu pomoci:';
+        suggestions = isEn
+          ? [
+              { label: 'How to create an invoice?', icon: '📄' },
+              { label: 'Where are my clients?', icon: '👥' },
+              { label: 'Overdue invoices', icon: '⏰' },
+              { label: 'How many invoices do I have?', icon: '📊' },
+              { label: 'Where is accounting?', icon: '💰' },
+              { label: 'What can you do?', icon: '🤖' },
+            ]
+          : [
+              { label: 'Jak vytvořím fakturu?', icon: '📄' },
+              { label: 'Kde najdu klienty?', icon: '👥' },
+              { label: 'Faktury po splatnosti', icon: '⏰' },
+              { label: 'Kolik mám faktur?', icon: '📊' },
+              { label: 'Kde je účetnictví?', icon: '💰' },
+              { label: 'Co umíš?', icon: '🤖' },
+            ];
       }
       link = null;
     }
@@ -2512,7 +2529,7 @@ app.post('/api/chatbot/message', ...tenanted, (req, res) => {
     convId = r.lastInsertRowid;
   }
 
-  res.json({ answer, link, conversation_id: convId });
+  res.json({ answer, link, conversation_id: convId, ...(suggestions ? { suggestions } : {}) });
 });
 
 // Admin: get knowledge base

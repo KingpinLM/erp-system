@@ -1351,11 +1351,15 @@ a:hover { opacity: 0.85; }
   opacity: 0.85;
 }
 
-.chatbot-quick-actions {
+.chatbot-quick-actions,
+.chatbot-suggestions {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
   padding: 4px 0;
+}
+.chatbot-suggestions {
+  margin-top: 8px;
 }
 .chatbot-quick-btn {
   background: var(--primary-50, #eef2ff);
