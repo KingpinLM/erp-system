@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api';
 import { useAuth } from '../App';
@@ -7,6 +7,103 @@ import { useToast } from '../components/Toast';
 import { useConfirm } from '../components/ConfirmDialog';
 import { SkeletonTable } from '../components/Skeleton';
 import EmptyState from '../components/EmptyState';
+
+const fmt = (n, cur = 'CZK') => new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: cur, maximumFractionDigits: 2 }).format(n);
+const fmtDate = (d) => { if (!d) return '—'; const p = d.slice(0,10).split('-'); return p.length === 3 ? `${p[2]}.${p[1]}.${p[0]}` : d; };
+const statusLabels = { draft: 'Koncept', sent: 'Odesláno', paid: 'Zaplaceno', overdue: 'Po splatnosti', cancelled: 'Zrušeno' };
+const statusColors = { draft: '#64748b', sent: '#4f46e5', paid: '#059669', overdue: '#dc2626', cancelled: '#d97706' };
+const statusBg = { draft: '#f1f5f9', sent: '#eef2ff', paid: '#ecfdf5', overdue: '#fef2f2', cancelled: '#fffbeb' };
+
+function ClientHoverPreview({ client, invoices, style }) {
+  if (!client) return null;
+  const totalInvoiced = (invoices || []).reduce((s, i) => s + (i.total_czk || 0), 0);
+  const totalPaid = (invoices || []).filter(i => i.status === 'paid').reduce((s, i) => s + (i.total_czk || 0), 0);
+  const unpaidCount = (invoices || []).filter(i => ['sent', 'overdue'].includes(i.status)).length;
+  return (
+    <div style={{
+      position: 'fixed', zIndex: 9999, pointerEvents: 'none',
+      width: 300, background: 'white', borderRadius: 12,
+      border: '1px solid #e2e8f0', boxShadow: '0 20px 50px rgba(0,0,0,0.15), 0 4px 12px rgba(0,0,0,0.08)',
+      overflow: 'hidden', animation: 'fadeIn 0.12s ease-out',
+      ...style,
+    }}>
+      {/* Header */}
+      <div style={{ padding: '12px 16px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+        <div style={{ fontSize: 11, fontWeight: 800, color: '#6366f1', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Klient</div>
+        <div style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em' }}>{client.name}</div>
+      </div>
+
+      <div style={{ padding: '10px 16px' }}>
+        {/* IČO / DIČ */}
+        <div style={{ display: 'flex', gap: 16, marginBottom: 8 }}>
+          {client.ico && (
+            <div>
+              <div style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>IČO</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', fontFamily: 'monospace' }}>{client.ico}</div>
+            </div>
+          )}
+          {client.dic && (
+            <div>
+              <div style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>DIČ</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', fontFamily: 'monospace' }}>{client.dic}</div>
+            </div>
+          )}
+        </div>
+
+        {/* Contact */}
+        {(client.email || client.phone) && (
+          <div style={{ marginBottom: 8, fontSize: 12, color: '#64748b' }}>
+            {client.email && <div>{client.email}</div>}
+            {client.phone && <div>{client.phone}</div>}
+          </div>
+        )}
+
+        {/* Address */}
+        {(client.address || client.city) && (
+          <div style={{ marginBottom: 10, fontSize: 12, color: '#64748b' }}>
+            {client.address}{client.address && client.city ? ', ' : ''}{client.city}{client.zip ? ` ${client.zip}` : ''}
+          </div>
+        )}
+
+        {/* Stats */}
+        <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 8, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+          <div>
+            <div style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Fakturováno</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>{fmt(totalInvoiced)}</div>
+          </div>
+          <div>
+            <div style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Zaplaceno</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#059669' }}>{fmt(totalPaid)}</div>
+          </div>
+          <div>
+            <div style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Faktur celkem</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>{(invoices || []).length}</div>
+          </div>
+          <div>
+            <div style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Neuhrazené</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: unpaidCount > 0 ? '#dc2626' : '#0f172a' }}>{unpaidCount}</div>
+          </div>
+        </div>
+
+        {/* Recent invoices */}
+        {(invoices || []).length > 0 && (
+          <div style={{ borderTop: '1px solid #e2e8f0', marginTop: 8, paddingTop: 8 }}>
+            <div style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>Poslední faktury</div>
+            {(invoices || []).slice(0, 3).map(inv => (
+              <div key={inv.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 0', fontSize: 12 }}>
+                <span style={{ fontWeight: 600, color: '#0f172a' }}>{inv.invoice_number}</span>
+                <span style={{ padding: '1px 6px', borderRadius: 4, fontSize: 9, fontWeight: 700, background: statusBg[inv.status], color: statusColors[inv.status] }}>
+                  {statusLabels[inv.status]}
+                </span>
+                <span style={{ color: '#64748b', fontWeight: 600 }}>{fmt(inv.total || 0, inv.currency || 'CZK')}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function Clients() {
   const [clients, setClients] = useState([]);
@@ -30,6 +127,52 @@ export default function Clients() {
   if (form.ico && !/^\d{7,8}$/.test(form.ico)) clientErrors.ico = 'IČO musí mít 7-8 číslic';
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(20);
+
+  // Hover preview state
+  const [hoveredId, setHoveredId] = useState(null);
+  const [hoverPos, setHoverPos] = useState({ top: 0, left: 0 });
+  const [hoverDetail, setHoverDetail] = useState(null);
+  const hoverTimer = useRef(null);
+  const hoverCache = useRef({});
+
+  const calcPreviewPos = useCallback((clientX, clientY) => {
+    const pw = 300, ph = 360, gap = 16;
+    let left = clientX + gap;
+    if (left + pw > window.innerWidth - 8) left = clientX - pw - gap;
+    if (left < 8) left = 8;
+    let top = clientY - 20;
+    if (top + ph > window.innerHeight - 8) top = window.innerHeight - ph - 8;
+    if (top < 8) top = 8;
+    return { top, left };
+  }, []);
+
+  const handleRowMouseEnter = useCallback((c, e) => {
+    setHoverPos(calcPreviewPos(e.clientX, e.clientY));
+    setHoveredId(c.id);
+    if (hoverCache.current[c.id]) {
+      setHoverDetail(hoverCache.current[c.id]);
+      return;
+    }
+    clearTimeout(hoverTimer.current);
+    hoverTimer.current = setTimeout(() => {
+      Promise.all([api.getClient(c.id), api.getClientInvoices(c.id)])
+        .then(([client, invoices]) => {
+          const detail = { client, invoices };
+          hoverCache.current[c.id] = detail;
+          setHoverDetail(detail);
+        }).catch(() => {});
+    }, 150);
+  }, [calcPreviewPos]);
+
+  const handleRowMouseMove = useCallback((e) => {
+    setHoverPos(calcPreviewPos(e.clientX, e.clientY));
+  }, [calcPreviewPos]);
+
+  const handleRowMouseLeave = useCallback(() => {
+    clearTimeout(hoverTimer.current);
+    setHoveredId(null);
+    setHoverDetail(null);
+  }, []);
 
   const load = () => { setLoading(true); api.getClients().then(setClients).finally(() => setLoading(false)); };
   useEffect(load, []);
@@ -142,7 +285,11 @@ export default function Clients() {
               </tr></thead>
               <tbody>
                 {sorted.slice((page - 1) * perPage, page * perPage).map(c => (
-                  <tr key={c.id}>
+                  <tr key={c.id}
+                    onMouseEnter={(e) => handleRowMouseEnter(c, e)}
+                    onMouseMove={handleRowMouseMove}
+                    onMouseLeave={handleRowMouseLeave}
+                  >
                     <td><Link to={`/clients/${c.id}`} style={{ color: 'var(--primary)', fontWeight: 600, textDecoration: 'none' }}>{c.name}</Link></td>
                     <td>{c.ico || '—'}</td>
                     <td>{c.dic || '—'}</td>
@@ -164,6 +311,11 @@ export default function Clients() {
         )}
         <Pagination total={sorted.length} page={page} perPage={perPage} onPageChange={setPage} onPerPageChange={v => { setPerPage(v); setPage(1); }} />
       </div>
+
+      {/* Hover preview */}
+      {hoveredId && hoverDetail && hoverDetail.client?.id === hoveredId && (
+        <ClientHoverPreview client={hoverDetail.client} invoices={hoverDetail.invoices} style={{ top: hoverPos.top, left: hoverPos.left }} />
+      )}
 
       {showModal && (
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
