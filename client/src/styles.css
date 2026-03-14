@@ -885,13 +885,40 @@ a:hover { opacity: 0.85; }
 .dash-status-overdue { background: var(--danger-light); color: var(--danger-dark); }
 .dash-status-cancelled { background: var(--warning-light); color: var(--warning-dark); }
 
-/* Pie legend */
-.dash-pie-legend { display: flex; flex-direction: column; gap: 0.3rem; margin-top: 0.75rem; }
-.dash-pie-legend-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.3rem 0.5rem; border-radius: 8px; transition: background 0.1s; }
-.dash-pie-legend-item:hover { background: var(--gray-50); }
-.dash-pie-legend-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
-.dash-pie-legend-label { font-size: 0.8rem; color: var(--gray-700); flex: 1; }
-.dash-pie-legend-value { font-size: 0.85rem; font-weight: 700; color: var(--gray-900); font-variant-numeric: tabular-nums; }
+/* Pie chart redesigned */
+.dash-card-pie { display: flex; flex-direction: column; }
+.dash-pie-wrap { position: relative; }
+.dash-pie-center {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  display: flex; flex-direction: column; align-items: center; pointer-events: none;
+}
+.dash-pie-center-value { font-size: 1.5rem; font-weight: 800; color: var(--gray-900); line-height: 1; }
+.dash-pie-center-label { font-size: 0.65rem; font-weight: 600; color: var(--gray-400); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 0.15rem; }
+
+/* Bar selection detail */
+.dash-bar-detail {
+  margin-top: 0.75rem; padding: 1rem 1.25rem;
+  background: linear-gradient(135deg, rgba(13, 148, 136, 0.04), rgba(8, 145, 178, 0.04));
+  border: 1px solid rgba(13, 148, 136, 0.12); border-radius: 12px;
+}
+.dash-bar-detail-header {
+  display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;
+}
+.dash-bar-detail-title {
+  font-size: 0.9rem; font-weight: 700; color: var(--gray-900);
+}
+.dash-bar-detail-close {
+  background: none; border: none; font-size: 1.3rem; color: var(--gray-400); cursor: pointer;
+  width: 28px; height: 28px; border-radius: 8px; display: flex; align-items: center;
+  justify-content: center; transition: all 0.15s; font-family: inherit;
+}
+.dash-bar-detail-close:hover { background: var(--gray-100); color: var(--gray-700); }
+.dash-bar-detail-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem;
+}
+.dash-bar-detail-item { display: flex; flex-direction: column; gap: 0.15rem; }
+.dash-bar-detail-label { font-size: 0.68rem; font-weight: 600; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.05em; }
+.dash-bar-detail-value { font-size: 1.1rem; font-weight: 800; letter-spacing: -0.02em; }
 
 /* Ranking list */
 .dash-rank-list { display: flex; flex-direction: column; gap: 0.75rem; }
@@ -951,6 +978,7 @@ a:hover { opacity: 0.85; }
   .dash-grid-2 { grid-template-columns: 1fr; }
   .dash-header { flex-direction: column; }
   .dash-period-pills { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 0.25rem; }
+  .dash-bar-detail-grid { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 480px) {
   .dash-kpi-grid { grid-template-columns: 1fr; }
@@ -971,7 +999,10 @@ a:hover { opacity: 0.85; }
 [data-theme="dark"] .dash-period-pill:hover { border-color: var(--primary-light); color: var(--primary-light); background: rgba(13, 148, 136, 0.06); }
 [data-theme="dark"] .dash-period-pill.active { background: var(--primary); border-color: var(--primary); color: white; }
 [data-theme="dark"] .dash-invoice-row:hover { background: rgba(13, 148, 136, 0.06); }
-[data-theme="dark"] .dash-pie-legend-item:hover { background: rgba(255,255,255,0.04); }
+[data-theme="dark"] .dash-pie-center-value { color: #e2e8f0; }
+[data-theme="dark"] .dash-bar-detail { background: linear-gradient(135deg, rgba(13, 148, 136, 0.08), rgba(8, 145, 178, 0.06)); border-color: rgba(13, 148, 136, 0.2); }
+[data-theme="dark"] .dash-bar-detail-title { color: #e2e8f0; }
+[data-theme="dark"] .dash-bar-detail-close:hover { background: rgba(255,255,255,0.06); color: #e2e8f0; }
 [data-theme="dark"] .dash-rank-bar-bg { background: #334155; }
 [data-theme="dark"] .dash-rank-pos { background: rgba(255,255,255,0.06); }
 [data-theme="dark"] .dash-alert-warning { background: rgba(245, 158, 11, 0.08); border-color: rgba(245, 158, 11, 0.15); }

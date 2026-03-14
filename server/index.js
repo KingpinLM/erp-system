@@ -628,6 +628,45 @@ app.get('/api/dashboard', ...tenanted, (req, res) => {
     GROUP BY month ORDER BY month
   `).all(chartYear, tid);
 
+  // Quarterly data (last 2 years) for quarter view
+  const qYear = new Date().getFullYear();
+  const quarterlyIssued = db.prepare(`
+    SELECT strftime('%Y', issue_date) as year,
+      CASE WHEN CAST(strftime('%m', issue_date) AS INTEGER) <= 3 THEN 'Q1'
+           WHEN CAST(strftime('%m', issue_date) AS INTEGER) <= 6 THEN 'Q2'
+           WHEN CAST(strftime('%m', issue_date) AS INTEGER) <= 9 THEN 'Q3'
+           ELSE 'Q4' END as quarter,
+      SUM(total_czk) as total, SUM(tax_amount) as tax
+    FROM invoices WHERE type='issued' AND tenant_id=?
+      AND issue_date >= '${qYear - 1}-01-01'
+    GROUP BY year, quarter ORDER BY year, quarter
+  `).all(tid);
+
+  const quarterlyExpenses = db.prepare(`
+    SELECT strftime('%Y', date) as year,
+      CASE WHEN CAST(strftime('%m', date) AS INTEGER) <= 3 THEN 'Q1'
+           WHEN CAST(strftime('%m', date) AS INTEGER) <= 6 THEN 'Q2'
+           WHEN CAST(strftime('%m', date) AS INTEGER) <= 9 THEN 'Q3'
+           ELSE 'Q4' END as quarter,
+      SUM(amount) as total
+    FROM evidence WHERE type='expense' AND tenant_id=?
+      AND date >= '${qYear - 1}-01-01'
+    GROUP BY year, quarter ORDER BY year, quarter
+  `).all(tid);
+
+  // Yearly data (all history) for year view
+  const yearlyIssued = db.prepare(`
+    SELECT strftime('%Y', issue_date) as year, SUM(total_czk) as total, SUM(tax_amount) as tax
+    FROM invoices WHERE type='issued' AND tenant_id=?
+    GROUP BY year ORDER BY year
+  `).all(tid);
+
+  const yearlyExpenses = db.prepare(`
+    SELECT strftime('%Y', date) as year, SUM(amount) as total
+    FROM evidence WHERE type='expense' AND tenant_id=?
+    GROUP BY year ORDER BY year
+  `).all(tid);
+
   const pendingItems = [];
   const overdueList = db.prepare(`
     SELECT i.id, i.invoice_number, i.total, i.currency, i.due_date, c.name as client_name
@@ -655,7 +694,7 @@ app.get('/api/dashboard', ...tenanted, (req, res) => {
   res.json({
     kpis: { totalRevenue, totalExpenses, profit: totalRevenue - totalExpenses, unpaidInvoices, overdueInvoices, totalClients, draftInvoices, pendingUsers },
     revenueByMonth, expensesByCategory, invoicesByStatus, recentInvoices, topClients, topSuppliers, currencyBreakdown,
-    monthlyIssued, monthlyExpenses, pendingItems, chartYear
+    monthlyIssued, monthlyExpenses, quarterlyIssued, quarterlyExpenses, yearlyIssued, yearlyExpenses, pendingItems, chartYear
   });
 });
 

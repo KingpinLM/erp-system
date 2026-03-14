@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area, LineChart, Line } from 'recharts';
 import { api } from '../api';
@@ -130,6 +130,7 @@ export default function Dashboard() {
   const [period, setPeriod] = useState('all');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
+  const [selectedBar, setSelectedBar] = useState(null);
   const { can } = useAuth();
 
   const loadData = () => {
@@ -155,11 +156,12 @@ export default function Dashboard() {
   );
   if (!data || data.error || !data.kpis) return <div className="dash-empty-hero"><span className="dash-empty-icon">{Icons.alert}</span><span>{data?.error || 'Nelze načíst data'}</span></div>;
 
-  const { kpis, revenueByMonth, expensesByCategory, invoicesByStatus, recentInvoices, topClients, topSuppliers, currencyBreakdown, monthlyIssued, monthlyExpenses, pendingItems, chartYear } = data;
+  const { kpis, revenueByMonth, expensesByCategory, invoicesByStatus, recentInvoices, topClients, topSuppliers, currencyBreakdown, monthlyIssued, monthlyExpenses, quarterlyIssued, quarterlyExpenses, yearlyIssued, yearlyExpenses, pendingItems, chartYear } = data;
 
   const statusLabels = { draft: 'Koncept', sent: 'Odesláno', paid: 'Zaplaceno', overdue: 'Po splatnosti', cancelled: 'Zrušeno' };
   const statusColors = { draft: '#94a3b8', sent: '#0891b2', paid: '#0d9488', overdue: '#e11d48', cancelled: '#d97706' };
   const pieData = (invoicesByStatus || []).map(s => ({ name: statusLabels[s.status] || s.status, value: s.count, color: statusColors[s.status] || '#999' }));
+  const pieTotal = pieData.reduce((s, d) => s + d.value, 0);
 
   const monthlyData = MONTHS.map((name, i) => {
     const monthKey = String(i + 1).padStart(2, '0');
@@ -167,6 +169,40 @@ export default function Dashboard() {
     const expense = monthlyExpenses?.find(m => m.month === monthKey);
     return { name, issued: issued?.total || 0, issuedTax: issued?.tax || 0, expenses: expense?.total || 0 };
   });
+
+  // Quarterly data - last 2 years, skip future empty quarters
+  const now = new Date();
+  const currentQ = Math.ceil((now.getMonth() + 1) / 3);
+  const currentQYear = now.getFullYear();
+  const quarterlyData = (() => {
+    const quarters = [];
+    for (let y = currentQYear - 1; y <= currentQYear; y++) {
+      for (let q = 1; q <= 4; q++) {
+        if (y === currentQYear && q > currentQ) continue; // skip future
+        const label = `Q${q} ${y}`;
+        const qKey = `Q${q}`;
+        const iss = (quarterlyIssued || []).find(r => r.year === String(y) && r.quarter === qKey);
+        const exp = (quarterlyExpenses || []).find(r => r.year === String(y) && r.quarter === qKey);
+        const issued = iss?.total || 0;
+        const expenses = exp?.total || 0;
+        if (issued === 0 && expenses === 0) continue; // skip fully empty
+        quarters.push({ name: label, issued, expenses, issuedTax: iss?.tax || 0 });
+      }
+    }
+    return quarters;
+  })();
+
+  // Yearly data - all years from history, skip future empty
+  const yearlyData = (() => {
+    const allYears = new Set();
+    (yearlyIssued || []).forEach(r => allYears.add(r.year));
+    (yearlyExpenses || []).forEach(r => allYears.add(r.year));
+    return Array.from(allYears).sort().filter(y => parseInt(y) <= currentQYear).map(y => {
+      const iss = (yearlyIssued || []).find(r => r.year === y);
+      const exp = (yearlyExpenses || []).find(r => r.year === y);
+      return { name: y, issued: iss?.total || 0, expenses: exp?.total || 0, issuedTax: iss?.tax || 0 };
+    });
+  })();
 
   const pendingCount = (pendingItems || []).length + (kpis.pendingUsers || 0);
   const profitMargin = kpis.totalRevenue > 0 ? ((kpis.profit / kpis.totalRevenue) * 100).toFixed(1) : 0;
@@ -205,6 +241,7 @@ export default function Dashboard() {
   })();
 
   const handleCategoryChange = (cat) => {
+    setSelectedBar(null);
     if (cat === 'all') setPeriod('all');
     else if (cat === 'month') setPeriod('month');
     else if (cat === 'quarter') setPeriod('q1');
@@ -223,6 +260,39 @@ export default function Dashboard() {
   ];
 
   const currentYear = new Date().getFullYear();
+
+  // Select chart data based on period category
+  const chartDisplayData = periodCategory === 'quarter' ? quarterlyData : periodCategory === 'year' ? yearlyData : monthlyData;
+  const chartTitle = periodCategory === 'quarter' ? 'Příjmy a výdaje — kvartály' : periodCategory === 'year' ? 'Příjmy a výdaje — roky' : 'Příjmy a výdaje';
+  const chartDesc = periodCategory === 'quarter' ? 'Poslední 2 roky' : periodCategory === 'year' ? 'Celá historie' : (chartYear ? `Rok ${chartYear}` : 'Celé období');
+
+  // Pie chart custom label renderer (Excel-style direct labels)
+  const renderPieLabel = ({ cx, cy, midAngle, outerRadius, name, value, percent }) => {
+    if (percent < 0.04) return null;
+    const RADIAN = Math.PI / 180;
+    const radius = outerRadius + 22;
+    const x = cx + radius * Math.cos(-midAngle * RADIAN);
+    const y = cy + radius * Math.sin(-midAngle * RADIAN);
+    const textAnchor = x > cx ? 'start' : 'end';
+    return (
+      <g>
+        <line x1={cx + (outerRadius + 4) * Math.cos(-midAngle * RADIAN)} y1={cy + (outerRadius + 4) * Math.sin(-midAngle * RADIAN)} x2={x - (x > cx ? 4 : -4)} y2={y} stroke="#94a3b8" strokeWidth={1} />
+        <text x={x} y={y} textAnchor={textAnchor} dominantBaseline="central" style={{ fontSize: '0.72rem', fontWeight: 600, fill: '#334155' }}>
+          {name}
+        </text>
+        <text x={x} y={y + 14} textAnchor={textAnchor} dominantBaseline="central" style={{ fontSize: '0.68rem', fontWeight: 700, fill: '#64748b' }}>
+          {value} ({(percent * 100).toFixed(0)}%)
+        </text>
+      </g>
+    );
+  };
+
+  // Handle bar click for selection
+  const handleBarClick = useCallback((data, index) => {
+    setSelectedBar(prev => prev === index ? null : index);
+  }, []);
+
+  const selectedBarData = selectedBar !== null ? chartDisplayData[selectedBar] : null;
 
   return (
     <div className="dash">
@@ -381,8 +451,8 @@ export default function Dashboard() {
           <div className="dash-card dash-card-chart">
             <div className="dash-card-head">
               <div>
-                <h3 className="dash-card-title">Příjmy a výdaje</h3>
-                <span className="dash-card-desc">{chartYear ? `Rok ${chartYear}` : 'Celé období'}</span>
+                <h3 className="dash-card-title">{chartTitle}</h3>
+                <span className="dash-card-desc">{chartDesc}</span>
               </div>
               <div className="dash-legend">
                 <span className="dash-legend-item"><span className="dash-legend-dot" style={{ background: CHART_COLORS.income }} /> Příjmy</span>
@@ -390,15 +460,54 @@ export default function Dashboard() {
               </div>
             </div>
             <ResponsiveContainer width="100%" height={320}>
-              <BarChart data={monthlyData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }} barGap={3}>
+              <BarChart data={chartDisplayData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }} barGap={3} onClick={(state) => { if (state && state.activeTooltipIndex !== undefined) handleBarClick(state, state.activeTooltipIndex); }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
                 <XAxis dataKey="name" fontSize={11} tick={{ fill: '#94a3b8' }} axisLine={false} tickLine={false} />
                 <YAxis fontSize={11} tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} tick={{ fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-                <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="issued" name="Příjmy" fill={CHART_COLORS.income} radius={[4, 4, 0, 0]} barSize={22} />
-                <Bar dataKey="expenses" name="Výdaje" fill={CHART_COLORS.expense} radius={[4, 4, 0, 0]} barSize={22} opacity={0.75} />
+                <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(13, 148, 136, 0.04)' }} />
+                <Bar dataKey="issued" name="Příjmy" radius={[4, 4, 0, 0]} barSize={periodCategory === 'year' ? 36 : 22} style={{ cursor: 'pointer' }}>
+                  {chartDisplayData.map((_, i) => (
+                    <Cell key={i} fill={CHART_COLORS.income} opacity={selectedBar === null || selectedBar === i ? 1 : 0.3} stroke={selectedBar === i ? '#0f766e' : 'none'} strokeWidth={selectedBar === i ? 2 : 0} />
+                  ))}
+                </Bar>
+                <Bar dataKey="expenses" name="Výdaje" radius={[4, 4, 0, 0]} barSize={periodCategory === 'year' ? 36 : 22} style={{ cursor: 'pointer' }}>
+                  {chartDisplayData.map((_, i) => (
+                    <Cell key={i} fill={CHART_COLORS.expense} opacity={selectedBar === null || selectedBar === i ? 0.75 : 0.2} stroke={selectedBar === i ? '#be123c' : 'none'} strokeWidth={selectedBar === i ? 2 : 0} />
+                  ))}
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
+            {/* Selected bar detail */}
+            {selectedBarData && (
+              <div className="dash-bar-detail dash-fade-in">
+                <div className="dash-bar-detail-header">
+                  <span className="dash-bar-detail-title">{selectedBarData.name}</span>
+                  <button className="dash-bar-detail-close" onClick={() => setSelectedBar(null)}>&times;</button>
+                </div>
+                <div className="dash-bar-detail-grid">
+                  <div className="dash-bar-detail-item">
+                    <span className="dash-bar-detail-label">Příjmy</span>
+                    <span className="dash-bar-detail-value" style={{ color: CHART_COLORS.income }}>{fmt(selectedBarData.issued)}</span>
+                  </div>
+                  <div className="dash-bar-detail-item">
+                    <span className="dash-bar-detail-label">Výdaje</span>
+                    <span className="dash-bar-detail-value" style={{ color: CHART_COLORS.expense }}>{fmt(selectedBarData.expenses)}</span>
+                  </div>
+                  <div className="dash-bar-detail-item">
+                    <span className="dash-bar-detail-label">Zisk</span>
+                    <span className="dash-bar-detail-value" style={{ color: selectedBarData.issued - selectedBarData.expenses >= 0 ? CHART_COLORS.profit : CHART_COLORS.expense }}>
+                      {fmt(selectedBarData.issued - selectedBarData.expenses)}
+                    </span>
+                  </div>
+                  <div className="dash-bar-detail-item">
+                    <span className="dash-bar-detail-label">Marže</span>
+                    <span className="dash-bar-detail-value" style={{ color: '#64748b' }}>
+                      {selectedBarData.issued > 0 ? ((( selectedBarData.issued - selectedBarData.expenses) / selectedBarData.issued) * 100).toFixed(1) : 0}%
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Second row */}
@@ -424,24 +533,35 @@ export default function Dashboard() {
               </div>
             </div>
 
-            <div className="dash-card">
-              <h3 className="dash-card-title" style={{ marginBottom: '1rem' }}>Stav faktur</h3>
-              <ResponsiveContainer width="100%" height={180}>
-                <PieChart>
-                  <Pie data={pieData} cx="50%" cy="50%" outerRadius={72} innerRadius={46} dataKey="value" paddingAngle={2} strokeWidth={0}>
-                    {pieData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
-                  </Pie>
-                  <Tooltip content={<PieTooltip />} />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="dash-pie-legend">
-                {pieData.map(p => (
-                  <div key={p.name} className="dash-pie-legend-item">
-                    <span className="dash-pie-legend-dot" style={{ background: p.color }} />
-                    <span className="dash-pie-legend-label">{p.name}</span>
-                    <span className="dash-pie-legend-value">{p.value}</span>
-                  </div>
-                ))}
+            <div className="dash-card dash-card-pie">
+              <h3 className="dash-card-title" style={{ marginBottom: '0.5rem' }}>Stav faktur</h3>
+              <div className="dash-pie-wrap">
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={pieData}
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={90}
+                      innerRadius={56}
+                      dataKey="value"
+                      paddingAngle={3}
+                      strokeWidth={0}
+                      label={renderPieLabel}
+                      labelLine={false}
+                      animationBegin={0}
+                      animationDuration={800}
+                      animationEasing="ease-out"
+                    >
+                      {pieData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+                    </Pie>
+                    <Tooltip content={<PieTooltip />} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="dash-pie-center">
+                  <span className="dash-pie-center-value">{pieTotal}</span>
+                  <span className="dash-pie-center-label">faktur</span>
+                </div>
               </div>
             </div>
           </div>
@@ -709,7 +829,7 @@ export default function Dashboard() {
               </div>
             </div>
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={monthlyData.map(d => ({ ...d, profit: d.issued - d.expenses }))} margin={{ top: 10, right: 10, left: 0, bottom: 0 }} barGap={1}>
+              <BarChart data={chartDisplayData.map(d => ({ ...d, profit: d.issued - d.expenses }))} margin={{ top: 10, right: 10, left: 0, bottom: 0 }} barGap={1}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
                 <XAxis dataKey="name" fontSize={11} tick={{ fill: '#94a3b8' }} axisLine={false} tickLine={false} />
                 <YAxis fontSize={11} tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} tick={{ fill: '#94a3b8' }} axisLine={false} tickLine={false} />
