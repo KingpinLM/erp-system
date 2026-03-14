@@ -201,7 +201,7 @@ module.exports = function getLoginPage(error) {
     <div class="brand">
       <div class="brand-content">
         <div class="logo-icon">
-          <svg width="180" height="48" viewBox="0 0 300 80" xmlns="http://www.w3.org/2000/svg">
+          <svg width="240" height="64" viewBox="0 0 300 80" xmlns="http://www.w3.org/2000/svg">
             <defs>
               <linearGradient id="login-sp" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stop-color="#1E2A3A"/>
