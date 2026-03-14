@@ -108,7 +108,13 @@ evidenceData.forEach(e => insertEvidence.run(tenantId, ...e));
 // ─── COMPANY (tenant-scoped) ────────────────────────────────
 const existingCompany = db.prepare('SELECT id FROM company WHERE tenant_id = ?').get(tenantId);
 if (!existingCompany) {
-  db.prepare(`INSERT INTO company (tenant_id, name, ico, dic, invoice_prefix, invoice_counter) VALUES (?, 'Rainbow Family Investment s.r.o.', '23486899', 'CZ23486899', 'FV', 11)`).run(tenantId);
+  db.prepare(`INSERT INTO company (tenant_id, name, ico, dic, bank_account, bank_code, iban, invoice_prefix, invoice_counter) VALUES (?, 'Rainbow Family Investment s.r.o.', '23486899', 'CZ23486899', '1234567890', '0100', 'CZ6501000000001234567890', 'FV', 11)`).run(tenantId);
+} else {
+  // Ensure bank details exist for existing records
+  const comp = db.prepare('SELECT bank_account FROM company WHERE tenant_id = ?').get(tenantId);
+  if (!comp.bank_account) {
+    db.prepare("UPDATE company SET bank_account='1234567890', bank_code='0100', iban='CZ6501000000001234567890' WHERE tenant_id=?").run(tenantId);
+  }
 }
 
 // ─── DEMO TENANT 2 (globally unique usernames!) ─────────────

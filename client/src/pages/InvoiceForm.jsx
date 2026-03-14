@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { api } from '../api';
 import { useAuth } from '../App';
 
@@ -212,7 +212,7 @@ export default function InvoiceForm() {
 
       {!hasBankDetails && (
         <div style={{ background: '#fef2f2', color: '#991b1b', padding: '0.75rem 1rem', borderRadius: 'var(--radius)', marginBottom: '1rem', fontSize: '0.85rem', border: '1px solid #fecaca' }}>
-          Nelze vystavit fakturu bez bankovního spojení. <a href="/settings" style={{ color: '#991b1b', fontWeight: 600 }}>Vyplňte údaje v nastavení firmy →</a>
+          Nelze vystavit fakturu bez bankovního spojení. <Link to="/company" style={{ color: '#991b1b', fontWeight: 600 }}>Vyplňte údaje v nastavení firmy →</Link>
         </div>
       )}
 
