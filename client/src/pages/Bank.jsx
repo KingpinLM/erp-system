@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../api';
 import { useAuth } from '../App';
 import Pagination, { usePagination } from '../components/Pagination';
+import { SkeletonTable } from '../components/Skeleton';
 
 export default function Bank() {
   const { can } = useAuth();
@@ -185,7 +186,7 @@ export default function Bank() {
 
           {showImport && <ImportForm accounts={accounts} onClose={() => setShowImport(false)} onDone={(msg) => { setShowImport(false); setSuccess(msg); loadTransactions(); }} onError={setError} />}
 
-          {loading ? <p>Načítání...</p> : (
+          {loading ? <SkeletonTable rows={5} cols={3} /> : (
             <table className="table">
               <thead><tr><th>Datum</th><th>Částka</th><th className="hide-mobile">Protiúčet</th><th className="hide-mobile">VS</th><th className="hide-mobile">Popis</th><th className="hide-mobile">Stav</th><th className="hide-mobile">Faktura</th><th>Akce</th></tr></thead>
               <tbody>

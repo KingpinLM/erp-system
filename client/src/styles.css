@@ -1953,6 +1953,69 @@ a.dash-rank-item:hover { background: var(--gray-50); }
   background-size: 200% 100% !important;
 }
 
+/* ─── MOBILE CARD LIST (replaces table on mobile) ──── */
+.mobile-card-list { display: none; }
+@media (max-width: 768px) {
+  .desktop-table-only { display: none !important; }
+  .mobile-card-list { display: block; }
+  .mobile-card-list .list-card {
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    padding: 0.875rem;
+    margin-bottom: 0.5rem;
+    transition: box-shadow 0.15s;
+  }
+  .mobile-card-list .list-card:active { box-shadow: var(--shadow-md); }
+  .mobile-card-list .list-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+  }
+  .mobile-card-list .list-card-title {
+    font-weight: 700;
+    font-size: 0.9rem;
+    color: var(--gray-900);
+  }
+  .mobile-card-list .list-card-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.82rem;
+    color: var(--gray-600);
+    padding: 0.15rem 0;
+  }
+  .mobile-card-list .list-card-row strong {
+    color: var(--gray-800);
+  }
+  .mobile-card-list .list-card-actions {
+    display: flex;
+    gap: 0.35rem;
+    margin-top: 0.625rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--gray-100);
+  }
+  .mobile-card-list .list-card-actions .btn {
+    flex: 1;
+    justify-content: center;
+    font-size: 0.78rem;
+  }
+}
+
+/* ─── SWIPE-TO-DISMISS BOTTOM SHEET ──────────── */
+.tap-preview-sheet { touch-action: pan-y; }
+.tap-preview-sheet.dragging { transition: none !important; animation: none !important; }
+
+/* ─── SKELETON CARD LIST ─────────────────────── */
+.skeleton-card-list .skeleton-card {
+  background: white;
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-lg);
+  padding: 0.875rem;
+  margin-bottom: 0.5rem;
+}
+
 /* ─── JOURNAL ENTRY FORM MOBILE ───────────────── */
 .journal-lines-mobile { display: none; }
 .journal-line-card {

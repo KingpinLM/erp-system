@@ -45,23 +45,23 @@ export default function VatReport() {
       {error && <div className="alert alert-error" onClick={() => setError('')}>{error}</div>}
       {success && <div className="alert alert-success" onClick={() => setSuccess('')}>{success}</div>}
 
-      <button className="btn btn-ghost" onClick={() => setFiltersOpen(o => !o)} style={{ marginBottom: 8 }}>
-        {filtersOpen ? '▲ Skrýt filtry' : '▼ Zobrazit filtry'}
+      <button className="mobile-filter-toggle" onClick={() => setFiltersOpen(o => !o)}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+        Filtry a akce
+        <span style={{ marginLeft: 'auto' }}>{filtersOpen ? '▲' : '▼'}</span>
       </button>
-      {filtersOpen && (
-        <div style={{ display: 'flex', gap: 8, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
-          <select className="form-input" style={{ width: 100 }} value={year} onChange={e => setYear(parseInt(e.target.value))}>
-            {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
-          </select>
-          <select className="form-input" style={{ width: 140 }} value={month} onChange={e => setMonth(parseInt(e.target.value))}>
-            {months.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
-          </select>
-          {can('admin', 'accountant') && <>
-            <button className="btn btn-primary" onClick={generate}>Generovat z faktur</button>
-            <button className="btn btn-secondary" onClick={exportXml}>Export XML</button>
-          </>}
-        </div>
-      )}
+      <div className={`filters-collapsible ${filtersOpen ? 'filters-open' : ''}`} style={{ display: 'flex', gap: 8, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+        <select className="form-input" style={{ width: 100 }} value={year} onChange={e => setYear(parseInt(e.target.value))}>
+          {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
+        </select>
+        <select className="form-input" style={{ width: 140 }} value={month} onChange={e => setMonth(parseInt(e.target.value))}>
+          {months.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
+        </select>
+        {can('admin', 'accountant') && <>
+          <button className="btn btn-primary" onClick={generate}>Generovat z faktur</button>
+          <button className="btn btn-secondary" onClick={exportXml}>Export XML</button>
+        </>}
+      </div>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
         <Link to="/financni-urad" className="btn btn-ghost">Finanční úřad (KH, SH, DPFO)</Link>

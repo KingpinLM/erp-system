@@ -14,6 +14,8 @@ export default function RecurringInvoices() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [statusFilter, setStatusFilter] = useState('');
   const { can } = useAuth();
   const toast = useToast();
   const confirm = useConfirm();
@@ -60,13 +62,26 @@ export default function RecurringInvoices() {
         </div>
       )}
 
+      <button className="mobile-filter-toggle" onClick={() => setFiltersOpen(f => !f)}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+        Filtry
+        <span style={{ marginLeft: 'auto' }}>{filtersOpen ? '▲' : '▼'}</span>
+      </button>
+      <div className={`filters-collapsible ${filtersOpen ? 'filters-open' : ''}`} style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+        <select className="form-select" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+          <option value="">Všechny stavy</option>
+          <option value="active">Aktivní</option>
+          <option value="paused">Pozastavené</option>
+        </select>
+      </div>
+
       <div className="card">
         {loading ? <div className="loading">Načítání...</div> : items.length === 0 ? <div className="empty-state">Žádné opakované faktury</div> : (
           <div className="table-responsive">
             <table>
               <thead><tr><th>Klient</th><th className="hide-mobile">Interval</th><th className="hide-mobile">Další datum</th><th className="hide-mobile">Konec</th><th className="hide-mobile">Měna</th><th>Stav</th><th>Akce</th></tr></thead>
               <tbody>
-                {items.map(r => (
+                {items.filter(r => !statusFilter || (statusFilter === 'active' ? r.active : !r.active)).map(r => (
                   <tr key={r.id} style={{ opacity: r.active ? 1 : 0.5 }}>
                     <td style={{ fontWeight: 600 }}>{r.client_name || '—'}</td>
                     <td className="hide-mobile">{intervalLabels[r.interval]}</td>

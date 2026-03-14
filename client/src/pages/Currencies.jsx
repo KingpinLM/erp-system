@@ -8,6 +8,7 @@ export default function Currencies() {
   const [refreshing, setRefreshing] = useState(false);
   const [editingCode, setEditingCode] = useState(null);
   const [newRate, setNewRate] = useState('');
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const { can } = useAuth();
 
   const load = () => { setLoading(true); api.getCurrencies().then(setCurrencies).finally(() => setLoading(false)); };
@@ -38,11 +39,18 @@ export default function Currencies() {
   return (
     <div>
       {can('admin') && (
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
-          <button className="btn btn-primary" onClick={refreshRates} disabled={refreshing}>
-            {refreshing ? 'Aktualizuji...' : 'Aktualizovat z ČNB'}
+        <>
+          <button className="mobile-filter-toggle" onClick={() => setFiltersOpen(f => !f)}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+            Akce
+            <span style={{ marginLeft: 'auto' }}>{filtersOpen ? '▲' : '▼'}</span>
           </button>
-        </div>
+          <div className={`filters-collapsible ${filtersOpen ? 'filters-open' : ''}`} style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
+            <button className="btn btn-primary" onClick={refreshRates} disabled={refreshing}>
+              {refreshing ? 'Aktualizuji...' : 'Aktualizovat z ČNB'}
+            </button>
+          </div>
+        </>
       )}
 
       <div className="card">

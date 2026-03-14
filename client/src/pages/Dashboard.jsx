@@ -4,6 +4,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { api } from '../api';
 import { useAuth } from '../App';
 import Pagination from '../components/Pagination';
+import { useSwipeDismiss } from '../hooks/useSwipeDismiss';
 
 const isTouchDevice = () => window.matchMedia('(hover: none) and (pointer: coarse)').matches;
 
@@ -140,6 +141,7 @@ export default function Dashboard() {
   const [clientSortDir, setClientSortDir] = useState('desc');
   const { can } = useAuth();
   const [tapPreview, setTapPreview] = useState(null);
+  const swipe = useSwipeDismiss(() => setTapPreview(null));
 
   const loadData = () => {
     setLoading(true);
@@ -1064,7 +1066,8 @@ export default function Dashboard() {
 
       {tapPreview && (
         <div className="tap-preview-overlay" onClick={() => setTapPreview(null)}>
-          <div className="tap-preview-sheet" onClick={e => e.stopPropagation()}>
+          <div className="tap-preview-sheet" ref={swipe.sheetRef} onClick={e => e.stopPropagation()}
+            onTouchStart={swipe.onTouchStart} onTouchMove={swipe.onTouchMove} onTouchEnd={swipe.onTouchEnd}>
             <div className="tap-preview-handle" />
             <div style={{ padding: '0 16px 16px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>

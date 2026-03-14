@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useSwipeDismiss } from '../hooks/useSwipeDismiss';
 import { Link } from 'react-router-dom';
 import { api } from '../api';
 import { useAuth } from '../App';
@@ -131,6 +132,7 @@ export default function Clients() {
   const [perPage, setPerPage] = useState(20);
   const [tapPreview, setTapPreview] = useState(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const swipe = useSwipeDismiss(() => setTapPreview(null));
 
   // Hover preview state
   const [hoveredId, setHoveredId] = useState(null);
@@ -306,7 +308,26 @@ export default function Clients() {
 
       <div className="card">
         {loading ? <SkeletonTable rows={5} cols={7} /> : sorted.length === 0 ? <EmptyState type="clients" title="Žádní klienti" description="Přidejte prvního klienta pro začátek fakturace." action={can('admin', 'accountant', 'manager') ? openNew : undefined} actionLabel="+ Nový klient" /> : (
-          <div className="table-responsive">
+          <>
+          <div className="mobile-card-list">
+            {sorted.slice((page - 1) * perPage, page * perPage).map(c => (
+              <div key={c.id} className="list-card" onClick={() => handleRowTap(c)}>
+                <div className="list-card-header">
+                  <Link to={`/clients/${c.id}`} className="list-card-title" style={{ color: 'var(--primary)', textDecoration: 'none' }} onClick={e => e.stopPropagation()}>{c.name}</Link>
+                </div>
+                {(c.ico || c.dic) && <div className="list-card-row"><span>{c.ico ? `IČO: ${c.ico}` : ''}{c.ico && c.dic ? ' · ' : ''}{c.dic ? `DIČ: ${c.dic}` : ''}</span></div>}
+                {c.email && <div className="list-card-row"><span>{c.email}</span></div>}
+                {c.city && <div className="list-card-row"><span>{c.city}{c.country ? `, ${c.country}` : ''}</span></div>}
+                <div className="list-card-actions" onClick={e => e.stopPropagation()}>
+                  <Link to={`/clients/${c.id}`} className="btn btn-outline btn-sm">Detail</Link>
+                  {can('admin', 'accountant', 'manager') && <button className="btn btn-outline btn-sm" onClick={() => openEdit(c)}>Upravit</button>}
+                  {can('admin') && <button className="btn btn-danger btn-sm" onClick={() => handleDelete(c.id)}>Smazat</button>}
+                </div>
+              </div>
+            ))}
+          </div>
+          {/* Desktop table */}
+          <div className="table-responsive desktop-table-only">
             <table>
               <thead><tr>
                 <th style={{ cursor: 'pointer' }} onClick={() => toggleSort('name')}>Název<SortIcon col="name" /></th>
@@ -343,7 +364,8 @@ export default function Clients() {
                 ))}
               </tbody>
             </table>
-          </div>
+          </div>{/* end desktop-table-only */}
+          </>
         )}
         <Pagination total={sorted.length} page={page} perPage={perPage} onPageChange={setPage} onPerPageChange={v => { setPerPage(v); setPage(1); }} />
       </div>
@@ -356,7 +378,8 @@ export default function Clients() {
       {/* Tap preview (mobile bottom sheet) */}
       {tapPreview && (
         <div className="tap-preview-overlay" onClick={() => setTapPreview(null)}>
-          <div className="tap-preview-sheet" onClick={e => e.stopPropagation()}>
+          <div className="tap-preview-sheet" ref={swipe.sheetRef} onClick={e => e.stopPropagation()}
+            onTouchStart={swipe.onTouchStart} onTouchMove={swipe.onTouchMove} onTouchEnd={swipe.onTouchEnd}>
             <div className="tap-preview-handle" />
             <div style={{ padding: '0 16px 16px' }}>
               <div style={{ fontSize: 11, fontWeight: 800, color: '#6366f1', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Klient</div>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useSwipeDismiss } from '../hooks/useSwipeDismiss';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import { useAuth } from '../App';
@@ -103,6 +104,7 @@ export default function Invoices() {
   const hoverCache = useRef({});
   const [tapPreview, setTapPreview] = useState(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const swipe = useSwipeDismiss(() => setTapPreview(null));
 
   const load = () => {
     setLoading(true);
@@ -277,7 +279,29 @@ export default function Invoices() {
         <div className="card"><EmptyState type="invoices" title="Žádné faktury" description="Zatím nemáte žádné faktury. Vytvořte první fakturu a začněte fakturovat." action={can('admin', 'accountant') ? () => navigate('/invoices/new') : undefined} actionLabel="+ Nová faktura" /></div>
       ) : (
       <div className="card">
-          <div className="table-responsive">
+          {/* Mobile card list */}
+          <div className="mobile-card-list">
+            {sorted.slice((page - 1) * perPage, page * perPage).map(inv => (
+              <div key={inv.id} className="list-card" onClick={() => handleRowTap(inv)}>
+                <div className="list-card-header">
+                  <Link to={`/invoices/${inv.id}`} className="list-card-title" style={{ color: 'var(--primary)', textDecoration: 'none' }} onClick={e => e.stopPropagation()}>{inv.invoice_number}</Link>
+                  <span className={`badge badge-${inv.status}`}>{statusLabels[inv.status]}</span>
+                </div>
+                <div className="list-card-row"><span>{inv.client_name || '—'}</span></div>
+                <div className="list-card-row">
+                  <span>{fmtDate(inv.issue_date)} → {fmtDate(inv.due_date)}</span>
+                  <strong style={{ fontSize: '0.95rem', color: '#0f172a' }}>{fmt(inv.total, inv.currency)}</strong>
+                </div>
+                <div className="list-card-actions" onClick={e => e.stopPropagation()}>
+                  <Link to={`/invoices/${inv.id}`} className="btn btn-outline btn-sm">Detail</Link>
+                  {can('admin', 'accountant') && <Link to={`/invoices/${inv.id}/edit`} className="btn btn-outline btn-sm">Upravit</Link>}
+                  {can('admin', 'manager') && <button className="btn btn-danger btn-sm" onClick={() => handleDelete(inv.id)}>Smazat</button>}
+                </div>
+              </div>
+            ))}
+          </div>
+          {/* Desktop table */}
+          <div className="table-responsive desktop-table-only">
             <table>
               <thead>
                 <tr>
@@ -322,7 +346,7 @@ export default function Invoices() {
                 ))}
               </tbody>
             </table>
-          </div>
+          </div>{/* end desktop-table-only */}
         <Pagination total={sorted.length} page={page} perPage={perPage} onPageChange={setPage} onPerPageChange={v => { setPerPage(v); setPage(1); }} />
       </div>
       )}
@@ -335,7 +359,8 @@ export default function Invoices() {
       {/* Tap preview (mobile bottom sheet) */}
       {tapPreview && (
         <div className="tap-preview-overlay" onClick={() => setTapPreview(null)}>
-          <div className="tap-preview-sheet" onClick={e => e.stopPropagation()}>
+          <div className="tap-preview-sheet" ref={swipe.sheetRef} onClick={e => e.stopPropagation()}
+            onTouchStart={swipe.onTouchStart} onTouchMove={swipe.onTouchMove} onTouchEnd={swipe.onTouchEnd}>
             <div className="tap-preview-handle" />
             <div style={{ padding: '0 16px 16px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>

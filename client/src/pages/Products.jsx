@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../api';
 import { useAuth } from '../App';
 import Pagination, { usePagination } from '../components/Pagination';
+import { SkeletonTable, SkeletonCards } from '../components/Skeleton';
 import { useToast } from '../components/Toast';
 import { useConfirm } from '../components/ConfirmDialog';
 
@@ -177,7 +178,7 @@ export default function Products() {
               <option value="service">Služby</option>
             </select>
           </div>
-          {loading ? <p>Načítání...</p> : (
+          {loading ? <SkeletonTable rows={5} cols={4} /> : (
             <table className="table">
               <thead><tr><th>Název</th><th className="hide-mobile">SKU</th><th className="hide-mobile">Typ</th><th className="hide-mobile">Jednotka</th><th style={{ textAlign: 'right' }}>Cena</th><th className="hide-mobile" style={{ textAlign: 'right' }}>DPH</th><th style={{ textAlign: 'right' }}>Skladem</th><th>Akce</th></tr></thead>
               <tbody>
@@ -211,21 +212,21 @@ export default function Products() {
       {tab === 'movements' && (
         loading ? <p>Načítání...</p> : (
           <table className="table">
-            <thead><tr><th>Datum</th><th>Produkt</th><th>Typ</th><th style={{ textAlign: 'right' }}>Množství</th><th style={{ textAlign: 'right' }}>Cena/ks</th><th>Poznámka</th><th>Vytvořil</th></tr></thead>
+            <thead><tr><th>Datum</th><th>Produkt</th><th className="hide-mobile">Typ</th><th style={{ textAlign: 'right' }}>Množství</th><th className="hide-mobile" style={{ textAlign: 'right' }}>Cena/ks</th><th className="hide-mobile">Poznámka</th><th className="hide-mobile">Vytvořil</th></tr></thead>
             <tbody>
               {movements.slice((page - 1) * perPage, page * perPage).map(m => (
                 <tr key={m.id}>
                   <td>{new Date(m.date).toLocaleDateString('cs')}</td>
                   <td><strong>{m.product_name}</strong>{m.sku && <span style={{ fontSize: 11, color: '#64748b' }}> ({m.sku})</span>}</td>
-                  <td><span className={`badge badge-${m.type === 'in' ? 'paid' : m.type === 'out' ? 'overdue' : 'draft'}`}>
+                  <td className="hide-mobile"><span className={`badge badge-${m.type === 'in' ? 'paid' : m.type === 'out' ? 'overdue' : 'draft'}`}>
                     {m.type === 'in' ? 'Příjem' : m.type === 'out' ? 'Výdej' : 'Inventura'}
                   </span></td>
                   <td style={{ textAlign: 'right', fontWeight: 600, color: m.type === 'in' ? '#22c55e' : m.type === 'out' ? '#ef4444' : '#64748b' }}>
                     {m.type === 'in' ? '+' : m.type === 'out' ? '-' : ''}{m.quantity}
                   </td>
-                  <td style={{ textAlign: 'right' }}>{m.unit_price > 0 ? m.unit_price.toLocaleString('cs', { minimumFractionDigits: 2 }) : '—'}</td>
-                  <td style={{ fontSize: 12 }}>{m.note || '—'}</td>
-                  <td style={{ fontSize: 12 }}>{m.created_by_name || '—'}</td>
+                  <td className="hide-mobile" style={{ textAlign: 'right' }}>{m.unit_price > 0 ? m.unit_price.toLocaleString('cs', { minimumFractionDigits: 2 }) : '—'}</td>
+                  <td className="hide-mobile" style={{ fontSize: 12 }}>{m.note || '—'}</td>
+                  <td className="hide-mobile" style={{ fontSize: 12 }}>{m.created_by_name || '—'}</td>
                 </tr>
               ))}
             </tbody>
@@ -246,15 +247,15 @@ export default function Products() {
             <>
               <h3 style={{ color: '#ef4444', marginBottom: 8 }}>Nízké zásoby</h3>
               <table className="table">
-                <thead><tr><th>Produkt</th><th>SKU</th><th style={{ textAlign: 'right' }}>Skladem</th><th style={{ textAlign: 'right' }}>Minimum</th><th style={{ textAlign: 'right' }}>Chybí</th></tr></thead>
+                <thead><tr><th>Produkt</th><th className="hide-mobile">SKU</th><th style={{ textAlign: 'right' }}>Skladem</th><th className="hide-mobile" style={{ textAlign: 'right' }}>Minimum</th><th className="hide-mobile" style={{ textAlign: 'right' }}>Chybí</th></tr></thead>
                 <tbody>
                   {stockReport.lowStock.map(p => (
                     <tr key={p.id}>
                       <td><strong>{p.name}</strong></td>
-                      <td>{p.sku || '—'}</td>
+                      <td className="hide-mobile">{p.sku || '—'}</td>
                       <td style={{ textAlign: 'right', color: '#ef4444', fontWeight: 600 }}>{p.stock_quantity} {p.unit}</td>
-                      <td style={{ textAlign: 'right' }}>{p.min_stock} {p.unit}</td>
-                      <td style={{ textAlign: 'right', fontWeight: 600 }}>{(p.min_stock - p.stock_quantity).toFixed(1)} {p.unit}</td>
+                      <td className="hide-mobile" style={{ textAlign: 'right' }}>{p.min_stock} {p.unit}</td>
+                      <td className="hide-mobile" style={{ textAlign: 'right', fontWeight: 600 }}>{(p.min_stock - p.stock_quantity).toFixed(1)} {p.unit}</td>
                     </tr>
                   ))}
                 </tbody>
