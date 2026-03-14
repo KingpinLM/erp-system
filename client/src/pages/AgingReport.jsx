@@ -27,8 +27,7 @@ export default function AgingReport() {
 
   return (
     <div>
-      <div className="page-header">
-        <h1 className="page-title">Stárnutí pohledávek</h1>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
         <a href="/api/export/invoices" className="btn btn-outline btn-sm" download>CSV Export</a>
       </div>
 

@@ -396,23 +396,23 @@ export function usePageTitle(subtitle) {
 
 // Route → section mapping
 const routeSections = [
-  { match: /^\/$/, title: 'Dashboard', home: '/' },
+  { match: /^\/$/, title: 'Dashboard', sub: 'Finanční přehled a analytika', home: '/' },
   { match: /^\/invoices\/new/, title: 'Nová faktura', section: 'Faktury', home: '/invoices' },
   { match: /^\/invoices\/(\d+)\/edit/, title: 'Úprava faktury', section: 'Faktury', home: '/invoices' },
   { match: /^\/invoices\/(\d+)/, title: 'Detail faktury', section: 'Faktury', home: '/invoices' },
-  { match: /^\/invoices/, title: 'Faktury', home: '/invoices' },
+  { match: /^\/invoices/, title: 'Faktury', sub: 'Přehled vydaných faktur', home: '/invoices' },
   { match: /^\/clients\/(\d+)/, title: 'Detail klienta', section: 'Klienti', home: '/clients' },
-  { match: /^\/clients/, title: 'Klienti', home: '/clients' },
-  { match: /^\/evidence/, title: 'Evidence', home: '/evidence' },
-  { match: /^\/recurring/, title: 'Opakované faktury', home: '/recurring' },
-  { match: /^\/bank/, title: 'Banka', home: '/bank' },
-  { match: /^\/accounting/, title: 'Účetnictví', home: '/accounting' },
-  { match: /^\/vat/, title: 'DPH', home: '/vat' },
-  { match: /^\/currencies/, title: 'Správa měn', home: '/currencies' },
-  { match: /^\/company/, title: 'Společnost', home: '/company' },
+  { match: /^\/clients/, title: 'Klienti', sub: 'Správa klientů a kontaktů', home: '/clients' },
+  { match: /^\/evidence/, title: 'Evidence', sub: 'Přijaté doklady a náklady', home: '/evidence' },
+  { match: /^\/recurring/, title: 'Opakované faktury', sub: 'Automaticky generované faktury', home: '/recurring' },
+  { match: /^\/bank/, title: 'Banka', sub: 'Bankovní transakce a párování', home: '/bank' },
+  { match: /^\/accounting/, title: 'Účetnictví', sub: 'Účtová osnova a předkontace', home: '/accounting' },
+  { match: /^\/vat/, title: 'DPH', sub: 'Přiznání k DPH', home: '/vat' },
+  { match: /^\/currencies/, title: 'Správa měn', sub: 'Kurzy a měnové páry', home: '/currencies' },
+  { match: /^\/company/, title: 'Společnost', sub: 'Nastavení firmy a fakturace', home: '/company' },
   { match: /^\/users\/(\d+)/, title: 'Detail uživatele', section: 'Uživatelé', home: '/users' },
-  { match: /^\/users/, title: 'Uživatelé', home: '/users' },
-  { match: /^\/profile/, title: 'Profil', home: '/profile' },
+  { match: /^\/users/, title: 'Uživatelé', sub: 'Správa uživatelů a rolí', home: '/users' },
+  { match: /^\/profile/, title: 'Můj profil', sub: 'Osobní nastavení', home: '/profile' },
   { match: /^\/search/, title: 'Výsledky hledání', home: '/' },
 ];
 
@@ -439,6 +439,7 @@ function Layout({ children }) {
             )}
             {section.section && <span className="topbar-sep">/</span>}
             <Link to={section.home} className="topbar-title-link">{subtitle || section.title}</Link>
+            {section.sub && !subtitle && <span className="topbar-subtitle">{section.sub}</span>}
           </div>
           <div style={{ flex: 1 }} />
           <GlobalSearch />

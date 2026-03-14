@@ -39,13 +39,6 @@ export default function UserDetail() {
 
   return (
     <div>
-      <div className="page-header">
-        <div>
-          <Link to="/users" className="btn btn-outline btn-sm" style={{ marginBottom: '0.5rem' }}>← Zpět na uživatele</Link>
-          <h1 className="page-title">{user.first_name} {user.last_name}</h1>
-        </div>
-      </div>
-
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
         <div className="card">
           <div className="card-title" style={{ marginBottom: '1rem' }}>Osobní údaje</div>

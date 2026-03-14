@@ -37,14 +37,13 @@ export default function Currencies() {
 
   return (
     <div>
-      <div className="page-header">
-        <h1 className="page-title">Správa měn</h1>
-        {can('admin') && (
+      {can('admin') && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
           <button className="btn btn-primary" onClick={refreshRates} disabled={refreshing}>
             {refreshing ? 'Aktualizuji...' : 'Aktualizovat z ČNB'}
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       <div className="card">
         <p style={{ marginBottom: '1rem', fontSize: '0.85rem', color: 'var(--gray-500)' }}>

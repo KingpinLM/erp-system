@@ -205,10 +205,6 @@ export default function InvoiceForm() {
 
   return (
     <div>
-      <div className="page-header">
-        <h1 className="page-title">{isEdit ? 'Upravit fakturu' : 'Nová faktura'}</h1>
-      </div>
-
       {error && <div className="login-error" style={{ marginBottom: '1rem' }}>{error}</div>}
 
       {!hasBankDetails && (

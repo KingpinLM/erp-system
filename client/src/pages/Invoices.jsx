@@ -65,14 +65,11 @@ export default function Invoices() {
 
   return (
     <div>
-      <div className="page-header">
-        <h1 className="page-title">Faktury</h1>
-        <div className="btn-group">
-          <a href="/api/export/invoices" className="btn btn-outline btn-sm" download>CSV Export</a>
-          {can('admin', 'accountant') && (
-            <Link to="/invoices/new" className="btn btn-primary">+ Nová faktura</Link>
-          )}
-        </div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginBottom: '1rem' }}>
+        <a href="/api/export/invoices" className="btn btn-outline btn-sm" download>CSV Export</a>
+        {can('admin', 'accountant') && (
+          <Link to="/invoices/new" className="btn btn-primary">+ Nová faktura</Link>
+        )}
       </div>
 
       {selected.size > 0 && can('admin', 'accountant', 'manager') && (

@@ -299,20 +299,6 @@ export default function Dashboard() {
 
   return (
     <div className="dash">
-      {/* Header - Rillion sober style */}
-      <div className="dash-header">
-        <div className="dash-header-left">
-          <h1 className="dash-title">Dashboard</h1>
-          <span className="dash-subtitle">Finanční přehled a analytika</span>
-        </div>
-        <div className="dash-header-right">
-          <div className="dash-live-indicator">
-            <div className="dash-live-dot" />
-            <span className="dash-live-text">Live</span>
-          </div>
-        </div>
-      </div>
-
       {/* Period selector */}
       <div className="dash-period-bar" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
         <div className="dash-period-pills">

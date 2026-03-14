@@ -651,13 +651,9 @@ export default function Users() {
 
   return (
     <div>
-      <div className="page-header">
-        <h1 className="page-title">Správa uživatelů</h1>
-        <div className="btn-group">
-          {activeTab === 'users' && <button className="btn btn-primary" onClick={openNew}>+ Nový uživatel</button>}
-          {activeTab === 'roles' && <button className="btn btn-primary" onClick={openNewRole}>+ Nová role</button>}
-          {activeTab === 'groups' && null /* new group button is inside GroupsTab */}
-        </div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginBottom: '1rem' }}>
+        {activeTab === 'users' && <button className="btn btn-primary" onClick={openNew}>+ Nový uživatel</button>}
+        {activeTab === 'roles' && <button className="btn btn-primary" onClick={openNewRole}>+ Nová role</button>}
       </div>
 
       {/* Tabs */}

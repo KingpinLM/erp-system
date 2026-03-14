@@ -164,14 +164,11 @@ export default function Evidence() {
 
   return (
     <div>
-      <div className="page-header">
-        <h1 className="page-title">Evidence</h1>
-        <div className="btn-group">
-          <a href="/api/export/evidence" className="btn btn-outline btn-sm" download>CSV Export</a>
-          {can('admin', 'accountant', 'manager') && (
-            <button className="btn btn-primary" onClick={openNew}>+ Nový záznam</button>
-          )}
-        </div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginBottom: '1rem' }}>
+        <a href="/api/export/evidence" className="btn btn-outline btn-sm" download>CSV Export</a>
+        {can('admin', 'accountant', 'manager') && (
+          <button className="btn btn-primary" onClick={openNew}>+ Nový záznam</button>
+        )}
       </div>
 
       <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>

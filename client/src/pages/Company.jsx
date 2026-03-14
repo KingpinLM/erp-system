@@ -262,9 +262,6 @@ export default function Company() {
 
   return (
     <div>
-      <div className="page-header">
-        <h1 className="page-title">Nastavení společnosti</h1>
-      </div>
       {saved && <div style={{ background: '#d1fae5', color: '#059669', padding: '0.75rem', borderRadius: 'var(--radius)', marginBottom: '1rem' }}>Uloženo!</div>}
       <form onSubmit={handleSubmit}>
         <div className="card">

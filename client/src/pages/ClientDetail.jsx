@@ -29,13 +29,6 @@ export default function ClientDetail() {
 
   return (
     <div>
-      <div className="page-header">
-        <div>
-          <Link to="/clients" className="btn btn-outline btn-sm" style={{ marginBottom: '0.5rem' }}>← Zpět na klienty</Link>
-          <h1 className="page-title">{client.name}</h1>
-        </div>
-      </div>
-
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
         <div className="card">
           <div className="card-title" style={{ marginBottom: '1rem' }}>Kontaktní údaje</div>

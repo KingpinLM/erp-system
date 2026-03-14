@@ -262,47 +262,41 @@ export default function InvoiceDetail() {
 
   return (
     <div>
-      <div className="page-header">
-        <div>
-          <Link to="/invoices" className="btn btn-outline btn-sm" style={{ marginBottom: '0.5rem' }}>← Zpět na seznam</Link>
-          <h1 className="page-title">{invoice.invoice_number}</h1>
-        </div>
-        <div className="btn-group" style={{ flexWrap: 'wrap' }}>
-          <button className="btn btn-primary" onClick={downloadPDF}>PDF</button>
-          <a href={`/api/invoices/${id}/isdoc`} className="btn btn-outline" download>ISDOC</a>
-          {can('admin', 'accountant') && <>
-            <Link to={`/invoices/${id}/edit`} className="btn btn-outline">Upravit</Link>
-            <button className="btn btn-outline" onClick={async () => {
-              try { await api.sendInvoiceEmail(id, {}); alert('Email odeslán'); } catch (e) { alert(e.message); }
-            }}>Odeslat emailem</button>
-            {(invoice.status === 'overdue' || invoice.status === 'sent') && (
-              <button className="btn btn-outline" style={{ color: '#ef4444' }} onClick={async () => {
-                try { await api.sendInvoiceReminder(id); alert('Upomínka odeslána'); } catch (e) { alert(e.message); }
-              }}>Upomínka</button>
-            )}
-          </>}
-          {can('admin', 'accountant') && (
-            <button className="btn btn-outline" onClick={async () => { const r = await api.duplicateInvoice(id); navigate(`/invoices/${r.id}`); }}>Duplikovat</button>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+        <button className="btn btn-primary" onClick={downloadPDF}>PDF</button>
+        <a href={`/api/invoices/${id}/isdoc`} className="btn btn-outline" download>ISDOC</a>
+        {can('admin', 'accountant') && <>
+          <Link to={`/invoices/${id}/edit`} className="btn btn-outline">Upravit</Link>
+          <button className="btn btn-outline" onClick={async () => {
+            try { await api.sendInvoiceEmail(id, {}); alert('Email odeslán'); } catch (e) { alert(e.message); }
+          }}>Odeslat emailem</button>
+          {(invoice.status === 'overdue' || invoice.status === 'sent') && (
+            <button className="btn btn-outline" style={{ color: '#ef4444' }} onClick={async () => {
+              try { await api.sendInvoiceReminder(id); alert('Upomínka odeslána'); } catch (e) { alert(e.message); }
+            }}>Upomínka</button>
           )}
-          {can('admin', 'accountant') && invoice.status !== 'cancelled' && invoice.invoice_type !== 'credit_note' && (
-            <button className="btn btn-outline" onClick={async () => { const r = await api.createCreditNote(id); navigate(`/invoices/${r.id}`); }}>Dobropis</button>
-          )}
-          {can('admin', 'accountant') && invoice.invoice_type === 'proforma' && invoice.status !== 'paid' && (
-            <button className="btn btn-success" onClick={async () => { const r = await api.convertProforma(id); navigate(`/invoices/${r.id}`); }}>Převést na fakturu</button>
-          )}
-          {can('admin', 'accountant', 'manager') && invoice.status === 'draft' && (
-            <button className="btn btn-success" onClick={() => changeStatus('sent')}>Odeslat</button>
-          )}
-          {can('admin', 'accountant', 'manager') && ['sent', 'overdue'].includes(invoice.status) && (
-            <button className="btn btn-outline" onClick={() => setShowPayment(true)}>Zaznamenat platbu</button>
-          )}
-          {can('admin', 'accountant', 'manager') && invoice.status === 'sent' && (
-            <button className="btn btn-success" onClick={() => changeStatus('paid')}>Zaplaceno</button>
-          )}
-          {can('admin', 'accountant', 'manager') && ['sent', 'overdue'].includes(invoice.status) && (
-            <button className="btn btn-warning" onClick={() => changeStatus('cancelled')}>Zrušit</button>
-          )}
-        </div>
+        </>}
+        {can('admin', 'accountant') && (
+          <button className="btn btn-outline" onClick={async () => { const r = await api.duplicateInvoice(id); navigate(`/invoices/${r.id}`); }}>Duplikovat</button>
+        )}
+        {can('admin', 'accountant') && invoice.status !== 'cancelled' && invoice.invoice_type !== 'credit_note' && (
+          <button className="btn btn-outline" onClick={async () => { const r = await api.createCreditNote(id); navigate(`/invoices/${r.id}`); }}>Dobropis</button>
+        )}
+        {can('admin', 'accountant') && invoice.invoice_type === 'proforma' && invoice.status !== 'paid' && (
+          <button className="btn btn-success" onClick={async () => { const r = await api.convertProforma(id); navigate(`/invoices/${r.id}`); }}>Převést na fakturu</button>
+        )}
+        {can('admin', 'accountant', 'manager') && invoice.status === 'draft' && (
+          <button className="btn btn-success" onClick={() => changeStatus('sent')}>Odeslat</button>
+        )}
+        {can('admin', 'accountant', 'manager') && ['sent', 'overdue'].includes(invoice.status) && (
+          <button className="btn btn-outline" onClick={() => setShowPayment(true)}>Zaznamenat platbu</button>
+        )}
+        {can('admin', 'accountant', 'manager') && invoice.status === 'sent' && (
+          <button className="btn btn-success" onClick={() => changeStatus('paid')}>Zaplaceno</button>
+        )}
+        {can('admin', 'accountant', 'manager') && ['sent', 'overdue'].includes(invoice.status) && (
+          <button className="btn btn-warning" onClick={() => changeStatus('cancelled')}>Zrušit</button>
+        )}
       </div>
 
       <style dangerouslySetInnerHTML={{ __html: `

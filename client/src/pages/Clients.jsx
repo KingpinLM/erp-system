@@ -61,12 +61,9 @@ export default function Clients() {
 
   return (
     <div>
-      <div className="page-header">
-        <h1 className="page-title">Klienti</h1>
-        <div className="btn-group">
-          <a href="/api/export/clients" className="btn btn-outline btn-sm" download>CSV Export</a>
-          {can('admin', 'accountant', 'manager') && <button className="btn btn-primary" onClick={openNew}>+ Nový klient</button>}
-        </div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginBottom: '1rem' }}>
+        <a href="/api/export/clients" className="btn btn-outline btn-sm" download>CSV Export</a>
+        {can('admin', 'accountant', 'manager') && <button className="btn btn-primary" onClick={openNew}>+ Nový klient</button>}
       </div>
 
       <div className="filters" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>

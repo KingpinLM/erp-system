@@ -50,10 +50,11 @@ export default function RecurringInvoices() {
 
   return (
     <div>
-      <div className="page-header">
-        <h1 className="page-title">Opakované faktury</h1>
-        {can('admin', 'accountant') && <button className="btn btn-primary" onClick={openNew}>+ Nová opakovaná</button>}
-      </div>
+      {can('admin', 'accountant') && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
+          <button className="btn btn-primary" onClick={openNew}>+ Nová opakovaná</button>
+        </div>
+      )}
 
       <div className="card">
         {loading ? <div className="loading">Načítání...</div> : items.length === 0 ? <div className="empty-state">Žádné opakované faktury</div> : (

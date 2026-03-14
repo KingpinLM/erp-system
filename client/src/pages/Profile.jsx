@@ -86,8 +86,6 @@ export default function Profile() {
 
   return (
     <div>
-      <h1 className="page-title">Můj profil</h1>
-
       {msg && <div style={{ marginBottom: 16, padding: '10px 16px', background: msg.includes('Chyba') ? '#fee2e2' : '#d1fae5', borderRadius: 8, color: msg.includes('Chyba') ? '#dc2626' : '#059669', fontSize: 13 }}>{msg}</div>}
 
       <div className="card" style={{ maxWidth: 600 }}>
