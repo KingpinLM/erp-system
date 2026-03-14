@@ -106,15 +106,21 @@ const evidenceData = [
 evidenceData.forEach(e => insertEvidence.run(tenantId, ...e));
 
 // ─── COMPANY (tenant-scoped) ────────────────────────────────
+// Rainbow Family Investment brand logo (Prismatic Spectrum, white background)
+const brandLogoSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="300" height="80" viewBox="0 0 300 80"><rect width="300" height="80" fill="white"/><defs><linearGradient id="sp" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#1E2A3A"/><stop offset="20%" stop-color="#2D5A1E"/><stop offset="40%" stop-color="#7C8C6E"/><stop offset="60%" stop-color="#C4A265"/><stop offset="80%" stop-color="#C47D5A"/><stop offset="100%" stop-color="#8B5A6B"/></linearGradient></defs><rect x="12" y="12" width="4" height="56" rx="2" fill="url(#sp)"/><text x="26" y="44" font-family="Georgia,serif" font-size="30" font-weight="700" fill="#1E2A3A">Rainbow Family</text><text x="27" y="62" font-family="Arial,Helvetica,sans-serif" font-size="11" font-weight="500" fill="#1E2A3A" letter-spacing="4" opacity="0.45">INVESTMENT</text></svg>';
+const brandLogo = 'data:image/svg+xml;base64,' + Buffer.from(brandLogoSvg).toString('base64');
+
 const existingCompany = db.prepare('SELECT id FROM company WHERE tenant_id = ?').get(tenantId);
 if (!existingCompany) {
-  db.prepare(`INSERT INTO company (tenant_id, name, ico, dic, bank_account, bank_code, iban, invoice_prefix, invoice_counter) VALUES (?, 'Rainbow Family Investment s.r.o.', '23486899', 'CZ23486899', '1234567890', '0100', 'CZ6501000000001234567890', 'FV', 11)`).run(tenantId);
+  db.prepare(`INSERT INTO company (tenant_id, name, ico, dic, bank_account, bank_code, iban, invoice_prefix, invoice_counter, logo) VALUES (?, 'Rainbow Family Investment s.r.o.', '23486899', 'CZ23486899', '1234567890', '0100', 'CZ6501000000001234567890', 'FV', 11, ?)`).run(tenantId, brandLogo);
 } else {
-  // Ensure bank details exist for existing records
-  const comp = db.prepare('SELECT bank_account FROM company WHERE tenant_id = ?').get(tenantId);
+  // Ensure bank details and logo exist for existing records
+  const comp = db.prepare('SELECT bank_account, logo FROM company WHERE tenant_id = ?').get(tenantId);
   if (!comp.bank_account) {
     db.prepare("UPDATE company SET bank_account='1234567890', bank_code='0100', iban='CZ6501000000001234567890' WHERE tenant_id=?").run(tenantId);
   }
+  // Update logo to brand version
+  db.prepare("UPDATE company SET logo = ? WHERE tenant_id = ?").run(brandLogo, tenantId);
 }
 
 // ─── DEMO TENANT 2 (globally unique usernames!) ─────────────

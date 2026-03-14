@@ -6,7 +6,7 @@ module.exports = function getLoginPage(error) {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Cache-Control" content="no-store">
-  <title>RFI ERP - Přihlášení</title>
+  <title>Rainbow Family Investment - Přihlášení</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -89,11 +89,7 @@ module.exports = function getLoginPage(error) {
     }
     .brand-content { max-width: 300px; }
     .logo-icon {
-      width: 56px; height: 56px; border-radius: 16px;
-      background: linear-gradient(135deg, #0d9488 0%, #0891b2 100%);
-      display: flex; align-items: center; justify-content: center;
       margin-bottom: 1.5rem;
-      box-shadow: 0 8px 24px rgba(13,148,136,0.3);
     }
     .brand-title { font-size: 1.8rem; font-weight: 800; color: white; letter-spacing: -0.03em; margin-bottom: 0.5rem; }
     .brand-desc { font-size: 0.9rem; color: rgba(255,255,255,0.5); line-height: 1.6; margin-bottom: 2rem; }
@@ -205,11 +201,23 @@ module.exports = function getLoginPage(error) {
     <div class="brand">
       <div class="brand-content">
         <div class="logo-icon">
-          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/>
+          <svg width="180" height="48" viewBox="0 0 300 80" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="login-sp" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#1E2A3A"/>
+                <stop offset="20%" stop-color="#2D5A1E"/>
+                <stop offset="40%" stop-color="#7C8C6E"/>
+                <stop offset="60%" stop-color="#C4A265"/>
+                <stop offset="80%" stop-color="#C47D5A"/>
+                <stop offset="100%" stop-color="#8B5A6B"/>
+              </linearGradient>
+            </defs>
+            <rect x="12" y="12" width="4" height="56" rx="2" fill="url(#login-sp)"/>
+            <text x="26" y="44" font-family="Georgia,serif" font-size="30" font-weight="700" fill="white">Rainbow Family</text>
+            <text x="27" y="62" font-family="Arial,Helvetica,sans-serif" font-size="11" font-weight="500" fill="white" letter-spacing="4" opacity="0.45">INVESTMENT</text>
           </svg>
         </div>
-        <h1 class="brand-title">RFI ERP</h1>
+        <h1 class="brand-title" style="font-size:1.1rem;font-weight:500;opacity:0.6;letter-spacing:0.05em">ERP SYSTÉM</h1>
         <p class="brand-desc">Moderní systém pro správu faktur, klientů a účetnictví vaší firmy.</p>
         <div class="features">
           <div class="feature">

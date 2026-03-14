@@ -72,6 +72,8 @@
   font-size: 1.1rem; font-weight: 800; letter-spacing: -0.02em;
   color: var(--primary-dark);
 }
+.sidebar-brand { color: var(--gray-800); line-height: 1; }
+.sidebar-brand svg { display: block; }
 
 .sidebar-user {
   padding: 0.75rem 1rem;
@@ -1031,6 +1033,7 @@ a:hover { opacity: 0.85; }
 [data-theme="dark"] .sidebar { background: #111827; border-right-color: #1f2937; }
 [data-theme="dark"] .sidebar-header { border-bottom-color: #1f2937; }
 [data-theme="dark"] .sidebar-header h2 { color: var(--primary-light); }
+[data-theme="dark"] .sidebar-brand { color: #e5e7eb; }
 [data-theme="dark"] .sidebar-user { background: rgba(255,255,255,0.04); border-color: #1f2937; }
 [data-theme="dark"] .sidebar-user-name { color: #e5e7eb; }
 [data-theme="dark"] .sidebar-link { color: #9ca3af; }

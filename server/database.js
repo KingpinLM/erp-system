@@ -488,8 +488,8 @@ try {
 try {
   const companies = db.prepare("SELECT id FROM company WHERE logo IS NULL OR logo = ''").all();
   if (companies.length > 0) {
-    // Simple dummy SVG logo as base64
-    const dummyLogo = 'data:image/svg+xml;base64,' + Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="180" height="60" viewBox="0 0 180 60"><rect width="180" height="60" rx="8" fill="#6366f1"/><text x="90" y="36" text-anchor="middle" fill="white" font-family="Arial,sans-serif" font-weight="bold" font-size="22">RFI ERP</text></svg>').toString('base64');
+    // Rainbow Family Investment brand logo (white background, Prismatic Spectrum)
+    const dummyLogo = 'data:image/svg+xml;base64,' + Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="300" height="80" viewBox="0 0 300 80"><rect width="300" height="80" fill="white"/><defs><linearGradient id="sp" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#1E2A3A"/><stop offset="20%" stop-color="#2D5A1E"/><stop offset="40%" stop-color="#7C8C6E"/><stop offset="60%" stop-color="#C4A265"/><stop offset="80%" stop-color="#C47D5A"/><stop offset="100%" stop-color="#8B5A6B"/></linearGradient></defs><rect x="12" y="12" width="4" height="56" rx="2" fill="url(#sp)"/><text x="26" y="44" font-family="Georgia,serif" font-size="30" font-weight="700" fill="#1E2A3A">Rainbow Family</text><text x="27" y="62" font-family="Arial,Helvetica,sans-serif" font-size="11" font-weight="500" fill="#1E2A3A" letter-spacing="4" opacity="0.45">INVESTMENT</text></svg>').toString('base64');
     db.prepare("UPDATE company SET logo = ? WHERE logo IS NULL OR logo = ''").run(dummyLogo);
   }
 } catch (e) { /* ok */ }

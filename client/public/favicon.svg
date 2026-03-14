@@ -1,13 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
   <defs>
-    <linearGradient id="rainbow" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#ff6b6b"/>
-      <stop offset="25%" stop-color="#ffa500"/>
-      <stop offset="50%" stop-color="#ffd93d"/>
-      <stop offset="75%" stop-color="#6bcb77"/>
-      <stop offset="100%" stop-color="#4d96ff"/>
+    <linearGradient id="spectrum" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#1E2A3A"/>
+      <stop offset="20%" stop-color="#2D5A1E"/>
+      <stop offset="40%" stop-color="#7C8C6E"/>
+      <stop offset="60%" stop-color="#C4A265"/>
+      <stop offset="80%" stop-color="#C47D5A"/>
+      <stop offset="100%" stop-color="#8B5A6B"/>
     </linearGradient>
   </defs>
-  <rect width="32" height="32" rx="6" fill="#1a1a2e"/>
-  <text x="16" y="23" font-family="system-ui,sans-serif" font-size="18" font-weight="900" fill="url(#rainbow)" text-anchor="middle">R</text>
+  <rect width="32" height="32" rx="7" fill="#1E2A3A"/>
+  <rect x="6" y="5" width="20" height="2.5" rx="1.25" fill="url(#spectrum)"/>
+  <text x="16" y="24" font-family="'Playfair Display',Georgia,serif" font-size="16" font-weight="700" fill="#F5F0E4" text-anchor="middle">R</text>
 </svg>

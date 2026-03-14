@@ -162,8 +162,23 @@ function Sidebar({ open, onClose }) {
       <aside className={`sidebar ${open ? 'open' : ''}`}>
         <div className="sidebar-header">
           <Link to="/" onClick={onClose} style={{ textDecoration: 'none' }}>
-            <h2>RFI ERP</h2>
-            {tenant && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', fontWeight: 500, marginTop: 1 }}>{tenant.name}</div>}
+            <div className="sidebar-brand">
+              <svg width="120" height="36" viewBox="0 0 240 72" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <linearGradient id="sidebar-spectrum" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0%" stopColor="#1E2A3A"/>
+                    <stop offset="20%" stopColor="#2D5A1E"/>
+                    <stop offset="40%" stopColor="#7C8C6E"/>
+                    <stop offset="60%" stopColor="#C4A265"/>
+                    <stop offset="80%" stopColor="#C47D5A"/>
+                    <stop offset="100%" stopColor="#8B5A6B"/>
+                  </linearGradient>
+                </defs>
+                <rect x="0" y="8" width="4" height="56" rx="2" fill="url(#sidebar-spectrum)"/>
+                <text x="16" y="40" fontFamily="'Playfair Display',Georgia,serif" fontSize="30" fontWeight="700" fill="currentColor">Rainbow Family</text>
+                <text x="17" y="58" fontFamily="'Outfit',system-ui,sans-serif" fontSize="12" fontWeight="500" fill="currentColor" letterSpacing="4" opacity="0.5">INVESTMENT</text>
+              </svg>
+            </div>
           </Link>
           <button className="sidebar-close" onClick={onClose}>&times;</button>
         </div>
