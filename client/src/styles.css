@@ -152,6 +152,12 @@
 .topbar::after { display: none; }
 .menu-btn { display: none; background: none; border: none; font-size: 1.25rem; cursor: pointer; color: var(--gray-600); padding: 0.25rem; }
 .topbar-title { font-size: 1.05rem; font-weight: 700; color: var(--gray-800); letter-spacing: -0.01em; }
+.topbar-section-title { display: flex; align-items: center; gap: 0.35rem; min-width: 0; }
+.topbar-section-link { font-size: 0.82rem; font-weight: 500; color: var(--gray-400); text-decoration: none; white-space: nowrap; transition: color 0.15s; }
+.topbar-section-link:hover { color: var(--primary); }
+.topbar-sep { color: var(--gray-300); font-size: 0.82rem; font-weight: 400; }
+.topbar-title-link { font-size: 0.95rem; font-weight: 700; color: var(--gray-800); text-decoration: none; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color 0.15s; }
+.topbar-title-link:hover { color: var(--primary); }
 
 .content { padding: 1.5rem; max-width: 1440px; margin: 0 auto; }
 
@@ -692,6 +698,9 @@ a:hover { opacity: 0.85; }
 [data-theme="dark"] .main-area { background: #0c1222; }
 [data-theme="dark"] .topbar { background: rgba(15, 23, 42, 0.85); border-bottom-color: #1e293b; }
 [data-theme="dark"] .topbar-title { color: #f1f5f9; }
+[data-theme="dark"] .topbar-title-link { color: #f1f5f9; }
+[data-theme="dark"] .topbar-section-link { color: #64748b; }
+[data-theme="dark"] .topbar-sep { color: #475569; }
 [data-theme="dark"] .card { background: #1e293b; border-color: #334155; }
 [data-theme="dark"] .kpi-card { background: #1e293b; border-color: #334155; }
 [data-theme="dark"] table { border-color: #334155; }

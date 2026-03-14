@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { api } from '../api';
+import { usePageTitle } from '../App';
 import SignaturePad from '../components/SignaturePad';
 
 const roleLabels = { admin: 'Administrátor', accountant: 'Účetní', manager: 'Manažer', viewer: 'Náhled' };
@@ -9,6 +10,7 @@ export default function UserDetail() {
   const { id } = useParams();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  usePageTitle(user ? `${user.first_name} ${user.last_name}` : undefined);
   const [sigMode, setSigMode] = useState(null);
   const [sigMsg, setSigMsg] = useState('');
   const fileRef = useRef();

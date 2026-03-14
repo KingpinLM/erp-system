@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { api } from '../api';
-import { useAuth } from '../App';
+import { useAuth, usePageTitle } from '../App';
 
 const paymentMethods = [
   { value: 'bank_transfer', label: 'Bankovní převod' },
@@ -17,6 +17,7 @@ export default function InvoiceForm() {
   const navigate = useNavigate();
   const { can } = useAuth();
   const isEdit = !!id;
+  usePageTitle(isEdit ? `Úprava faktury #${id}` : 'Nová faktura');
 
   const [clients, setClients] = useState([]);
   const [currencies, setCurrencies] = useState([]);

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { api } from '../api';
-import { useAuth } from '../App';
+import { useAuth, usePageTitle } from '../App';
 
 const statusLabels = { draft: 'Koncept', sent: 'Odesláno', paid: 'Zaplaceno', overdue: 'Po splatnosti', cancelled: 'Zrušeno' };
 const paymentLabels = { bank_transfer: 'Bankovní převod', cash: 'Hotově', card: 'Kartou', other: 'Jiný' };
@@ -206,6 +206,7 @@ export default function InvoiceDetail() {
   const [payForm, setPayForm] = useState({ amount: '', date: new Date().toISOString().slice(0, 10), note: '' });
   const { can } = useAuth();
   const invoiceRef = useRef();
+  usePageTitle(invoice ? `Faktura ${invoice.invoice_number}` : undefined);
 
   useEffect(() => {
     Promise.all([api.getInvoice(id), api.getCompany()])

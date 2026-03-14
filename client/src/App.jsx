@@ -386,10 +386,46 @@ function GlobalSearch() {
   );
 }
 
+// Page title context — pages can set subtitle via usePageTitle()
+const PageTitleContext = React.createContext({ subtitle: '', setSubtitle: () => {} });
+export function usePageTitle(subtitle) {
+  const ctx = React.useContext(PageTitleContext);
+  React.useEffect(() => { if (subtitle !== undefined) ctx.setSubtitle(subtitle); return () => ctx.setSubtitle(''); }, [subtitle]);
+  return ctx;
+}
+
+// Route → section mapping
+const routeSections = [
+  { match: /^\/$/, title: 'Dashboard', home: '/' },
+  { match: /^\/invoices\/new/, title: 'Nová faktura', section: 'Faktury', home: '/invoices' },
+  { match: /^\/invoices\/(\d+)\/edit/, title: 'Úprava faktury', section: 'Faktury', home: '/invoices' },
+  { match: /^\/invoices\/(\d+)/, title: 'Detail faktury', section: 'Faktury', home: '/invoices' },
+  { match: /^\/invoices/, title: 'Faktury', home: '/invoices' },
+  { match: /^\/clients\/(\d+)/, title: 'Detail klienta', section: 'Klienti', home: '/clients' },
+  { match: /^\/clients/, title: 'Klienti', home: '/clients' },
+  { match: /^\/evidence/, title: 'Evidence', home: '/evidence' },
+  { match: /^\/recurring/, title: 'Opakované faktury', home: '/recurring' },
+  { match: /^\/bank/, title: 'Banka', home: '/bank' },
+  { match: /^\/accounting/, title: 'Účetnictví', home: '/accounting' },
+  { match: /^\/vat/, title: 'DPH', home: '/vat' },
+  { match: /^\/currencies/, title: 'Správa měn', home: '/currencies' },
+  { match: /^\/company/, title: 'Společnost', home: '/company' },
+  { match: /^\/users\/(\d+)/, title: 'Detail uživatele', section: 'Uživatelé', home: '/users' },
+  { match: /^\/users/, title: 'Uživatelé', home: '/users' },
+  { match: /^\/profile/, title: 'Profil', home: '/profile' },
+  { match: /^\/search/, title: 'Výsledky hledání', home: '/' },
+];
+
 function Layout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [subtitle, setSubtitle] = useState('');
   const { tenant } = useAuth();
+  const location = useLocation();
+
+  const section = routeSections.find(s => s.match.test(location.pathname)) || { title: '', home: '/' };
+
   return (
+    <PageTitleContext.Provider value={{ subtitle, setSubtitle }}>
     <div className="layout">
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <div className="main-area">
@@ -397,6 +433,13 @@ function Layout({ children }) {
           <button className="menu-btn" onClick={() => setSidebarOpen(true)}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
           </button>
+          <div className="topbar-section-title">
+            {section.section && (
+              <Link to={section.home} className="topbar-section-link">{section.section}</Link>
+            )}
+            {section.section && <span className="topbar-sep">/</span>}
+            <Link to={section.home} className="topbar-title-link">{subtitle || section.title}</Link>
+          </div>
           <div style={{ flex: 1 }} />
           <GlobalSearch />
           <button className="dark-toggle" onClick={() => {
@@ -411,6 +454,7 @@ function Layout({ children }) {
         <main className="content">{children}</main>
       </div>
     </div>
+    </PageTitleContext.Provider>
   );
 }
 
