@@ -105,13 +105,18 @@ export default function Invoices() {
 
   const handleRowMouseEnter = useCallback((inv, e) => {
     const rect = e.currentTarget.getBoundingClientRect();
-    const top = rect.top;
-    const left = rect.right + 12;
-    // Adjust if would go off-screen right
-    const adjustedLeft = left + 320 > window.innerWidth ? rect.left - 332 : left;
-    // Adjust if would go off-screen bottom
-    const adjustedTop = Math.min(top, window.innerHeight - 300);
-    setHoverPos({ top: adjustedTop, left: adjustedLeft });
+    const previewW = 320;
+    const previewH = 320;
+    const gap = 12;
+    // Horizontal: prefer right of row, fallback left, fallback clamp to viewport
+    let left = rect.right + gap;
+    if (left + previewW > window.innerWidth - 8) left = rect.left - previewW - gap;
+    if (left < 8) left = 8;
+    // Vertical: align to row top, clamp so preview stays fully in viewport
+    let top = rect.top;
+    if (top + previewH > window.innerHeight - 8) top = window.innerHeight - previewH - 8;
+    if (top < 8) top = 8;
+    setHoverPos({ top, left });
     setHoveredInv(inv.id);
 
     // Check cache first
