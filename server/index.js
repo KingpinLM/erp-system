@@ -1,4 +1,5 @@
 const express = require('express');
+const compression = require('compression');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
@@ -67,6 +68,7 @@ const cookieParser = require('cookie-parser');
 const app = express();
 app.disable('etag');
 app.disable('x-powered-by');
+app.use(compression());
 
 // ─── CORS — restrict origins ─────────────────────────────
 app.use(cors({
@@ -87,9 +89,14 @@ app.use(cookieParser());
 
 // ─── SECURITY HEADERS ────────────────────────────────────
 app.use((req, res, next) => {
-  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-  res.set('Pragma', 'no-cache');
-  res.set('Expires', '0');
+  // Allow short caching for GET API reads (reduces repeat requests)
+  if (req.method === 'GET' && req.path.startsWith('/api/')) {
+    res.set('Cache-Control', 'private, max-age=5');
+  } else {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+  }
   res.set('Surrogate-Control', 'no-store');
   res.set('X-Content-Type-Options', 'nosniff');
   res.set('X-Frame-Options', 'DENY');
@@ -2740,4 +2747,8 @@ app.use((err, req, res, _next) => {
 });
 
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, '0.0.0.0', () => console.log(`ERP server running on http://0.0.0.0:${PORT}`));
+const server = app.listen(PORT, '0.0.0.0', () => console.log(`ERP server running on http://0.0.0.0:${PORT}`));
+server.keepAliveTimeout = 65000;
+server.headersTimeout = 66000;
+server.maxConnections = 200;
+server.timeout = 30000;

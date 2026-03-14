@@ -155,15 +155,16 @@ export default function Clients() {
       setHoverDetail(hoverCache.current[c.id]);
       return;
     }
+    // Use client data already in memory, only fetch invoices
     clearTimeout(hoverTimer.current);
     abortRef.current?.abort();
     hoverTimer.current = setTimeout(() => {
       const ctrl = new AbortController();
       abortRef.current = ctrl;
-      Promise.all([api.getClient(c.id), api.getClientInvoices(c.id)])
-        .then(([client, invoices]) => {
+      api.getClientInvoices(c.id)
+        .then(invoices => {
           if (!ctrl.signal.aborted) {
-            const detail = { client, invoices };
+            const detail = { client: c, invoices };
             hoverCache.current[c.id] = detail;
             setHoverDetail(detail);
           }
