@@ -52,22 +52,22 @@ export default function Currencies() {
         {loading ? <div className="loading">Načítání...</div> : (
           <div className="table-responsive">
             <table>
-              <thead><tr><th>Kód</th><th>Název</th><th>Symbol</th><th className="text-right">Kurz k CZK</th><th>Poslední změna</th><th>Akce</th></tr></thead>
+              <thead><tr><th>Kód</th><th>Název</th><th className="hide-mobile">Symbol</th><th className="text-right">Kurz k CZK</th><th className="hide-mobile">Poslední změna</th><th>Akce</th></tr></thead>
               <tbody>
                 {currencies.map(c => (
                   <tr key={c.code}>
                     <td><strong>{c.code}</strong></td>
                     <td>{c.name}</td>
-                    <td style={{ fontSize: '1.2rem' }}>{c.symbol}</td>
+                    <td className="hide-mobile" style={{ fontSize: '1.2rem' }}>{c.symbol}</td>
                     <td className="text-right">
                       {editingCode === c.code ? (
                         <input className="form-input" type="number" step="0.01" value={newRate} onChange={e => setNewRate(e.target.value)}
-                          style={{ width: '120px', display: 'inline-block' }} autoFocus />
+                          style={{ width: '100%', display: 'inline-block', maxWidth: '120px' }} autoFocus />
                       ) : (
                         <strong>{c.rate_to_czk.toFixed(2)}</strong>
                       )}
                     </td>
-                    <td>{fmtDate(c.updated_at)}</td>
+                    <td className="hide-mobile">{fmtDate(c.updated_at)}</td>
                     <td>
                       {can('admin', 'accountant') && c.code !== 'CZK' && (
                         editingCode === c.code ? (

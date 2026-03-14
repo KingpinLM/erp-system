@@ -21,6 +21,7 @@ export default function Products() {
   const [typeFilter, setTypeFilter] = useState('');
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(20);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   useEffect(() => { setPage(1); load(); }, [tab]);
 
@@ -164,7 +165,12 @@ export default function Products() {
       {/* Products list */}
       {tab === 'list' && (
         <>
-          <div style={{ marginBottom: 8 }}>
+          <button className="mobile-filter-toggle" onClick={() => setFiltersOpen(f => !f)}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+            Filtry a řazení
+            <span style={{ marginLeft: 'auto' }}>{filtersOpen ? '▲' : '▼'}</span>
+          </button>
+          <div className={`filters-collapsible ${filtersOpen ? 'filters-open' : ''}`} style={{ marginBottom: 8 }}>
             <select className="form-input" style={{ width: 120 }} value={typeFilter} onChange={e => { setTypeFilter(e.target.value); setTimeout(load, 0); }}>
               <option value="">Vše</option>
               <option value="product">Produkty</option>
@@ -231,7 +237,7 @@ export default function Products() {
       {/* Stock report */}
       {tab === 'report' && stockReport && (
         <>
-          <div className="kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 16 }}>
+          <div className="kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 16 }}>
             <div className="kpi-card"><div className="kpi-label">Celková hodnota skladu</div><div className="kpi-value">{stockReport.totalValue.toLocaleString('cs', { minimumFractionDigits: 2 })} Kč</div></div>
             <div className="kpi-card"><div className="kpi-label">Produktů celkem</div><div className="kpi-value">{stockReport.products.length}</div></div>
             <div className="kpi-card"><div className="kpi-label" style={{ color: '#ef4444' }}>Pod minimem</div><div className="kpi-value" style={{ color: '#ef4444' }}>{stockReport.lowStock.length}</div></div>

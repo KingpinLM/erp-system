@@ -64,12 +64,12 @@ export default function RecurringInvoices() {
         {loading ? <div className="loading">Načítání...</div> : items.length === 0 ? <div className="empty-state">Žádné opakované faktury</div> : (
           <div className="table-responsive">
             <table>
-              <thead><tr><th>Klient</th><th>Interval</th><th className="hide-mobile">Další datum</th><th className="hide-mobile">Konec</th><th className="hide-mobile">Měna</th><th>Stav</th><th>Akce</th></tr></thead>
+              <thead><tr><th>Klient</th><th className="hide-mobile">Interval</th><th className="hide-mobile">Další datum</th><th className="hide-mobile">Konec</th><th className="hide-mobile">Měna</th><th>Stav</th><th>Akce</th></tr></thead>
               <tbody>
                 {items.map(r => (
                   <tr key={r.id} style={{ opacity: r.active ? 1 : 0.5 }}>
                     <td style={{ fontWeight: 600 }}>{r.client_name || '—'}</td>
-                    <td>{intervalLabels[r.interval]}</td>
+                    <td className="hide-mobile">{intervalLabels[r.interval]}</td>
                     <td className="hide-mobile">{fmtDate(r.next_date)}</td>
                     <td className="hide-mobile">{fmtDate(r.end_date)}</td>
                     <td className="hide-mobile">{r.currency}</td>

@@ -12,6 +12,7 @@ export default function VatReport() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const loadReport = async () => {
     setLoading(true); setError('');
@@ -44,25 +45,30 @@ export default function VatReport() {
       {error && <div className="alert alert-error" onClick={() => setError('')}>{error}</div>}
       {success && <div className="alert alert-success" onClick={() => setSuccess('')}>{success}</div>}
 
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
-        <select className="form-input" style={{ width: 100 }} value={year} onChange={e => setYear(parseInt(e.target.value))}>
-          {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
-        </select>
-        <select className="form-input" style={{ width: 140 }} value={month} onChange={e => setMonth(parseInt(e.target.value))}>
-          {months.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
-        </select>
-        {can('admin', 'accountant') && <>
-          <button className="btn btn-primary" onClick={generate}>Generovat z faktur</button>
-          <button className="btn btn-secondary" onClick={exportXml}>Export XML</button>
-        </>}
-      </div>
+      <button className="btn btn-ghost" onClick={() => setFiltersOpen(o => !o)} style={{ marginBottom: 8 }}>
+        {filtersOpen ? '▲ Skrýt filtry' : '▼ Zobrazit filtry'}
+      </button>
+      {filtersOpen && (
+        <div style={{ display: 'flex', gap: 8, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+          <select className="form-input" style={{ width: 100 }} value={year} onChange={e => setYear(parseInt(e.target.value))}>
+            {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
+          </select>
+          <select className="form-input" style={{ width: 140 }} value={month} onChange={e => setMonth(parseInt(e.target.value))}>
+            {months.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
+          </select>
+          {can('admin', 'accountant') && <>
+            <button className="btn btn-primary" onClick={generate}>Generovat z faktur</button>
+            <button className="btn btn-secondary" onClick={exportXml}>Export XML</button>
+          </>}
+        </div>
+      )}
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
         <Link to="/financni-urad" className="btn btn-ghost">Finanční úřad (KH, SH, DPFO)</Link>
       </div>
 
       {loading ? <p>Načítání...</p> : report && (
-        <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 16 }}>
+        <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 16 }}>
           <div className="card">
             <h3 style={{ marginBottom: 12 }}>DPH na výstupu (vydané faktury)</h3>
             <table className="table">
@@ -107,7 +113,7 @@ export default function VatReport() {
 
           <div className="card" style={{ gridColumn: '1 / -1' }}>
             <h3 style={{ marginBottom: 12 }}>Výsledek</h3>
-            <div className="kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
+            <div className="kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 16 }}>
               <div className="kpi-card">
                 <div className="kpi-label">DPH na výstupu</div>
                 <div className="kpi-value" style={{ color: '#ef4444' }}>{report.totalOutput.toLocaleString('cs', { minimumFractionDigits: 2 })} Kč</div>

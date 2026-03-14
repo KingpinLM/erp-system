@@ -12,6 +12,7 @@ function KontrolniHlaseniTab() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const load = async () => {
     setLoading(true); setError('');
@@ -45,7 +46,7 @@ function KontrolniHlaseniTab() {
                 <th className="hide-mobile">Číslo dokladu</th>
                 <th className="hide-mobile">Datum</th>
                 <th style={{ textAlign: 'right' }}>Základ</th>
-                <th style={{ textAlign: 'right' }}>DPH</th>
+                <th className="hide-mobile" style={{ textAlign: 'right' }}>DPH</th>
               </tr>
             </thead>
             <tbody>
@@ -55,7 +56,7 @@ function KontrolniHlaseniTab() {
                   <td className="hide-mobile">{r.invoice_number || r.evidence_number || '—'}</td>
                   <td className="hide-mobile">{r.date || r.issue_date || '—'}</td>
                   <td style={{ textAlign: 'right' }}>{fmt(r.base)}</td>
-                  <td style={{ textAlign: 'right' }}>{fmt(r.vat)}</td>
+                  <td className="hide-mobile" style={{ textAlign: 'right' }}>{fmt(r.vat)}</td>
                 </tr>
               ))}
             </tbody>
@@ -68,7 +69,12 @@ function KontrolniHlaseniTab() {
   return (
     <div>
       {error && <div className="alert alert-error" onClick={() => setError('')}>{error}</div>}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+      <button className="mobile-filter-toggle" onClick={() => setFiltersOpen(f => !f)}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+        Filtry
+        <span style={{ marginLeft: 'auto' }}>{filtersOpen ? '▲' : '▼'}</span>
+      </button>
+      <div className={`filters-collapsible ${filtersOpen ? 'filters-open' : ''}`} style={{ display: 'flex', gap: 8, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
         <select className="form-input" style={{ minWidth: 80, maxWidth: 120, flex: '0 1 auto' }} value={year} onChange={e => setYear(parseInt(e.target.value))}>
           {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
         </select>
@@ -113,6 +119,7 @@ function SouhrnneHlaseniTab() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const load = async () => {
     setLoading(true); setError('');
@@ -134,7 +141,12 @@ function SouhrnneHlaseniTab() {
   return (
     <div>
       {error && <div className="alert alert-error" onClick={() => setError('')}>{error}</div>}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+      <button className="mobile-filter-toggle" onClick={() => setFiltersOpen(f => !f)}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+        Filtry
+        <span style={{ marginLeft: 'auto' }}>{filtersOpen ? '▲' : '▼'}</span>
+      </button>
+      <div className={`filters-collapsible ${filtersOpen ? 'filters-open' : ''}`} style={{ display: 'flex', gap: 8, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
         <select className="form-input" style={{ minWidth: 80, maxWidth: 120, flex: '0 1 auto' }} value={year} onChange={e => setYear(parseInt(e.target.value))}>
           {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
         </select>
@@ -168,7 +180,7 @@ function SouhrnneHlaseniTab() {
                 <thead>
                   <tr>
                     <th>DIČ partnera</th>
-                    <th>Název</th>
+                    <th className="hide-mobile">Název</th>
                     <th className="hide-mobile">Kód plnění</th>
                     <th className="hide-mobile">Počet dokladů</th>
                     <th style={{ textAlign: 'right' }}>Celkem (CZK)</th>
@@ -178,7 +190,7 @@ function SouhrnneHlaseniTab() {
                   {partners.map((p, i) => (
                     <tr key={i}>
                       <td style={{ fontFamily: 'monospace' }}>{p.dic}</td>
-                      <td>{p.name || '—'}</td>
+                      <td className="hide-mobile">{p.name || '—'}</td>
                       <td className="hide-mobile">{p.code || '0'}</td>
                       <td className="hide-mobile">{p.count}</td>
                       <td style={{ textAlign: 'right', fontWeight: 600 }}>{fmt(p.total)}</td>
@@ -187,7 +199,8 @@ function SouhrnneHlaseniTab() {
                 </tbody>
                 <tfoot>
                   <tr style={{ fontWeight: 700 }}>
-                    <td colSpan={2}>Celkem</td>
+                    <td>Celkem</td>
+                    <td className="hide-mobile"></td>
                     <td className="hide-mobile"></td>
                     <td className="hide-mobile"></td>
                     <td style={{ textAlign: 'right' }}>{fmt(total)}</td>
@@ -208,6 +221,7 @@ function DanovePriznaniTab() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const load = async () => {
     setLoading(true); setError('');
@@ -228,7 +242,12 @@ function DanovePriznaniTab() {
   return (
     <div>
       {error && <div className="alert alert-error" onClick={() => setError('')}>{error}</div>}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+      <button className="mobile-filter-toggle" onClick={() => setFiltersOpen(f => !f)}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+        Filtry
+        <span style={{ marginLeft: 'auto' }}>{filtersOpen ? '▲' : '▼'}</span>
+      </button>
+      <div className={`filters-collapsible ${filtersOpen ? 'filters-open' : ''}`} style={{ display: 'flex', gap: 8, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
         <select className="form-input" style={{ minWidth: 80, maxWidth: 120, flex: '0 1 auto' }} value={year} onChange={e => setYear(parseInt(e.target.value))}>
           {[2023, 2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
         </select>
@@ -263,23 +282,23 @@ function DanovePriznaniTab() {
                 <thead>
                   <tr>
                     <th>Sazba</th>
-                    <th style={{ textAlign: 'right' }}>Paušální výdaje</th>
+                    <th className="hide-mobile" style={{ textAlign: 'right' }}>Paušální výdaje</th>
                     <th style={{ textAlign: 'right' }}>Základ daně</th>
-                    <th>Poznámka</th>
+                    <th className="hide-mobile">Poznámka</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr>
                     <td>60 %</td>
-                    <td style={{ textAlign: 'right' }}>{fmt(data.flat_rate_60)} Kč</td>
+                    <td className="hide-mobile" style={{ textAlign: 'right' }}>{fmt(data.flat_rate_60)} Kč</td>
                     <td style={{ textAlign: 'right' }}>{fmt(data.income - data.flat_rate_60)} Kč</td>
-                    <td style={{ fontSize: 12, color: '#888' }}>Většina živností, max 2 000 000 Kč</td>
+                    <td className="hide-mobile" style={{ fontSize: 12, color: '#888' }}>Většina živností, max 2 000 000 Kč</td>
                   </tr>
                   <tr>
                     <td>80 %</td>
-                    <td style={{ textAlign: 'right' }}>{fmt(data.flat_rate_80)} Kč</td>
+                    <td className="hide-mobile" style={{ textAlign: 'right' }}>{fmt(data.flat_rate_80)} Kč</td>
                     <td style={{ textAlign: 'right' }}>{fmt(data.income - data.flat_rate_80)} Kč</td>
-                    <td style={{ fontSize: 12, color: '#888' }}>Řemeslné živnosti, max 1 600 000 Kč</td>
+                    <td className="hide-mobile" style={{ fontSize: 12, color: '#888' }}>Řemeslné živnosti, max 1 600 000 Kč</td>
                   </tr>
                 </tbody>
               </table>
@@ -333,8 +352,8 @@ function DanovePriznaniTab() {
                 <thead>
                   <tr>
                     <th>Pojištění</th>
-                    <th style={{ textAlign: 'right' }}>Vyměřovací základ (50 %)</th>
-                    <th style={{ textAlign: 'right' }}>Sazba</th>
+                    <th className="hide-mobile" style={{ textAlign: 'right' }}>Vyměřovací základ (50 %)</th>
+                    <th className="hide-mobile" style={{ textAlign: 'right' }}>Sazba</th>
                     <th style={{ textAlign: 'right' }}>Roční odvod</th>
                     <th style={{ textAlign: 'right' }}>Měsíční záloha</th>
                   </tr>
@@ -343,8 +362,8 @@ function DanovePriznaniTab() {
                   {data.social && (
                     <tr>
                       <td>Sociální pojištění (ČSSZ)</td>
-                      <td style={{ textAlign: 'right' }}>{fmt(data.social.base)} Kč</td>
-                      <td style={{ textAlign: 'right' }}>29,2 %</td>
+                      <td className="hide-mobile" style={{ textAlign: 'right' }}>{fmt(data.social.base)} Kč</td>
+                      <td className="hide-mobile" style={{ textAlign: 'right' }}>29,2 %</td>
                       <td style={{ textAlign: 'right' }}>{fmt(data.social.yearly)} Kč</td>
                       <td style={{ textAlign: 'right', fontWeight: 600 }}>{fmt(data.social.monthly)} Kč</td>
                     </tr>
@@ -352,8 +371,8 @@ function DanovePriznaniTab() {
                   {data.health && (
                     <tr>
                       <td>Zdravotní pojištění (ZP)</td>
-                      <td style={{ textAlign: 'right' }}>{fmt(data.health.base)} Kč</td>
-                      <td style={{ textAlign: 'right' }}>13,5 %</td>
+                      <td className="hide-mobile" style={{ textAlign: 'right' }}>{fmt(data.health.base)} Kč</td>
+                      <td className="hide-mobile" style={{ textAlign: 'right' }}>13,5 %</td>
                       <td style={{ textAlign: 'right' }}>{fmt(data.health.yearly)} Kč</td>
                       <td style={{ textAlign: 'right', fontWeight: 600 }}>{fmt(data.health.monthly)} Kč</td>
                     </tr>
@@ -362,7 +381,9 @@ function DanovePriznaniTab() {
                 {data.social && data.health && (
                   <tfoot>
                     <tr style={{ fontWeight: 700 }}>
-                      <td colSpan={3}>Celkem odvody ročně</td>
+                      <td>Celkem odvody ročně</td>
+                      <td className="hide-mobile"></td>
+                      <td className="hide-mobile"></td>
                       <td style={{ textAlign: 'right' }}>{fmt(data.social.yearly + data.health.yearly)} Kč</td>
                       <td style={{ textAlign: 'right' }}>{fmt(data.social.monthly + data.health.monthly)} Kč</td>
                     </tr>

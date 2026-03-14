@@ -312,7 +312,7 @@ export default function Clients() {
                 <th style={{ cursor: 'pointer' }} onClick={() => toggleSort('name')}>Název<SortIcon col="name" /></th>
                 <th className="hide-mobile" style={{ cursor: 'pointer' }} onClick={() => toggleSort('ico')}>IČO<SortIcon col="ico" /></th>
                 <th className="hide-mobile">DIČ</th>
-                <th style={{ cursor: 'pointer' }} onClick={() => toggleSort('email')}>Email<SortIcon col="email" /></th>
+                <th className="hide-mobile" style={{ cursor: 'pointer' }} onClick={() => toggleSort('email')}>Email<SortIcon col="email" /></th>
                 <th className="hide-mobile">Telefon</th>
                 <th className="hide-mobile" style={{ cursor: 'pointer' }} onClick={() => toggleSort('city')}>Město<SortIcon col="city" /></th>
                 <th className="hide-mobile" style={{ cursor: 'pointer' }} onClick={() => toggleSort('country')}>Země<SortIcon col="country" /></th>
@@ -329,7 +329,7 @@ export default function Clients() {
                     <td><Link to={`/clients/${c.id}`} style={{ color: 'var(--primary)', fontWeight: 600, textDecoration: 'none' }}>{c.name}</Link></td>
                     <td className="hide-mobile">{c.ico || '—'}</td>
                     <td className="hide-mobile">{c.dic || '—'}</td>
-                    <td>{c.email || '—'}</td>
+                    <td className="hide-mobile">{c.email || '—'}</td>
                     <td className="hide-mobile">{c.phone || '—'}</td>
                     <td className="hide-mobile">{c.city || '—'}</td>
                     <td className="hide-mobile">{c.country}</td>

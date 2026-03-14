@@ -285,11 +285,11 @@ export default function Invoices() {
                   <th style={{ cursor: 'pointer' }} onClick={() => toggleSort('invoice_number')}>Číslo<SortIcon col="invoice_number" /></th>
                   <th style={{ cursor: 'pointer' }} onClick={() => toggleSort('client_name')}>Klient<SortIcon col="client_name" /></th>
                   <th className="hide-mobile" style={{ cursor: 'pointer' }} onClick={() => toggleSort('issue_date')}>Datum vystavení<SortIcon col="issue_date" /></th>
-                  <th style={{ cursor: 'pointer' }} onClick={() => toggleSort('due_date')}>Splatnost<SortIcon col="due_date" /></th>
+                  <th className="hide-mobile" style={{ cursor: 'pointer' }} onClick={() => toggleSort('due_date')}>Splatnost<SortIcon col="due_date" /></th>
                   <th className="text-right" style={{ cursor: 'pointer' }} onClick={() => toggleSort('total')}>Částka<SortIcon col="total" /></th>
                   <th className="hide-mobile">Měna</th>
                   <th className="text-right hide-mobile" style={{ cursor: 'pointer' }} onClick={() => toggleSort('total_czk')}>CZK<SortIcon col="total_czk" /></th>
-                  <th style={{ cursor: 'pointer' }} onClick={() => toggleSort('status')}>Stav<SortIcon col="status" /></th>
+                  <th className="hide-mobile" style={{ cursor: 'pointer' }} onClick={() => toggleSort('status')}>Stav<SortIcon col="status" /></th>
                   <th>Akce</th>
                 </tr>
               </thead>
@@ -306,11 +306,11 @@ export default function Invoices() {
                     <td><Link to={`/invoices/${inv.id}`} style={{ color: 'var(--primary)', fontWeight: 600 }}>{inv.invoice_number}</Link>{inv.invoice_type && inv.invoice_type !== 'regular' && <span style={{ fontSize: 10, color: '#94a3b8', marginLeft: 4 }}>({typeLabels[inv.invoice_type]})</span>}</td>
                     <td>{inv.client_name}</td>
                     <td className="hide-mobile">{fmtDate(inv.issue_date)}</td>
-                    <td>{fmtDate(inv.due_date)}</td>
+                    <td className="hide-mobile">{fmtDate(inv.due_date)}</td>
                     <td className="text-right">{fmt(inv.total, inv.currency)}</td>
                     <td className="hide-mobile">{inv.currency}</td>
                     <td className="text-right hide-mobile">{fmt(inv.total_czk, 'CZK')}</td>
-                    <td><span className={`badge badge-${inv.status}`}>{statusLabels[inv.status]}</span></td>
+                    <td className="hide-mobile"><span className={`badge badge-${inv.status}`}>{statusLabels[inv.status]}</span></td>
                     <td>
                       <div className="btn-group">
                         <Link to={`/invoices/${inv.id}`} className="btn btn-outline btn-sm">Detail</Link>
