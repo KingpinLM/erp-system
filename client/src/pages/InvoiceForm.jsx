@@ -31,6 +31,7 @@ export default function InvoiceForm() {
     items: [{ description: '', quantity: 1, unit: 'ks', unit_price: 0, tax_rate: 21 }]
   });
   const [error, setError] = useState('');
+  const [draftDialog, setDraftDialog] = useState(null); // { missing: string[] }
 
   useEffect(() => {
     const promises = [api.getClients(), api.getCurrencies(), api.getCompany()];
@@ -111,11 +112,42 @@ export default function InvoiceForm() {
   const totalTax = itemTotals.reduce((s, t) => s + t.tax, 0);
   const total = subtotal + totalTax;
 
+  // Validate required fields for issuing (not draft)
+  const getIssueMissing = () => {
+    const missing = [];
+    if (!form.variable_symbol?.trim()) missing.push('Variabilní symbol');
+    if (!form.client_id) missing.push('Příjemce (klient)');
+    if (total <= 0) missing.push('Nenulová částka');
+    if (!hasBankDetails) missing.push('Bankovní spojení');
+    if (!form.currency?.trim()) missing.push('Měna');
+    return missing;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+
+    // Check if invoice is complete for issuing
+    const missing = getIssueMissing();
+    if (missing.length > 0 && form.status !== 'draft') {
+      // Force draft dialog if trying to save non-draft with missing fields
+      setDraftDialog({ missing });
+      return;
+    }
+    if (missing.length > 0 && !draftDialog) {
+      // Show dialog on first submit attempt
+      setDraftDialog({ missing });
+      return;
+    }
+
+    await saveInvoice(form);
+  };
+
+  const saveInvoice = async (formData) => {
+    setError('');
+    setDraftDialog(null);
     try {
-      const data = { ...form, client_id: form.client_id || null };
+      const data = { ...formData, client_id: formData.client_id || null };
       if (isEdit) {
         await api.updateInvoice(id, data);
       } else {
@@ -125,6 +157,10 @@ export default function InvoiceForm() {
     } catch (err) {
       setError(err.message);
     }
+  };
+
+  const handleSaveAsDraft = async () => {
+    await saveInvoice({ ...form, status: 'draft' });
   };
 
   const fmtCur = (n) => new Intl.NumberFormat('cs-CZ', { minimumFractionDigits: 2 }).format(n);
@@ -303,10 +339,44 @@ export default function InvoiceForm() {
         </div>
 
         <div className="btn-group">
-          <button type="submit" className="btn btn-primary" disabled={!hasBankDetails}>{isEdit ? 'Uložit změny' : 'Vytvořit fakturu'}</button>
+          <button type="submit" className="btn btn-primary">{isEdit ? 'Uložit změny' : 'Vytvořit fakturu'}</button>
           <button type="button" className="btn btn-outline" onClick={() => navigate('/invoices')}>Zrušit</button>
         </div>
       </form>
+
+      {/* Draft validation dialog */}
+      {draftDialog && (
+        <div className="modal-overlay" onClick={() => setDraftDialog(null)}>
+          <div className="modal draft-dialog" onClick={e => e.stopPropagation()}>
+            <div className="draft-dialog-icon">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+              </svg>
+            </div>
+            <h3 className="draft-dialog-title">Faktura bude uložena jako koncept</h3>
+            <p className="draft-dialog-desc">
+              Pro vystavení faktury je třeba doplnit následující údaje:
+            </p>
+            <ul className="draft-dialog-list">
+              {draftDialog.missing.map(m => (
+                <li key={m}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#e11d48" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  {m}
+                </li>
+              ))}
+            </ul>
+            <div className="draft-dialog-buttons">
+              <button className="btn btn-primary" onClick={handleSaveAsDraft}>
+                Uložit jako koncept
+              </button>
+              <button className="btn btn-outline" onClick={() => setDraftDialog(null)}>
+                Pokračovat v úpravách
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
