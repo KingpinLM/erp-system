@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import { useAuth } from '../App';
@@ -32,6 +32,34 @@ export default function InvoiceForm() {
   });
   const [error, setError] = useState('');
   const [draftDialog, setDraftDialog] = useState(null); // { missing: string[] }
+  const [isDirty, setIsDirty] = useState(false);
+  const [leaveDialog, setLeaveDialog] = useState(false);
+  const savedRef = useRef(false); // track if form was saved successfully
+
+  // Intercept in-app link clicks when form is dirty
+  const pendingHref = useRef(null);
+  useEffect(() => {
+    if (!isDirty || savedRef.current) return;
+    const handler = (e) => {
+      const anchor = e.target.closest('a[href]');
+      if (!anchor) return;
+      const href = anchor.getAttribute('href');
+      if (!href || href.startsWith('http') || href.startsWith('mailto:')) return;
+      e.preventDefault();
+      pendingHref.current = href;
+      setLeaveDialog(true);
+    };
+    document.addEventListener('click', handler, true);
+    return () => document.removeEventListener('click', handler, true);
+  }, [isDirty]);
+
+  // Browser beforeunload guard
+  useEffect(() => {
+    if (!isDirty) return;
+    const handler = (e) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [isDirty]);
 
   useEffect(() => {
     const promises = [api.getClients(), api.getCurrencies(), api.getCompany()];
@@ -81,6 +109,7 @@ export default function InvoiceForm() {
   }, [id]);
 
   const updateField = (field, value) => {
+    setIsDirty(true);
     setForm(f => {
       const updated = { ...f, [field]: value };
       if (field === 'issue_date' && !isEdit) {
@@ -94,14 +123,15 @@ export default function InvoiceForm() {
   };
 
   const updateItem = (idx, field, value) => {
+    setIsDirty(true);
     setForm(f => {
       const items = [...f.items];
       items[idx] = { ...items[idx], [field]: value };
       return { ...f, items };
     });
   };
-  const addItem = () => setForm(f => ({ ...f, items: [...f.items, { description: '', quantity: 1, unit: 'ks', unit_price: 0, tax_rate: vatPayer ? 21 : 0 }] }));
-  const removeItem = (idx) => setForm(f => ({ ...f, items: f.items.filter((_, i) => i !== idx) }));
+  const addItem = () => { setIsDirty(true); setForm(f => ({ ...f, items: [...f.items, { description: '', quantity: 1, unit: 'ks', unit_price: 0, tax_rate: vatPayer ? 21 : 0 }] })); };
+  const removeItem = (idx) => { setIsDirty(true); setForm(f => ({ ...f, items: f.items.filter((_, i) => i !== idx) })); };
 
   const itemTotals = form.items.map(i => {
     const base = (i.quantity || 0) * (i.unit_price || 0);
@@ -146,6 +176,7 @@ export default function InvoiceForm() {
   const saveInvoice = async (formData) => {
     setError('');
     setDraftDialog(null);
+    setLeaveDialog(false);
     try {
       const data = { ...formData, client_id: formData.client_id || null };
       if (isEdit) {
@@ -153,6 +184,8 @@ export default function InvoiceForm() {
       } else {
         await api.createInvoice(data);
       }
+      savedRef.current = true;
+      setIsDirty(false);
       navigate('/invoices');
     } catch (err) {
       setError(err.message);
@@ -340,7 +373,9 @@ export default function InvoiceForm() {
 
         <div className="btn-group">
           <button type="submit" className="btn btn-primary">{isEdit ? 'Uložit změny' : 'Vytvořit fakturu'}</button>
-          <button type="button" className="btn btn-outline" onClick={() => navigate('/invoices')}>Zrušit</button>
+          <button type="button" className="btn btn-outline" onClick={() => {
+            if (isDirty) { setLeaveDialog(true); } else { navigate('/invoices'); }
+          }}>Zrušit</button>
         </div>
       </form>
 
@@ -371,6 +406,42 @@ export default function InvoiceForm() {
                 Uložit jako koncept
               </button>
               <button className="btn btn-outline" onClick={() => setDraftDialog(null)}>
+                Pokračovat v úpravách
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Leave confirmation dialog */}
+      {leaveDialog && (
+        <div className="modal-overlay" onClick={() => { setLeaveDialog(false); pendingHref.current = null; }}>
+          <div className="modal draft-dialog" onClick={e => e.stopPropagation()}>
+            <div className="draft-dialog-icon">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#e11d48" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+              </svg>
+            </div>
+            <h3 className="draft-dialog-title">Neuložené změny</h3>
+            <p className="draft-dialog-desc">
+              Máte neuložené změny ve faktuře. Chcete práci zahodit, nebo uložit fakturu jako koncept?
+            </p>
+            <div className="draft-dialog-buttons">
+              <button className="btn btn-primary" onClick={handleSaveAsDraft}>
+                Uložit jako koncept
+              </button>
+              <button className="btn btn-danger" onClick={() => {
+                savedRef.current = true;
+                setIsDirty(false);
+                setLeaveDialog(false);
+                navigate(pendingHref.current || '/invoices');
+                pendingHref.current = null;
+              }}>
+                Zahodit změny
+              </button>
+              <button className="btn btn-outline" onClick={() => {
+                setLeaveDialog(false);
+                pendingHref.current = null;
+              }}>
                 Pokračovat v úpravách
               </button>
             </div>
