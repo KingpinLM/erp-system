@@ -512,6 +512,19 @@ try {
   });
 } catch (e) { /* ok */ }
 
+// Enforce unique client names per tenant (for existing DBs without the constraint)
+try {
+  // First remove duplicates, keeping the one with lowest id
+  db.exec(`DELETE FROM clients WHERE id NOT IN (SELECT MIN(id) FROM clients GROUP BY tenant_id, name)`);
+  // Create unique index if not exists
+  db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_clients_tenant_name ON clients(tenant_id, name)`);
+} catch (e) { /* already exists or constraint satisfied */ }
+
+// Enforce unique bank accounts per currency per tenant
+try {
+  db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_bank_accounts_tenant_currency ON bank_accounts(tenant_id, currency)`);
+} catch (e) { /* already exists */ }
+
 // Set invoice counter based on existing invoices
 try {
   const tenants = db.prepare("SELECT id FROM tenants").all();
