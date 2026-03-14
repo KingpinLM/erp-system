@@ -268,9 +268,12 @@ app.delete('/api/superadmin/tenants/:id', authenticate, requireSuperadmin, (req,
 // ─── FORM-BASED LOGIN (no fetch, no JS - direct form POST + redirect) ──
 app.post('/api/auth/form-login', rateLimit(15 * 60 * 1000, 10), express.urlencoded({ extended: false }), (req, res) => {
   const { username, password } = req.body;
-  const user = db.prepare('SELECT * FROM users WHERE username = ? AND active = 1').get(username);
+  const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
   if (!user || !bcrypt.compareSync(password, user.password)) {
     return res.redirect('/login?error=1');
+  }
+  if (!user.active) {
+    return res.redirect('/login?error=deactivated');
   }
   const token = generateToken(user);
   res.cookie('erp_session', token, { httpOnly: true, maxAge: 8*60*60*1000, sameSite: 'lax', path: '/' });
@@ -280,9 +283,12 @@ app.post('/api/auth/form-login', rateLimit(15 * 60 * 1000, 10), express.urlencod
 // ─── AUTH (login without tenant slug — globally unique usernames) ──
 app.post('/api/auth/login', rateLimit(15 * 60 * 1000, 10), (req, res) => {
   const { username, password } = req.body;
-  const user = db.prepare('SELECT * FROM users WHERE username = ? AND active = 1').get(username);
+  const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
   if (!user || !bcrypt.compareSync(password, user.password)) {
     return res.status(401).json({ error: 'Neplatné přihlašovací údaje' });
+  }
+  if (!user.active) {
+    return res.status(403).json({ error: 'Váš účet byl deaktivován. Kontaktujte administrátora.' });
   }
   const token = generateToken(user);
   const { password: _, ...safeUser } = user;
@@ -2594,9 +2600,12 @@ app.delete('/api/chatbot/unanswered/:id', ...tenanted, authorize('admin'), (req,
 // GET-based login (bypasses POST issues with port forwarding)
 app.get('/api/auth/get-login', (req, res) => {
   const { username, password } = req.query;
-  const user = db.prepare('SELECT * FROM users WHERE username = ? AND active = 1').get(username);
+  const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
   if (!user || !bcrypt.compareSync(password, user.password)) {
     return res.status(401).json({ error: 'Neplatné přihlašovací údaje' });
+  }
+  if (!user.active) {
+    return res.status(403).json({ error: 'Váš účet byl deaktivován. Kontaktujte administrátora.' });
   }
   const token = generateToken(user);
   const { password: _, ...safeUser } = user;

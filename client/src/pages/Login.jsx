@@ -90,7 +90,10 @@ export default function Login() {
   const [focusField, setFocusField] = useState('');
 
   useEffect(() => {
-    if (searchParams.get('error')) {
+    const err = searchParams.get('error');
+    if (err === 'deactivated') {
+      setError('Váš účet byl deaktivován. Kontaktujte administrátora vaší organizace.');
+    } else if (err) {
       setError('Neplatné přihlašovací údaje');
     }
   }, [searchParams]);

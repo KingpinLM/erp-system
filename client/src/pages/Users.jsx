@@ -769,7 +769,28 @@ export default function Users() {
                             </span>
                           )}
                         </td>
-                        <td><span className={`badge ${u.active ? 'badge-paid' : 'badge-cancelled'}`}>{u.active ? 'Aktivní' : 'Neaktivní'}</span></td>
+                        <td>
+                          {can('admin') ? (
+                            <button
+                              className={`badge ${u.active ? 'badge-paid' : 'badge-cancelled'}`}
+                              style={{ cursor: 'pointer', border: 'none', transition: 'all 0.15s' }}
+                              title={u.active ? 'Klikněte pro deaktivaci' : 'Klikněte pro aktivaci'}
+                              onClick={async () => {
+                                const newActive = u.active ? 0 : 1;
+                                const action = newActive ? 'aktivovat' : 'deaktivovat';
+                                if (!confirm(`Opravdu chcete ${action} uživatele ${u.username}?${!newActive ? '\n\nDeaktivovaný uživatel se nebude moci přihlásit.' : ''}`)) return;
+                                try {
+                                  await api.updateUser(u.id, { email: u.email, first_name: u.first_name, last_name: u.last_name, role: u.role, active: newActive });
+                                  load();
+                                } catch (e) { setError(e.message); }
+                              }}
+                            >
+                              {u.active ? 'Aktivní' : 'Neaktivní'}
+                            </button>
+                          ) : (
+                            <span className={`badge ${u.active ? 'badge-paid' : 'badge-cancelled'}`}>{u.active ? 'Aktivní' : 'Neaktivní'}</span>
+                          )}
+                        </td>
                         <td>{u.created_at?.slice(0, 10)}</td>
                         <td>
                           <div className="btn-group">
