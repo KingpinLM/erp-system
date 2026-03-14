@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '../api';
 import { useAuth } from '../App';
 
@@ -54,6 +55,12 @@ export default function VatReport() {
           <button className="btn btn-primary" onClick={generate}>Generovat z faktur</button>
           <button className="btn btn-secondary" onClick={exportXml}>Export XML</button>
         </>}
+      </div>
+
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+        <Link to="/kontrolni-hlaseni" className="btn btn-ghost">Kontrolní hlášení DPH</Link>
+        <Link to="/souhrnne-hlaseni" className="btn btn-ghost">Souhrnné hlášení</Link>
+        <Link to="/danove-priznani" className="btn btn-ghost">Daňové přiznání DPFO</Link>
       </div>
 
       {loading ? <p>Načítání...</p> : report && (

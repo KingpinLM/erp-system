@@ -25,6 +25,9 @@ import Bank from './pages/Bank';
 import SearchResults from './pages/SearchResults';
 import ChatWidget from './components/ChatWidget';
 import ChatbotSettings from './pages/ChatbotSettings';
+import KontrolniHlaseni from './pages/KontrolniHlaseni';
+import SouhrnneHlaseni from './pages/SouhrnneHlaseni';
+import DanovePriznani from './pages/DanovePriznani';
 import './styles.css';
 
 export const AuthContext = createContext(null);
@@ -151,6 +154,9 @@ function Sidebar({ open, onClose }) {
         { to: '/bank', label: 'Banka', icon: 'bank' },
         { to: '/accounting', label: 'Účetnictví', icon: 'accounting' },
         { to: '/vat', label: 'DPH', icon: 'vat' },
+        { to: '/kontrolni-hlaseni', label: 'Kontrolní hlášení', icon: 'vat' },
+        { to: '/souhrnne-hlaseni', label: 'Souhrnné hlášení', icon: 'vat' },
+        { to: '/danove-priznani', label: 'Daňové přiznání', icon: 'vat' },
         { to: '/currencies', label: 'Měny', icon: 'currencies' },
       ]
     },
@@ -504,6 +510,9 @@ export default function App() {
                   <Route path="/bank" element={<Bank />} />
                   <Route path="/accounting" element={<Accounting />} />
                   <Route path="/vat" element={<VatReport />} />
+                  <Route path="/kontrolni-hlaseni" element={<KontrolniHlaseni />} />
+                  <Route path="/souhrnne-hlaseni" element={<SouhrnneHlaseni />} />
+                  <Route path="/danove-priznani" element={<DanovePriznani />} />
                   <Route path="/currencies" element={<Currencies />} />
                   <Route path="/recurring" element={<RecurringInvoices />} />
                   <Route path="/company" element={<Company />} />
