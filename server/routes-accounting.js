@@ -280,9 +280,14 @@ router.post('/api/vat/generate', ...tenanted, authorize('admin', 'accountant'), 
     AND COALESCE(i.supply_date, i.issue_date) >= ? AND COALESCE(i.supply_date, i.issue_date) <= ?
   `).all(req.tenant_id, from, to);
 
+  // Kontrolní hlášení sekce (od 2024):
+  // Výstup: A.4 = plnění nad 10 000 Kč vč. DPH (podrobně), A.5 = do 10 000 Kč (souhrnně)
+  // Vstup: B.2 = plnění nad 10 000 Kč vč. DPH (podrobně), B.3 = do 10 000 Kč (souhrnně)
   const ins = db.prepare('INSERT INTO vat_records (tenant_id, invoice_id, type, tax_base, tax_amount, vat_rate, date, section) VALUES (?,?,?,?,?,?,?,?)');
   issued.forEach(r => {
-    const section = r.tax_rate >= 21 ? 'A1' : r.tax_rate >= 12 ? 'A2' : 'A5';
+    if (r.tax_rate <= 0) return; // Osvobozená plnění se do KH neuvádějí
+    const totalWithTax = Math.abs(r.item_total) + Math.abs(r.tax_amount);
+    const section = totalWithTax >= 10000 ? 'A4' : 'A5';
     ins.run(req.tenant_id, r.id, 'output', r.item_total, r.tax_amount, r.tax_rate, r.supply_date || r.issue_date, section);
   });
 
@@ -293,7 +298,9 @@ router.post('/api/vat/generate', ...tenanted, authorize('admin', 'accountant'), 
     AND COALESCE(i.supply_date, i.issue_date) >= ? AND COALESCE(i.supply_date, i.issue_date) <= ?
   `).all(req.tenant_id, from, to);
   received.forEach(r => {
-    const section = r.tax_rate >= 21 ? 'B1' : r.tax_rate >= 12 ? 'B2' : 'B3';
+    if (r.tax_rate <= 0) return;
+    const totalWithTax = Math.abs(r.item_total) + Math.abs(r.tax_amount);
+    const section = totalWithTax >= 10000 ? 'B2' : 'B3';
     ins.run(req.tenant_id, r.id, 'input', Math.abs(r.item_total), Math.abs(r.tax_amount), r.tax_rate, r.supply_date || r.issue_date, section);
   });
 
@@ -360,18 +367,31 @@ router.get('/api/vat/kontrolni-hlaseni', ...tenanted, authorize('admin', 'accoun
 
   // Section B - input (received invoices)
   const sectionB = db.prepare(`
-    SELECT i.id, i.invoice_number, i.issue_date, i.supply_date, i.note as supplier_name,
+    SELECT i.id, i.invoice_number, i.issue_date, i.supply_date,
+      c.name as client_name, c.dic as client_dic,
       v.section, v.tax_base, v.tax_amount, v.vat_rate, v.date as vat_date
     FROM vat_records v
     JOIN invoices i ON v.invoice_id = i.id
+    LEFT JOIN clients c ON i.client_id = c.id
     WHERE v.tenant_id = ? AND v.type = 'input' AND v.date >= ? AND v.date <= ?
     ORDER BY v.section, v.date
   `).all(req.tenant_id, from, to);
 
-  // Group by section
+  // Group by section, map fields to what frontend expects
   const groupBy = (arr) => {
     const m = {};
-    arr.forEach(r => { if (!m[r.section]) m[r.section] = []; m[r.section].push(r); });
+    arr.forEach(r => {
+      if (!m[r.section]) m[r.section] = [];
+      m[r.section].push({
+        dic: r.client_dic || r.supplier_dic || null,
+        invoice_number: r.invoice_number,
+        date: r.vat_date || r.supply_date || r.issue_date,
+        base: r.tax_base,
+        vat: r.tax_amount,
+        vat_rate: r.vat_rate,
+        client_name: r.client_name || r.supplier_name,
+      });
+    });
     return m;
   };
 
@@ -412,23 +432,23 @@ router.get('/api/vat/kontrolni-hlaseni-xml', ...tenanted, authorize('admin', 'ac
     ORDER BY v.section, v.date
   `).all(req.tenant_id, from, to);
 
-  // Build XML rows
+  // Build XML rows — sekce dle kontrolního hlášení
   const escXml = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   let vetaA4rows = '';
-  outputRecords.filter(r => r.tax_base >= 10000 || r.tax_amount >= 10000).forEach(r => {
-    vetaA4rows += `    <VetaA4 dic_odb="${escXml(r.dic_odb)}" c_evid_dd="${escXml(r.invoice_number)}" dppd="${r.duzp}" kod_rezim_pl="0" zdph_44="${r.tax_base.toFixed(0)}" dan1="${r.vat_rate >= 21 ? r.tax_amount.toFixed(0) : '0'}" dan2="${r.vat_rate >= 12 && r.vat_rate < 21 ? r.tax_amount.toFixed(0) : '0'}" />\n`;
+  outputRecords.filter(r => r.section === 'A4').forEach(r => {
+    vetaA4rows += `    <VetaA4 dic_odb="${escXml(r.dic_odb)}" c_evid_dd="${escXml(r.invoice_number)}" dppd="${r.duzp}" kod_rezim_pl="0" zakl_dane1="${r.vat_rate >= 21 ? r.tax_base.toFixed(0) : '0'}" dan1="${r.vat_rate >= 21 ? r.tax_amount.toFixed(0) : '0'}" zakl_dane2="${r.vat_rate >= 12 && r.vat_rate < 21 ? r.tax_base.toFixed(0) : '0'}" dan2="${r.vat_rate >= 12 && r.vat_rate < 21 ? r.tax_amount.toFixed(0) : '0'}" />\n`;
   });
   let vetaA5rows = '';
-  outputRecords.filter(r => r.tax_base < 10000 && r.tax_amount < 10000).forEach(r => {
-    vetaA5rows += `    <VetaA5 dppd="${r.duzp}" zakl_dane1="${r.vat_rate >= 21 ? r.tax_base.toFixed(0) : '0'}" dan1="${r.vat_rate >= 21 ? r.tax_amount.toFixed(0) : '0'}" zakl_dane2="${r.vat_rate >= 12 && r.vat_rate < 21 ? r.tax_base.toFixed(0) : '0'}" dan2="${r.vat_rate >= 12 && r.vat_rate < 21 ? r.tax_amount.toFixed(0) : '0'}" />\n`;
+  outputRecords.filter(r => r.section === 'A5').forEach(r => {
+    vetaA5rows += `    <VetaA5 zakl_dane1="${r.vat_rate >= 21 ? r.tax_base.toFixed(0) : '0'}" dan1="${r.vat_rate >= 21 ? r.tax_amount.toFixed(0) : '0'}" zakl_dane2="${r.vat_rate >= 12 && r.vat_rate < 21 ? r.tax_base.toFixed(0) : '0'}" dan2="${r.vat_rate >= 12 && r.vat_rate < 21 ? r.tax_amount.toFixed(0) : '0'}" />\n`;
   });
   let vetaB2rows = '';
-  inputRecords.filter(r => r.tax_base >= 10000 || r.tax_amount >= 10000).forEach(r => {
+  inputRecords.filter(r => r.section === 'B2').forEach(r => {
     vetaB2rows += `    <VetaB2 c_evid_dd="${escXml(r.invoice_number)}" dppd="${r.duzp}" zakl_dane1="${r.vat_rate >= 21 ? r.tax_base.toFixed(0) : '0'}" dan1="${r.vat_rate >= 21 ? r.tax_amount.toFixed(0) : '0'}" zakl_dane2="${r.vat_rate >= 12 && r.vat_rate < 21 ? r.tax_base.toFixed(0) : '0'}" dan2="${r.vat_rate >= 12 && r.vat_rate < 21 ? r.tax_amount.toFixed(0) : '0'}" />\n`;
   });
   let vetaB3rows = '';
-  inputRecords.filter(r => r.tax_base < 10000 && r.tax_amount < 10000).forEach(r => {
-    vetaB3rows += `    <VetaB3 dppd="${r.duzp}" zakl_dane1="${r.vat_rate >= 21 ? r.tax_base.toFixed(0) : '0'}" dan1="${r.vat_rate >= 21 ? r.tax_amount.toFixed(0) : '0'}" zakl_dane2="${r.vat_rate >= 12 && r.vat_rate < 21 ? r.tax_base.toFixed(0) : '0'}" dan2="${r.vat_rate >= 12 && r.vat_rate < 21 ? r.tax_amount.toFixed(0) : '0'}" />\n`;
+  inputRecords.filter(r => r.section === 'B3').forEach(r => {
+    vetaB3rows += `    <VetaB3 zakl_dane1="${r.vat_rate >= 21 ? r.tax_base.toFixed(0) : '0'}" dan1="${r.vat_rate >= 21 ? r.tax_amount.toFixed(0) : '0'}" zakl_dane2="${r.vat_rate >= 12 && r.vat_rate < 21 ? r.tax_base.toFixed(0) : '0'}" dan2="${r.vat_rate >= 12 && r.vat_rate < 21 ? r.tax_amount.toFixed(0) : '0'}" />\n`;
   });
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
@@ -468,19 +488,22 @@ router.get('/api/vat/souhrnne-hlaseni', ...tenanted, authorize('admin', 'account
     ORDER BY c.dic, i.issue_date
   `).all(req.tenant_id, from, to);
 
-  // Group by client DIC
+  // Group by client DIC — kód plnění 0 = dodání zboží, 3 = poskytnutí služby
   const byClient = {};
   euInvoices.forEach(inv => {
     const dic = inv.client_dic;
-    if (!byClient[dic]) byClient[dic] = { dic, name: inv.client_name, country: (dic || '').substring(0, 2), total: 0, invoices: [] };
+    if (!byClient[dic]) byClient[dic] = { dic, name: inv.client_name, country: (dic || '').substring(0, 2), code: '3', total: 0, count: 0, invoices: [] };
     byClient[dic].total += inv.total;
+    byClient[dic].count += 1;
     byClient[dic].invoices.push(inv);
   });
 
+  // Frontend expects "partners" key
   res.json({
     period: { year: parseInt(year), quarter: q, from, to },
     company: { dic: co.dic, ico: co.ico, name: co.name },
-    entries: Object.values(byClient),
+    partners: Object.values(byClient),
+    entries: Object.values(byClient), // backwards compat
     total: euInvoices.reduce((s, i) => s + i.total, 0),
   });
 });
@@ -556,21 +579,21 @@ router.get('/api/tax/income-report', ...tenanted, authorize('admin', 'accountant
     GROUP BY month ORDER BY month
   `).all(req.tenant_id, from, to);
 
-  // Expenses from evidence (categorized)
+  // Expenses from evidence (only expense type)
   const expenses = db.prepare(`
     SELECT SUM(amount) as total, COUNT(*) as count
-    FROM evidence WHERE tenant_id = ? AND date >= ? AND date <= ?
+    FROM evidence WHERE tenant_id = ? AND type = 'expense' AND date >= ? AND date <= ?
   `).get(req.tenant_id, from, to);
 
   const expensesByCategory = db.prepare(`
     SELECT category, SUM(amount) as total, COUNT(*) as count
-    FROM evidence WHERE tenant_id = ? AND date >= ? AND date <= ? AND category IS NOT NULL AND category != ''
+    FROM evidence WHERE tenant_id = ? AND type = 'expense' AND date >= ? AND date <= ? AND category IS NOT NULL AND category != ''
     GROUP BY category ORDER BY total DESC
   `).all(req.tenant_id, from, to);
 
   const expensesByMonth = db.prepare(`
     SELECT strftime('%m', date) as month, SUM(amount) as total
-    FROM evidence WHERE tenant_id = ? AND date >= ? AND date <= ?
+    FROM evidence WHERE tenant_id = ? AND type = 'expense' AND date >= ? AND date <= ?
     GROUP BY month ORDER BY month
   `).all(req.tenant_id, from, to);
 
@@ -586,48 +609,86 @@ router.get('/api/tax/income-report', ...tenanted, authorize('admin', 'accountant
   const totalExpenses = expenses?.total || 0;
   const profit = totalIncome - totalExpenses;
 
-  // Flat-rate expenses (paušální výdaje) - 60% for services, 80% for trade
-  const flatRate60 = totalIncome * 0.6;
-  const flatRate80 = totalIncome * 0.8;
+  // Paušální výdaje (§ 7 odst. 7 ZDP)
+  // 60% pro příjmy ze živnosti neřemeslné, max 2 000 000 Kč
+  // 80% pro příjmy z řemeslné živnosti a zemědělství, max 1 600 000 Kč
+  const flatRate60 = Math.min(totalIncome * 0.6, 2000000);
+  const flatRate80 = Math.min(totalIncome * 0.8, 1600000);
 
-  // Social and health insurance bases
-  const socialBase = profit * 0.5;
-  const healthBase = profit * 0.5;
-  const socialRate = 0.292; // 29.2% in 2025
-  const healthRate = 0.135; // 13.5%
+  // Základ daně (ze skutečných výdajů)
+  const taxBase = Math.max(0, profit);
 
+  // Výpočet daně z příjmů FO (§ 16 ZDP, od 2024):
+  // 15% do 36násobku průměrné mzdy (2026: ~1 935 552 Kč)
+  // 23% nad tento limit (solidární zvýšení nahrazeno progresí od 2024)
+  const bracketLimit = 1935552;
+  const discountPoplatnik = 30840; // Sleva na poplatníka (§ 35ba odst. 1 písm. a)
+
+  let tax15 = 0, tax23 = 0;
+  if (taxBase <= bracketLimit) {
+    tax15 = taxBase * 0.15;
+  } else {
+    tax15 = bracketLimit * 0.15;
+    tax23 = (taxBase - bracketLimit) * 0.23;
+  }
+  const taxTotal = Math.round(tax15 + tax23);
+  const taxAfterDiscount = taxTotal - discountPoplatnik;
+
+  // Sociální a zdravotní pojištění OSVČ
+  // Vyměřovací základ = 50 % zisku (min. základ se kontroluje dle aktuálního roku)
+  const socialBase = Math.max(profit * 0.5, 0);
+  const healthBase = Math.max(profit * 0.5, 0);
+  const socialRate = 0.292; // 29.2 % (důchodové 28 % + nemocenské 0 % + příspěvek na SP 2.1 % + ... = 29.2 %)
+  const healthRate = 0.135; // 13.5 %
+
+  const socialYearly = Math.round(socialBase * socialRate);
+  const healthYearly = Math.round(healthBase * healthRate);
+
+  // Frontend očekává plochý objekt s těmito klíči
   res.json({
     year: parseInt(year),
     company: { name: co.name, ico: co.ico, dic: co.dic, vat_payer: co.vat_payer },
-    income: {
+    // Plochá čísla pro KPI karty
+    income: totalIncome,
+    expenses: totalExpenses,
+    profit,
+    // Detail pro rozpad
+    incomeDetail: {
       total: totalIncome,
       count: income?.count || 0,
       byMonth: incomeByMonth,
     },
-    expenses: {
+    expensesDetail: {
       total: totalExpenses,
       count: expenses?.count || 0,
       byCategory: expensesByCategory,
       byMonth: expensesByMonth,
     },
-    profit,
-    flatRateExpenses: {
-      rate60: { rate: 0.6, amount: flatRate60, profit: totalIncome - flatRate60 },
-      rate80: { rate: 0.8, amount: flatRate80, profit: totalIncome - flatRate80 },
+    // Paušální výdaje
+    flat_rate_60: flatRate60,
+    flat_rate_80: flatRate80,
+    // Orientační výpočet daně
+    tax_base: taxBase,
+    tax_15: Math.round(tax15),
+    tax_23: Math.round(tax23),
+    tax_total: taxTotal,
+    tax_after_discount: taxAfterDiscount,
+    // Sociální a zdravotní
+    social: {
+      base: socialBase,
+      rate: socialRate,
+      yearly: socialYearly,
+      monthly: Math.round(socialYearly / 12),
     },
-    vat: co.vat_payer ? {
-      output: vatOutput?.total || 0,
-      input: vatInput?.total || 0,
-      liability: (vatOutput?.total || 0) - (vatInput?.total || 0),
-    } : null,
-    insurance: {
-      social: { base: socialBase, rate: socialRate, amount: socialBase * socialRate },
-      health: { base: healthBase, rate: healthRate, amount: healthBase * healthRate },
+    health: {
+      base: healthBase,
+      rate: healthRate,
+      yearly: healthYearly,
+      monthly: Math.round(healthYearly / 12),
     },
-    taxBrackets: [
-      { rate: 0.15, limit: 1935552, label: '15% do 1 935 552 Kč' },
-      { rate: 0.23, limit: null, label: '23% nad 1 935 552 Kč' },
-    ],
+    // DPH souhrn za rok
+    vat_output: co.vat_payer ? (vatOutput?.total || 0) : null,
+    vat_input: co.vat_payer ? (vatInput?.total || 0) : null,
   });
 });
 

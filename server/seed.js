@@ -106,10 +106,10 @@ const adminId = adminUser?.id || 1;
 const ucetniId = ucetniUser?.id || 2;
 
 const insertInvoice = db.prepare(`
-  INSERT OR IGNORE INTO invoices (tenant_id, invoice_number, type, client_id, issue_date, due_date, paid_date, status, currency, exchange_rate, subtotal, tax_rate, tax_amount, total, total_czk, note, created_by)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  INSERT OR IGNORE INTO invoices (tenant_id, invoice_number, type, client_id, issue_date, due_date, paid_date, status, currency, exchange_rate, subtotal, tax_rate, tax_amount, total, total_czk, supply_date, payment_method, variable_symbol, note, created_by)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `);
-const insertItem = db.prepare(`INSERT INTO invoice_items (invoice_id, description, quantity, unit, unit_price, total) VALUES (?, ?, ?, ?, ?, ?)`);
+const insertItem = db.prepare(`INSERT INTO invoice_items (invoice_id, description, quantity, unit, unit_price, total, tax_rate, tax_amount, total_with_tax) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
 
 const getClientId = (name) => {
   const c = db.prepare("SELECT id FROM clients WHERE name = ? AND tenant_id = ?").get(name, tenantId);
@@ -117,83 +117,148 @@ const getClientId = (name) => {
 };
 
 // exchange_rate: CZK=1, EUR=25.20, USD=23.50, GBP=29.80 (kurz platný při vystavení)
+// Od 1.1.2024 platí v ČR pouze sazby DPH: 21% (základní), 12% (snížená), 0% (osvobozeno)
+// supply_date = DUZP (datum uskutečnění zdanitelného plnění) — obvykle = issue_date
+// variable_symbol = číslo pro identifikaci platby
 const invoices = [
-  ['FV-2026-001', 'issued', 'TechSoft s.r.o.', '2026-01-15', '2026-02-14', '2026-02-10', 'paid', 'CZK', 1, 50000, 21, 10500, 60500, 60500, 'Vývoj webové aplikace', adminId],
-  ['FV-2026-002', 'issued', 'DataPro a.s.', '2026-01-20', '2026-02-19', null, 'overdue', 'CZK', 1, 35000, 21, 7350, 42350, 42350, 'Konzultace a analýza', adminId],
-  ['FV-2026-003', 'issued', 'EuroTrade GmbH', '2026-02-01', '2026-03-03', '2026-02-28', 'paid', 'EUR', 25.20, 2000, 21, 420, 2420, 60984, 'Software development', adminId],
-  ['FV-2026-004', 'issued', 'WebDesign Studio', '2026-02-10', '2026-03-12', null, 'sent', 'CZK', 1, 18000, 21, 3780, 21780, 21780, 'Grafický návrh', ucetniId],
-  ['FV-2026-005', 'issued', 'TechSoft s.r.o.', '2026-02-15', '2026-03-17', null, 'draft', 'CZK', 1, 75000, 21, 15750, 90750, 90750, 'Údržba systému Q1', adminId],
-  ['FV-2026-006', 'issued', 'Nordic Solutions ApS', '2026-03-01', '2026-03-31', null, 'sent', 'EUR', 25.20, 5000, 0, 0, 5000, 126000, 'Consulting services', adminId],
-  ['FP-2026-001', 'received', 'DataPro a.s.', '2026-01-05', '2026-01-19', '2026-01-18', 'paid', 'CZK', 1, 12000, 21, 2520, 14520, 14520, 'Licence software', adminId],
-  ['FP-2026-002', 'received', 'EuroTrade GmbH', '2026-02-01', '2026-02-28', null, 'overdue', 'EUR', 25.20, 800, 19, 152, 952, 23990, 'Cloud hosting', adminId],
-  ['FV-2026-007', 'issued', 'DataPro a.s.', '2026-03-05', '2026-04-04', null, 'draft', 'CZK', 1, 45000, 21, 9450, 54450, 54450, 'API integrace', ucetniId],
-  ['FV-2026-008', 'issued', 'WebDesign Studio', '2026-03-10', '2026-04-09', null, 'sent', 'USD', 23.50, 3000, 21, 630, 3630, 85305, 'Mobile app development', adminId],
-  ['FV-2026-009', 'issued', 'Alza.cz a.s.', '2026-01-10', '2026-02-09', '2026-02-05', 'paid', 'CZK', 1, 28000, 21, 5880, 33880, 33880, 'IT vybavení kanceláře', adminId],
-  ['FV-2026-010', 'issued', 'ŠKODA AUTO a.s.', '2026-01-18', '2026-02-17', '2026-02-15', 'paid', 'CZK', 1, 120000, 21, 25200, 145200, 145200, 'ERP implementace', adminId],
-  ['FV-2026-011', 'issued', 'Avast Software s.r.o.', '2026-01-22', '2026-02-21', null, 'overdue', 'CZK', 1, 85000, 21, 17850, 102850, 102850, 'Bezpečnostní audit', adminId],
-  ['FV-2026-012', 'issued', 'Komerční banka a.s.', '2026-01-25', '2026-02-24', '2026-02-20', 'paid', 'CZK', 1, 195000, 21, 40950, 235950, 235950, 'Bankovní integrace API', adminId],
-  ['FV-2026-013', 'issued', 'ČEZ a.s.', '2026-02-01', '2026-03-03', null, 'sent', 'CZK', 1, 67000, 21, 14070, 81070, 81070, 'Energetický reporting', ucetniId],
-  ['FV-2026-014', 'issued', 'Seznam.cz a.s.', '2026-02-05', '2026-03-07', null, 'sent', 'CZK', 1, 42000, 21, 8820, 50820, 50820, 'SEO optimalizace', adminId],
-  ['FV-2026-015', 'issued', 'Rohlík Group a.s.', '2026-02-08', '2026-03-10', null, 'draft', 'CZK', 1, 156000, 21, 32760, 188760, 188760, 'E-commerce platforma', adminId],
-  ['FV-2026-016', 'issued', 'JetBrains s.r.o.', '2026-02-10', '2026-03-12', '2026-03-01', 'paid', 'EUR', 25.20, 8500, 21, 1785, 10285, 259182, 'Plugin development', ucetniId],
-  ['FV-2026-017', 'issued', 'SAP ČR spol. s r.o.', '2026-02-12', '2026-03-14', null, 'sent', 'CZK', 1, 230000, 21, 48300, 278300, 278300, 'SAP integrace', adminId],
-  ['FV-2026-018', 'issued', 'Oracle Czech s.r.o.', '2026-02-14', '2026-03-16', null, 'overdue', 'CZK', 1, 175000, 21, 36750, 211750, 211750, 'Databázová migrace', adminId],
-  ['FV-2026-019', 'issued', 'Microsoft Czech Republic', '2026-02-16', '2026-03-18', null, 'sent', 'USD', 23.50, 15000, 21, 3150, 18150, 426525, 'Azure consulting', adminId],
-  ['FV-2026-020', 'issued', 'IBM Česká republika spol. s r.o.', '2026-02-18', '2026-03-20', null, 'draft', 'CZK', 1, 89000, 21, 18690, 107690, 107690, 'AI implementace', ucetniId],
-  ['FV-2026-021', 'issued', 'DELL Computer spol. s r.o.', '2026-02-20', '2026-03-22', null, 'sent', 'CZK', 1, 45000, 21, 9450, 54450, 54450, 'Hardware servis', adminId],
-  ['FV-2026-022', 'issued', 'Vodafone Czech Republic a.s.', '2026-02-22', '2026-03-24', null, 'sent', 'CZK', 1, 32000, 21, 6720, 38720, 38720, 'Mobilní řešení', adminId],
-  ['FV-2026-023', 'issued', 'T-Mobile Czech Republic a.s.', '2026-02-24', '2026-03-26', '2026-03-10', 'paid', 'CZK', 1, 55000, 21, 11550, 66550, 66550, 'IoT platforma', adminId],
-  ['FV-2026-024', 'issued', 'O2 Czech Republic a.s.', '2026-02-26', '2026-03-28', null, 'sent', 'CZK', 1, 48000, 21, 10080, 58080, 58080, 'Telekomunikační řešení', ucetniId],
-  ['FV-2026-025', 'issued', 'Česká pojišťovna a.s.', '2026-02-28', '2026-03-30', null, 'draft', 'CZK', 1, 135000, 21, 28350, 163350, 163350, 'Pojistný systém', adminId],
-  ['FV-2026-026', 'issued', 'Siemens s.r.o.', '2026-03-01', '2026-03-31', null, 'sent', 'EUR', 25.20, 12000, 21, 2520, 14520, 365904, 'Průmyslová automatizace', adminId],
-  ['FV-2026-027', 'issued', 'Bosch Group ČR', '2026-03-02', '2026-04-01', null, 'draft', 'CZK', 1, 78000, 21, 16380, 94380, 94380, 'Smart home integrace', ucetniId],
-  ['FV-2026-028', 'issued', 'ABB s.r.o.', '2026-03-03', '2026-04-02', null, 'sent', 'CZK', 1, 99000, 21, 20790, 119790, 119790, 'Řídicí systémy', adminId],
-  ['FV-2026-029', 'issued', 'Red Hat Czech s.r.o.', '2026-03-04', '2026-04-03', null, 'sent', 'USD', 23.50, 7500, 21, 1575, 9075, 213263, 'Linux consulting', adminId],
-  ['FV-2026-030', 'issued', 'Kentico Software s.r.o.', '2026-03-05', '2026-04-04', null, 'draft', 'CZK', 1, 62000, 21, 13020, 75020, 75020, 'CMS customizace', ucetniId],
-  ['FV-2026-031', 'issued', 'Y Soft Corporation a.s.', '2026-03-06', '2026-04-05', null, 'sent', 'CZK', 1, 41000, 21, 8610, 49610, 49610, 'Print management', adminId],
-  ['FV-2026-032', 'issued', 'Kiwi.com s.r.o.', '2026-03-07', '2026-04-06', null, 'sent', 'EUR', 25.20, 9200, 21, 1932, 11132, 280525, 'Booking engine API', adminId],
-  ['FV-2026-033', 'issued', 'Socialbakers a.s.', '2026-03-08', '2026-04-07', null, 'draft', 'CZK', 1, 53000, 21, 11130, 64130, 64130, 'Social media analytics', ucetniId],
-  ['FV-2026-034', 'issued', 'GoodData Corporation s.r.o.', '2026-03-09', '2026-04-08', null, 'sent', 'CZK', 1, 87000, 21, 18270, 105270, 105270, 'BI dashboard', adminId],
-  ['FV-2026-035', 'issued', 'Productboard s.r.o.', '2026-03-10', '2026-04-09', null, 'sent', 'USD', 23.50, 6000, 21, 1260, 7260, 170610, 'Product roadmap tool', adminId],
-  ['FP-2026-003', 'received', 'Alza.cz a.s.', '2026-01-12', '2026-01-26', '2026-01-24', 'paid', 'CZK', 1, 15800, 21, 3318, 19118, 19118, 'Monitory a příslušenství', adminId],
-  ['FP-2026-004', 'received', 'Vodafone Czech Republic a.s.', '2026-02-01', '2026-02-28', '2026-02-25', 'paid', 'CZK', 1, 8500, 21, 1785, 10285, 10285, 'Mobilní tarify', ucetniId],
-  ['FP-2026-005', 'received', 'DELL Computer spol. s r.o.', '2026-02-15', '2026-03-17', null, 'sent', 'CZK', 1, 42000, 21, 8820, 50820, 50820, 'Servery a storage', adminId],
-  ['FP-2026-006', 'received', 'Microsoft Czech Republic', '2026-03-01', '2026-03-31', null, 'sent', 'USD', 23.50, 4500, 21, 945, 5445, 127958, 'Azure licence', adminId],
-  ['FP-2026-007', 'received', 'Red Hat Czech s.r.o.', '2026-03-05', '2026-04-04', null, 'draft', 'USD', 23.50, 3200, 21, 672, 3872, 90992, 'RHEL subscriptions', ucetniId],
-  ['FV-2026-036', 'issued', 'Apify Technologies s.r.o.', '2026-03-10', '2026-04-09', null, 'sent', 'CZK', 1, 34000, 21, 7140, 41140, 41140, 'Web scraping platforma', adminId],
-  ['FV-2026-037', 'issued', 'Rossum s.r.o.', '2026-03-11', '2026-04-10', null, 'draft', 'CZK', 1, 72000, 21, 15120, 87120, 87120, 'AI document processing', ucetniId],
-  ['FV-2026-038', 'issued', 'Cleverlance Enterprise Sol. a.s.', '2026-03-12', '2026-04-11', null, 'sent', 'CZK', 1, 115000, 21, 24150, 139150, 139150, 'Enterprise architektura', adminId],
-  ['FV-2026-039', 'issued', 'Unicorn a.s.', '2026-03-13', '2026-04-12', null, 'sent', 'CZK', 1, 96000, 21, 20160, 116160, 116160, 'Business modelling', adminId],
-  ['FV-2026-040', 'issued', 'Logex Solutions s.r.o.', '2026-03-14', '2026-04-13', null, 'draft', 'CZK', 1, 28500, 21, 5985, 34485, 34485, 'Logistický software', ucetniId],
-  ['FV-2026-041', 'issued', 'CloudStack s.r.o.', '2026-03-14', '2026-04-13', null, 'sent', 'CZK', 1, 43000, 21, 9030, 52030, 52030, 'Cloud migrace', adminId],
-  ['FV-2026-042', 'issued', 'DataVault a.s.', '2026-03-14', '2026-04-13', null, 'draft', 'CZK', 1, 67500, 21, 14175, 81675, 81675, 'Data warehousing', adminId],
-  ['FV-2026-043', 'issued', 'CyberGuard s.r.o.', '2026-03-14', '2026-04-13', null, 'sent', 'CZK', 1, 55000, 21, 11550, 66550, 66550, 'Penetrační testování', ucetniId],
+  // [number, type, client, issue_date, due_date, paid_date, status, currency, rate, subtotal, tax_rate, tax_amount, total, total_czk, supply_date, payment_method, vs, note, created_by]
+  ['FV-2026-001', 'issued', 'TechSoft s.r.o.', '2026-01-15', '2026-02-14', '2026-02-10', 'paid', 'CZK', 1, 50000, 21, 10500, 60500, 60500, '2026-01-15', 'bank_transfer', '2026001', 'Vývoj webové aplikace', adminId],
+  ['FV-2026-002', 'issued', 'DataPro a.s.', '2026-01-20', '2026-02-19', null, 'overdue', 'CZK', 1, 35000, 21, 7350, 42350, 42350, '2026-01-20', 'bank_transfer', '2026002', 'Konzultace a analýza', adminId],
+  ['FV-2026-003', 'issued', 'EuroTrade GmbH', '2026-02-01', '2026-03-03', '2026-02-28', 'paid', 'EUR', 25.20, 2000, 0, 0, 2000, 50400, '2026-02-01', 'bank_transfer', '2026003', 'Software development (reverse charge)', adminId],
+  ['FV-2026-004', 'issued', 'WebDesign Studio', '2026-02-10', '2026-03-12', null, 'sent', 'CZK', 1, 18000, 21, 3780, 21780, 21780, '2026-02-10', 'bank_transfer', '2026004', 'Grafický návrh', ucetniId],
+  ['FV-2026-005', 'issued', 'TechSoft s.r.o.', '2026-02-15', '2026-03-17', null, 'draft', 'CZK', 1, 75000, 21, 15750, 90750, 90750, '2026-02-15', 'bank_transfer', '2026005', 'Údržba systému Q1', adminId],
+  ['FV-2026-006', 'issued', 'Nordic Solutions ApS', '2026-03-01', '2026-03-31', null, 'sent', 'EUR', 25.20, 5000, 0, 0, 5000, 126000, '2026-03-01', 'bank_transfer', '2026006', 'Consulting services (reverse charge)', adminId],
+  ['FP-2026-001', 'received', 'DataPro a.s.', '2026-01-05', '2026-01-19', '2026-01-18', 'paid', 'CZK', 1, 12000, 21, 2520, 14520, 14520, '2026-01-05', 'bank_transfer', '9001001', 'Licence software', adminId],
+  ['FP-2026-002', 'received', 'EuroTrade GmbH', '2026-02-01', '2026-02-28', null, 'overdue', 'EUR', 25.20, 800, 21, 168, 968, 24394, '2026-02-01', 'bank_transfer', '9002001', 'Cloud hosting', adminId],
+  ['FV-2026-007', 'issued', 'DataPro a.s.', '2026-03-05', '2026-04-04', null, 'draft', 'CZK', 1, 45000, 21, 9450, 54450, 54450, '2026-03-05', 'bank_transfer', '2026007', 'API integrace', ucetniId],
+  ['FV-2026-008', 'issued', 'WebDesign Studio', '2026-03-10', '2026-04-09', null, 'sent', 'USD', 23.50, 3000, 21, 630, 3630, 85305, '2026-03-10', 'bank_transfer', '2026008', 'Mobile app development', adminId],
+  ['FV-2026-009', 'issued', 'Alza.cz a.s.', '2026-01-10', '2026-02-09', '2026-02-05', 'paid', 'CZK', 1, 28000, 21, 5880, 33880, 33880, '2026-01-10', 'bank_transfer', '2026009', 'IT vybavení kanceláře', adminId],
+  ['FV-2026-010', 'issued', 'ŠKODA AUTO a.s.', '2026-01-18', '2026-02-17', '2026-02-15', 'paid', 'CZK', 1, 120000, 21, 25200, 145200, 145200, '2026-01-18', 'bank_transfer', '2026010', 'ERP implementace', adminId],
+  ['FV-2026-011', 'issued', 'Avast Software s.r.o.', '2026-01-22', '2026-02-21', null, 'overdue', 'CZK', 1, 85000, 21, 17850, 102850, 102850, '2026-01-22', 'bank_transfer', '2026011', 'Bezpečnostní audit', adminId],
+  ['FV-2026-012', 'issued', 'Komerční banka a.s.', '2026-01-25', '2026-02-24', '2026-02-20', 'paid', 'CZK', 1, 195000, 21, 40950, 235950, 235950, '2026-01-25', 'bank_transfer', '2026012', 'Bankovní integrace API', adminId],
+  ['FV-2026-013', 'issued', 'ČEZ a.s.', '2026-02-01', '2026-03-03', null, 'sent', 'CZK', 1, 67000, 21, 14070, 81070, 81070, '2026-02-01', 'bank_transfer', '2026013', 'Energetický reporting', ucetniId],
+  ['FV-2026-014', 'issued', 'Seznam.cz a.s.', '2026-02-05', '2026-03-07', null, 'sent', 'CZK', 1, 42000, 21, 8820, 50820, 50820, '2026-02-05', 'bank_transfer', '2026014', 'SEO optimalizace', adminId],
+  ['FV-2026-015', 'issued', 'Rohlík Group a.s.', '2026-02-08', '2026-03-10', null, 'draft', 'CZK', 1, 156000, 21, 32760, 188760, 188760, '2026-02-08', 'bank_transfer', '2026015', 'E-commerce platforma', adminId],
+  ['FV-2026-016', 'issued', 'JetBrains s.r.o.', '2026-02-10', '2026-03-12', '2026-03-01', 'paid', 'EUR', 25.20, 8500, 21, 1785, 10285, 259182, '2026-02-10', 'bank_transfer', '2026016', 'Plugin development', ucetniId],
+  ['FV-2026-017', 'issued', 'SAP ČR spol. s r.o.', '2026-02-12', '2026-03-14', null, 'sent', 'CZK', 1, 230000, 21, 48300, 278300, 278300, '2026-02-12', 'bank_transfer', '2026017', 'SAP integrace', adminId],
+  ['FV-2026-018', 'issued', 'Oracle Czech s.r.o.', '2026-02-14', '2026-03-16', null, 'overdue', 'CZK', 1, 175000, 21, 36750, 211750, 211750, '2026-02-14', 'bank_transfer', '2026018', 'Databázová migrace', adminId],
+  ['FV-2026-019', 'issued', 'Microsoft Czech Republic', '2026-02-16', '2026-03-18', null, 'sent', 'USD', 23.50, 15000, 21, 3150, 18150, 426525, '2026-02-16', 'bank_transfer', '2026019', 'Azure consulting', adminId],
+  ['FV-2026-020', 'issued', 'IBM Česká republika spol. s r.o.', '2026-02-18', '2026-03-20', null, 'draft', 'CZK', 1, 89000, 21, 18690, 107690, 107690, '2026-02-18', 'bank_transfer', '2026020', 'AI implementace', ucetniId],
+  ['FV-2026-021', 'issued', 'DELL Computer spol. s r.o.', '2026-02-20', '2026-03-22', null, 'sent', 'CZK', 1, 45000, 21, 9450, 54450, 54450, '2026-02-20', 'bank_transfer', '2026021', 'Hardware servis', adminId],
+  ['FV-2026-022', 'issued', 'Vodafone Czech Republic a.s.', '2026-02-22', '2026-03-24', null, 'sent', 'CZK', 1, 32000, 21, 6720, 38720, 38720, '2026-02-22', 'bank_transfer', '2026022', 'Mobilní řešení', adminId],
+  ['FV-2026-023', 'issued', 'T-Mobile Czech Republic a.s.', '2026-02-24', '2026-03-26', '2026-03-10', 'paid', 'CZK', 1, 55000, 21, 11550, 66550, 66550, '2026-02-24', 'bank_transfer', '2026023', 'IoT platforma', adminId],
+  ['FV-2026-024', 'issued', 'O2 Czech Republic a.s.', '2026-02-26', '2026-03-28', null, 'sent', 'CZK', 1, 48000, 21, 10080, 58080, 58080, '2026-02-26', 'bank_transfer', '2026024', 'Telekomunikační řešení', ucetniId],
+  ['FV-2026-025', 'issued', 'Česká pojišťovna a.s.', '2026-02-28', '2026-03-30', null, 'draft', 'CZK', 1, 135000, 21, 28350, 163350, 163350, '2026-02-28', 'bank_transfer', '2026025', 'Pojistný systém', adminId],
+  ['FV-2026-026', 'issued', 'Siemens s.r.o.', '2026-03-01', '2026-03-31', null, 'sent', 'EUR', 25.20, 12000, 21, 2520, 14520, 365904, '2026-03-01', 'bank_transfer', '2026026', 'Průmyslová automatizace', adminId],
+  ['FV-2026-027', 'issued', 'Bosch Group ČR', '2026-03-02', '2026-04-01', null, 'draft', 'CZK', 1, 78000, 21, 16380, 94380, 94380, '2026-03-02', 'bank_transfer', '2026027', 'Smart home integrace', ucetniId],
+  ['FV-2026-028', 'issued', 'ABB s.r.o.', '2026-03-03', '2026-04-02', null, 'sent', 'CZK', 1, 99000, 21, 20790, 119790, 119790, '2026-03-03', 'bank_transfer', '2026028', 'Řídicí systémy', adminId],
+  ['FV-2026-029', 'issued', 'Red Hat Czech s.r.o.', '2026-03-04', '2026-04-03', null, 'sent', 'USD', 23.50, 7500, 21, 1575, 9075, 213263, '2026-03-04', 'bank_transfer', '2026029', 'Linux consulting', adminId],
+  ['FV-2026-030', 'issued', 'Kentico Software s.r.o.', '2026-03-05', '2026-04-04', null, 'draft', 'CZK', 1, 62000, 21, 13020, 75020, 75020, '2026-03-05', 'bank_transfer', '2026030', 'CMS customizace', ucetniId],
+  ['FV-2026-031', 'issued', 'Y Soft Corporation a.s.', '2026-03-06', '2026-04-05', null, 'sent', 'CZK', 1, 41000, 21, 8610, 49610, 49610, '2026-03-06', 'bank_transfer', '2026031', 'Print management', adminId],
+  ['FV-2026-032', 'issued', 'Kiwi.com s.r.o.', '2026-03-07', '2026-04-06', null, 'sent', 'EUR', 25.20, 9200, 21, 1932, 11132, 280525, '2026-03-07', 'bank_transfer', '2026032', 'Booking engine API', adminId],
+  ['FV-2026-033', 'issued', 'Socialbakers a.s.', '2026-03-08', '2026-04-07', null, 'draft', 'CZK', 1, 53000, 21, 11130, 64130, 64130, '2026-03-08', 'bank_transfer', '2026033', 'Social media analytics', ucetniId],
+  ['FV-2026-034', 'issued', 'GoodData Corporation s.r.o.', '2026-03-09', '2026-04-08', null, 'sent', 'CZK', 1, 87000, 21, 18270, 105270, 105270, '2026-03-09', 'bank_transfer', '2026034', 'BI dashboard', adminId],
+  ['FV-2026-035', 'issued', 'Productboard s.r.o.', '2026-03-10', '2026-04-09', null, 'sent', 'USD', 23.50, 6000, 21, 1260, 7260, 170610, '2026-03-10', 'bank_transfer', '2026035', 'Product roadmap tool', adminId],
+  ['FP-2026-003', 'received', 'Alza.cz a.s.', '2026-01-12', '2026-01-26', '2026-01-24', 'paid', 'CZK', 1, 15800, 21, 3318, 19118, 19118, '2026-01-12', 'bank_transfer', '9003001', 'Monitory a příslušenství', adminId],
+  ['FP-2026-004', 'received', 'Vodafone Czech Republic a.s.', '2026-02-01', '2026-02-28', '2026-02-25', 'paid', 'CZK', 1, 8500, 21, 1785, 10285, 10285, '2026-02-01', 'bank_transfer', '9004001', 'Mobilní tarify', ucetniId],
+  ['FP-2026-005', 'received', 'DELL Computer spol. s r.o.', '2026-02-15', '2026-03-17', null, 'sent', 'CZK', 1, 42000, 21, 8820, 50820, 50820, '2026-02-15', 'bank_transfer', '9005001', 'Servery a storage', adminId],
+  ['FP-2026-006', 'received', 'Microsoft Czech Republic', '2026-03-01', '2026-03-31', null, 'sent', 'USD', 23.50, 4500, 21, 945, 5445, 127958, '2026-03-01', 'bank_transfer', '9006001', 'Azure licence', adminId],
+  ['FP-2026-007', 'received', 'Red Hat Czech s.r.o.', '2026-03-05', '2026-04-04', null, 'draft', 'USD', 23.50, 3200, 21, 672, 3872, 90992, '2026-03-05', 'bank_transfer', '9007001', 'RHEL subscriptions', ucetniId],
+  // Přijaté faktury se sníženou sazbou 12% (od 2024)
+  ['FP-2026-008', 'received', 'ČEZ a.s.', '2026-01-15', '2026-02-14', '2026-02-10', 'paid', 'CZK', 1, 25000, 12, 3000, 28000, 28000, '2026-01-15', 'bank_transfer', '9008001', 'Elektřina kanceláře', adminId],
+  ['FP-2026-009', 'received', 'Česká pojišťovna a.s.', '2026-02-01', '2026-03-01', '2026-02-20', 'paid', 'CZK', 1, 45000, 0, 0, 45000, 45000, '2026-02-01', 'bank_transfer', '9009001', 'Pojištění majetku (osvobozeno)', adminId],
+  ['FP-2026-010', 'received', 'Alza.cz a.s.', '2026-03-01', '2026-03-31', null, 'sent', 'CZK', 1, 35000, 21, 7350, 42350, 42350, '2026-03-01', 'bank_transfer', '9010001', 'IT vybavení a příslušenství', adminId],
+  // Vydané faktury se sníženou sazbou 12% (např. ubytovací služby, knihy)
+  ['FV-2026-044', 'issued', 'TechSoft s.r.o.', '2026-01-20', '2026-02-19', '2026-02-15', 'paid', 'CZK', 1, 8000, 12, 960, 8960, 8960, '2026-01-20', 'bank_transfer', '2026044', 'Školení a vzdělávací materiály', adminId],
+  ['FV-2026-045', 'issued', 'DataPro a.s.', '2026-02-05', '2026-03-07', null, 'sent', 'CZK', 1, 5500, 12, 660, 6160, 6160, '2026-02-05', 'bank_transfer', '2026045', 'Odborné publikace a knihy', ucetniId],
+  ['FV-2026-036', 'issued', 'Apify Technologies s.r.o.', '2026-03-10', '2026-04-09', null, 'sent', 'CZK', 1, 34000, 21, 7140, 41140, 41140, '2026-03-10', 'bank_transfer', '2026036', 'Web scraping platforma', adminId],
+  ['FV-2026-037', 'issued', 'Rossum s.r.o.', '2026-03-11', '2026-04-10', null, 'draft', 'CZK', 1, 72000, 21, 15120, 87120, 87120, '2026-03-11', 'bank_transfer', '2026037', 'AI document processing', ucetniId],
+  ['FV-2026-038', 'issued', 'Cleverlance Enterprise Sol. a.s.', '2026-03-12', '2026-04-11', null, 'sent', 'CZK', 1, 115000, 21, 24150, 139150, 139150, '2026-03-12', 'bank_transfer', '2026038', 'Enterprise architektura', adminId],
+  ['FV-2026-039', 'issued', 'Unicorn a.s.', '2026-03-13', '2026-04-12', null, 'sent', 'CZK', 1, 96000, 21, 20160, 116160, 116160, '2026-03-13', 'bank_transfer', '2026039', 'Business modelling', adminId],
+  ['FV-2026-040', 'issued', 'Logex Solutions s.r.o.', '2026-03-14', '2026-04-13', null, 'draft', 'CZK', 1, 28500, 21, 5985, 34485, 34485, '2026-03-14', 'bank_transfer', '2026040', 'Logistický software', ucetniId],
+  ['FV-2026-041', 'issued', 'CloudStack s.r.o.', '2026-03-14', '2026-04-13', null, 'sent', 'CZK', 1, 43000, 21, 9030, 52030, 52030, '2026-03-14', 'bank_transfer', '2026041', 'Cloud migrace', adminId],
+  ['FV-2026-042', 'issued', 'DataVault a.s.', '2026-03-14', '2026-04-13', null, 'draft', 'CZK', 1, 67500, 21, 14175, 81675, 81675, '2026-03-14', 'bank_transfer', '2026042', 'Data warehousing', adminId],
+  ['FV-2026-043', 'issued', 'CyberGuard s.r.o.', '2026-03-14', '2026-04-13', null, 'sent', 'CZK', 1, 55000, 21, 11550, 66550, 66550, '2026-03-14', 'bank_transfer', '2026043', 'Penetrační testování', ucetniId],
 ];
 invoices.forEach(inv => {
   const clientId = getClientId(inv[2]);
-  // inv: [0]=number, [1]=type, [2]=client, [3]=issue, [4]=due, [5]=paid, [6]=status, [7]=currency, [8]=exchange_rate, [9]=subtotal, [10]=tax_rate, [11]=tax_amount, [12]=total, [13]=total_czk, [14]=note, [15]=created_by
-  const info = insertInvoice.run(tenantId, inv[0], inv[1], clientId, inv[3], inv[4], inv[5], inv[6], inv[7], inv[8], inv[9], inv[10], inv[11], inv[12], inv[13], inv[14], inv[15]);
+  // inv: [0]=number, [1]=type, [2]=client, [3]=issue, [4]=due, [5]=paid, [6]=status, [7]=currency, [8]=rate, [9]=subtotal, [10]=tax_rate, [11]=tax_amount, [12]=total, [13]=total_czk, [14]=supply_date, [15]=payment_method, [16]=vs, [17]=note, [18]=created_by
+  const info = insertInvoice.run(tenantId, inv[0], inv[1], clientId, inv[3], inv[4], inv[5], inv[6], inv[7], inv[8], inv[9], inv[10], inv[11], inv[12], inv[13], inv[14], inv[15], inv[16], inv[17], inv[18]);
   if (info.changes > 0) {
     const invId = info.lastInsertRowid;
-    insertItem.run(invId, inv[14] || 'Služba', 1, 'ks', inv[9], inv[9]);
+    // invoice_items: description, qty, unit, unit_price, total(bez DPH), tax_rate, tax_amount, total_with_tax
+    insertItem.run(invId, inv[17] || 'Služba', 1, 'ks', inv[9], inv[9], inv[10], inv[11], inv[12]);
   }
 });
 
 // ─── EVIDENCE (tenant-scoped) ───────────────────────────────
 const insertEvidence = db.prepare(`INSERT OR IGNORE INTO evidence (tenant_id, type, title, description, amount, currency, date, category, invoice_id, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
 const evidenceData = [
-  ['income', 'Platba za FV-2026-001', 'Přijatá platba za vývoj', 60500, 'CZK', '2026-02-10', 'Služby', 1, adminId],
-  ['income', 'Platba za FV-2026-003', 'Payment received', 2420, 'EUR', '2026-02-28', 'Služby', 3, adminId],
-  ['expense', 'Licence software', 'Roční licence', 14520, 'CZK', '2026-01-18', 'Software', 7, adminId],
-  ['expense', 'Kancelářské potřeby', 'Papír, tonery', 3500, 'CZK', '2026-01-25', 'Kancelář', null, ucetniId],
-  ['expense', 'Hosting serveru', 'Měsíční hosting', 2500, 'CZK', '2026-02-01', 'IT', null, adminId],
+  // Příjmy (propojené s uhrazenými fakturami)
+  ['income', 'Platba za FV-2026-001', 'Přijatá platba za vývoj webové aplikace', 60500, 'CZK', '2026-02-10', 'Služby', 1, adminId],
+  ['income', 'Platba za FV-2026-003', 'Payment from EuroTrade GmbH', 50400, 'CZK', '2026-02-28', 'Služby', 3, adminId],
+  ['income', 'Platba za FV-2026-009', 'Platba za IT vybavení', 33880, 'CZK', '2026-02-05', 'Služby', 11, adminId],
+  ['income', 'Platba za FV-2026-010', 'ERP implementace ŠKODA', 145200, 'CZK', '2026-02-15', 'Služby', 12, adminId],
+  ['income', 'Platba za FV-2026-012', 'Bankovní integrace KB', 235950, 'CZK', '2026-02-20', 'Služby', 14, adminId],
+  ['income', 'Platba za FV-2026-016', 'Plugin development JetBrains', 259182, 'CZK', '2026-03-01', 'Služby', 18, ucetniId],
+  ['income', 'Platba za FV-2026-023', 'IoT platforma T-Mobile', 66550, 'CZK', '2026-03-10', 'Služby', 25, adminId],
+  ['income', 'Platba za FV-2026-044', 'Školení TechSoft', 8960, 'CZK', '2026-02-15', 'Služby', null, adminId],
+  // Výdaje (propojené s přijatými fakturami)
+  ['expense', 'Licence software DataPro', 'Roční licence software', 14520, 'CZK', '2026-01-18', 'Software', 7, adminId],
+  ['expense', 'Monitory Alza', 'Monitory a příslušenství pro kancelář', 19118, 'CZK', '2026-01-24', 'Hardware', null, adminId],
+  ['expense', 'Elektřina ČEZ', 'Elektřina za kanceláře Q4/2025', 28000, 'CZK', '2026-02-10', 'Energie', null, adminId],
+  ['expense', 'Mobilní tarify Vodafone', 'Firemní mobilní tarify', 10285, 'CZK', '2026-02-25', 'Telekomunikace', null, ucetniId],
+  ['expense', 'Pojištění majetku', 'Roční pojistka kanceláří a majetku', 45000, 'CZK', '2026-02-20', 'Pojištění', null, adminId],
+  // Další provozní výdaje (bez faktury)
+  ['expense', 'Kancelářské potřeby', 'Papír, tonery, kancelářské vybavení', 3500, 'CZK', '2026-01-25', 'Kancelář', null, ucetniId],
+  ['expense', 'Hosting serveru', 'Měsíční hosting a doména', 2500, 'CZK', '2026-02-01', 'IT', null, adminId],
+  ['expense', 'Cestovné Brno', 'Služební cesta k zákazníkovi', 1850, 'CZK', '2026-02-15', 'Cestovné', null, ucetniId],
+  ['expense', 'Školení React', 'Online kurz pro vývojáře', 8900, 'CZK', '2026-03-01', 'Vzdělávání', null, adminId],
+  ['expense', 'Obědy s klienty', 'Reprezentace - pracovní obědy', 4200, 'CZK', '2026-01-30', 'Reprezentace', null, adminId],
+  ['expense', 'Daňové poradenství', 'Čtvrtletní konzultace s daňovým poradcem', 12100, 'CZK', '2026-01-15', 'Služby', null, ucetniId],
+  ['expense', 'Účetní software', 'Měsíční předplatné', 1990, 'CZK', '2026-02-01', 'Software', null, ucetniId],
+  ['expense', 'Pronájem kanceláře', 'Měsíční nájem leden', 35000, 'CZK', '2026-01-05', 'Nájem', null, adminId],
+  ['expense', 'Pronájem kanceláře', 'Měsíční nájem únor', 35000, 'CZK', '2026-02-05', 'Nájem', null, adminId],
+  ['expense', 'Pronájem kanceláře', 'Měsíční nájem březen', 35000, 'CZK', '2026-03-05', 'Nájem', null, adminId],
+  // Majetek a dokumenty
   ['asset', 'MacBook Pro', 'Nový notebook pro vývojáře', 65000, 'CZK', '2026-01-10', 'Hardware', null, adminId],
-  ['document', 'Smlouva TechSoft', 'Rámcová smlouva 2026', null, 'CZK', '2026-01-01', 'Smlouvy', null, adminId],
-  ['income', 'Platba za FP-2026-001', 'Uhrazená faktura', 14520, 'CZK', '2026-01-18', 'Software', 7, adminId],
-  ['expense', 'Cestovné Brno', 'Služební cesta', 1850, 'CZK', '2026-02-15', 'Cestovné', null, ucetniId],
-  ['expense', 'Školení React', 'Online kurz', 8900, 'CZK', '2026-03-01', 'Vzdělávání', null, adminId],
+  ['asset', 'ThinkPad X1 Carbon', 'Notebook pro účetní', 42000, 'CZK', '2026-02-15', 'Hardware', null, ucetniId],
+  ['document', 'Smlouva TechSoft', 'Rámcová smlouva o spolupráci 2026', null, 'CZK', '2026-01-01', 'Smlouvy', null, adminId],
+  ['document', 'Nájemní smlouva', 'Smlouva o pronájmu kancelářských prostor', null, 'CZK', '2026-01-01', 'Smlouvy', null, adminId],
 ];
 evidenceData.forEach(e => insertEvidence.run(tenantId, ...e));
+
+// ─── VAT RECORDS (auto-generate from invoices) ──────────────
+// Generujeme DPH záznamy ze všech faktur (vydaných = output, přijatých = input)
+// Používáme DUZP (supply_date) jako datum pro DPH
+// Sekce dle kontrolního hlášení: A.4/B.2 = nad 10000 Kč vč. DPH, A.5/B.3 = do 10000 Kč
+db.prepare('DELETE FROM vat_records WHERE tenant_id = ?').run(tenantId);
+
+const allInvoicesForVat = db.prepare(`
+  SELECT i.id, i.type, i.supply_date, i.issue_date, i.status, i.total,
+    ii.total as item_base, ii.tax_rate, ii.tax_amount
+  FROM invoices i
+  JOIN invoice_items ii ON i.id = ii.invoice_id
+  WHERE i.tenant_id = ? AND i.status != 'cancelled' AND ii.tax_rate > 0
+`).all(tenantId);
+
+const insertVat = db.prepare('INSERT INTO vat_records (tenant_id, invoice_id, type, tax_base, tax_amount, vat_rate, date, section) VALUES (?,?,?,?,?,?,?,?)');
+allInvoicesForVat.forEach(r => {
+  const vatDate = r.supply_date || r.issue_date;
+  const isOutput = r.type === 'issued';
+  const vatType = isOutput ? 'output' : 'input';
+  // Sekce kontrolního hlášení (od 2024):
+  // A.4 = výstup nad 10000, A.5 = výstup do 10000
+  // B.2 = vstup nad 10000, B.3 = vstup do 10000
+  const totalWithTax = Math.abs(r.item_base) + Math.abs(r.tax_amount);
+  let section;
+  if (isOutput) {
+    section = totalWithTax >= 10000 ? 'A4' : 'A5';
+  } else {
+    section = totalWithTax >= 10000 ? 'B2' : 'B3';
+  }
+  insertVat.run(tenantId, r.id, vatType, Math.abs(r.item_base), Math.abs(r.tax_amount), r.tax_rate, vatDate, section);
+});
 
 // ─── COMPANY (tenant-scoped) ────────────────────────────────
 // Rainbow Family Investment brand logo (Prismatic Spectrum, white background)
@@ -202,15 +267,22 @@ const brandLogo = 'data:image/svg+xml;base64,' + Buffer.from(brandLogoSvg).toStr
 
 const existingCompany = db.prepare('SELECT id FROM company WHERE tenant_id = ?').get(tenantId);
 if (!existingCompany) {
-  db.prepare(`INSERT INTO company (tenant_id, name, ico, dic, bank_account, bank_code, iban, invoice_prefix, invoice_counter, logo) VALUES (?, 'Rainbow Family Investment s.r.o.', '23486899', 'CZ23486899', '1234567890', '0100', 'CZ6501000000001234567890', 'FV', 44, ?)`).run(tenantId, brandLogo);
+  db.prepare(`INSERT INTO company (tenant_id, name, ico, dic, email, phone, address, city, zip, bank_account, bank_code, iban, invoice_prefix, invoice_counter, vat_payer, default_due_days, logo) VALUES (?, 'Rainbow Family Investment s.r.o.', '23486899', 'CZ23486899', 'info@rfi.cz', '+420 222 333 444', 'Václavské náměstí 1', 'Praha', '11000', '1234567890', '0100', 'CZ6501000000001234567890', 'FV', 46, 1, 14, ?)`).run(tenantId, brandLogo);
 } else {
-  // Ensure bank details and logo exist for existing records
-  const comp = db.prepare('SELECT bank_account, logo FROM company WHERE tenant_id = ?').get(tenantId);
-  if (!comp.bank_account) {
-    db.prepare("UPDATE company SET bank_account='1234567890', bank_code='0100', iban='CZ6501000000001234567890' WHERE tenant_id=?").run(tenantId);
-  }
-  // Update logo to brand version
-  db.prepare("UPDATE company SET logo = ? WHERE tenant_id = ?").run(brandLogo, tenantId);
+  // Ensure all company details are populated
+  db.prepare(`UPDATE company SET
+    bank_account = COALESCE(NULLIF(bank_account,''), '1234567890'),
+    bank_code = COALESCE(NULLIF(bank_code,''), '0100'),
+    iban = COALESCE(NULLIF(iban,''), 'CZ6501000000001234567890'),
+    email = COALESCE(NULLIF(email,''), 'info@rfi.cz'),
+    phone = COALESCE(NULLIF(phone,''), '+420 222 333 444'),
+    address = COALESCE(NULLIF(address,''), 'Václavské náměstí 1'),
+    city = COALESCE(NULLIF(city,''), 'Praha'),
+    zip = COALESCE(NULLIF(zip,''), '11000'),
+    vat_payer = 1,
+    default_due_days = COALESCE(default_due_days, 14),
+    logo = ?
+  WHERE tenant_id = ?`).run(brandLogo, tenantId);
 }
 
 // ─── CHATBOT KNOWLEDGE BASE (comprehensive FAQ) ─────────────
