@@ -143,22 +143,19 @@ export default function Clients() {
   const abortRef = useRef(null);
   const moveThrottle = useRef(0);
 
-  const calcPreviewPos = useCallback((rowElement) => {
-    if (!rowElement) return { top: 100, left: 100 };
-    const rect = rowElement.getBoundingClientRect();
-    const pw = 300, ph = 360, gap = 8;
-    let left = rect.right + gap;
-    if (left + pw > window.innerWidth - 8) left = rect.left - pw - gap;
+  const calcPreviewPos = useCallback((cx, cy) => {
+    const pw = 300, ph = 360, gap = 12;
+    let left = cx + gap;
+    if (left + pw > window.innerWidth - 8) left = cx - pw - gap;
     if (left < 8) left = 8;
-    let top = rect.top;
+    let top = cy - 20;
     if (top + ph > window.innerHeight - 8) top = window.innerHeight - ph - 8;
     if (top < 8) top = 8;
     return { top, left };
   }, []);
 
   const handleRowMouseEnter = useCallback((c, e) => {
-    const row = e.currentTarget;
-    setHoverPos(calcPreviewPos(row));
+    setHoverPos(calcPreviewPos(e.clientX, e.clientY));
     setHoveredId(c.id);
     if (hoverCache.current[c.id]) {
       setHoverDetail(hoverCache.current[c.id]);
@@ -346,6 +343,7 @@ export default function Clients() {
                 {sorted.slice((page - 1) * perPage, page * perPage).map(c => (
                   <tr key={c.id}
                     onMouseEnter={(e) => handleRowMouseEnter(c, e)}
+                    onMouseMove={handleRowMouseMove}
                     onMouseLeave={handleRowMouseLeave}
                     onTouchEnd={(e) => { if (e.target.closest('a, button, input')) return; handleRowTap(c); }}
                   >

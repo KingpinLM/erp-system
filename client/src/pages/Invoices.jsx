@@ -116,21 +116,13 @@ export default function Invoices() {
 
   useEffect(() => { setPage(1); load(); }, [filters]);
 
-  const calcPreviewPos = useCallback((rowElement) => {
-    if (!rowElement) return { top: 100, left: 100 };
-    const rect = rowElement.getBoundingClientRect();
-    const previewW = 320;
-    const previewH = 320;
-    const gap = 8;
-    // Position to the right of the table, aligned with row top
-    let left = rect.right + gap;
-    if (left + previewW > window.innerWidth - 8) {
-      // If no space on right, position to the left of table
-      left = rect.left - previewW - gap;
-    }
+  const calcPreviewPos = useCallback((cx, cy) => {
+    const pw = 320, ph = 320, gap = 12;
+    let left = cx + gap;
+    if (left + pw > window.innerWidth - 8) left = cx - pw - gap;
     if (left < 8) left = 8;
-    let top = rect.top;
-    if (top + previewH > window.innerHeight - 8) top = window.innerHeight - previewH - 8;
+    let top = cy - 20;
+    if (top + ph > window.innerHeight - 8) top = window.innerHeight - ph - 8;
     if (top < 8) top = 8;
     return { top, left };
   }, []);
@@ -138,9 +130,15 @@ export default function Invoices() {
   const abortRef = useRef(null);
   const moveThrottle = useRef(0);
 
+  const handleRowMouseMove = useCallback((e) => {
+    const now = Date.now();
+    if (now - moveThrottle.current < 32) return;
+    moveThrottle.current = now;
+    setHoverPos(calcPreviewPos(e.clientX, e.clientY));
+  }, [calcPreviewPos]);
+
   const handleRowMouseEnter = useCallback((inv, e) => {
-    const row = e.currentTarget;
-    setHoverPos(calcPreviewPos(row));
+    setHoverPos(calcPreviewPos(e.clientX, e.clientY));
     setHoveredInv(inv.id);
 
     if (hoverCache.current[inv.id]) {
@@ -322,6 +320,7 @@ export default function Invoices() {
                   <tr key={inv.id}
                     style={{ background: selected.has(inv.id) ? '#eff6ff' : '' }}
                     onMouseEnter={(e) => handleRowMouseEnter(inv, e)}
+                    onMouseMove={handleRowMouseMove}
                     onMouseLeave={handleRowMouseLeave}
                     onTouchEnd={(e) => { if (e.target.closest('a, button, input')) return; handleRowTap(inv); }}
                   >
