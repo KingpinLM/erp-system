@@ -619,9 +619,11 @@ router.get('/api/tax/income-report', ...tenanted, authorize('admin', 'accountant
   const taxBase = Math.max(0, profit);
 
   // Výpočet daně z příjmů FO (§ 16 ZDP, od 2024):
-  // 15% do 36násobku průměrné mzdy (2026: ~1 935 552 Kč)
-  // 23% nad tento limit (solidární zvýšení nahrazeno progresí od 2024)
-  const bracketLimit = 1935552;
+  // 15% do 48násobku průměrné měsíční mzdy
+  // 23% nad tento limit
+  // 2025: 48 × 34 918 = 1 676 064 Kč, 2026: 48 × 36 726 = 1 762 848 Kč
+  const yearInt = parseInt(year);
+  const bracketLimit = yearInt >= 2026 ? 1762848 : yearInt >= 2025 ? 1676064 : 1935552;
   const discountPoplatnik = 30840; // Sleva na poplatníka (§ 35ba odst. 1 písm. a)
 
   let tax15 = 0, tax23 = 0;
@@ -669,6 +671,7 @@ router.get('/api/tax/income-report', ...tenanted, authorize('admin', 'accountant
     flat_rate_80: flatRate80,
     // Orientační výpočet daně
     tax_base: taxBase,
+    tax_bracket_limit: bracketLimit,
     tax_15: Math.round(tax15),
     tax_23: Math.round(tax23),
     tax_total: taxTotal,

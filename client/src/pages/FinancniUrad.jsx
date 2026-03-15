@@ -318,13 +318,13 @@ function DanovePriznaniTab() {
                   )}
                   {data.tax_15 != null && (
                     <tr>
-                      <td>Daň 15 % (do 1 935 552 Kč)</td>
+                      <td>Daň 15 % (do {data.tax_bracket_limit ? Number(data.tax_bracket_limit).toLocaleString('cs-CZ') : '—'} Kč)</td>
                       <td style={{ textAlign: 'right' }}>{fmt(data.tax_15)} Kč</td>
                     </tr>
                   )}
                   {data.tax_23 != null && data.tax_23 > 0 && (
                     <tr>
-                      <td>Daň 23 % (nad 1 935 552 Kč)</td>
+                      <td>Daň 23 % (nad {data.tax_bracket_limit ? Number(data.tax_bracket_limit).toLocaleString('cs-CZ') : '—'} Kč)</td>
                       <td style={{ textAlign: 'right' }}>{fmt(data.tax_23)} Kč</td>
                     </tr>
                   )}
