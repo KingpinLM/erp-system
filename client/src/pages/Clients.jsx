@@ -144,12 +144,12 @@ export default function Clients() {
   const moveThrottle = useRef(0);
 
   const calcPreviewPos = useCallback((cx, cy) => {
-    const pw = 300, ph = 360, gap = 12;
-    let left = cx + gap;
-    if (left + pw > window.innerWidth - 8) left = cx - pw - gap;
+    const pw = 300, ph = 360, off = 16;
+    let left = cx + off;
+    let top = cy + off;
+    if (left + pw > window.innerWidth - 8) left = cx - pw - off;
     if (left < 8) left = 8;
-    let top = cy - 20;
-    if (top + ph > window.innerHeight - 8) top = window.innerHeight - ph - 8;
+    if (top + ph > window.innerHeight - 8) top = cy - ph - off;
     if (top < 8) top = 8;
     return { top, left };
   }, []);

@@ -117,12 +117,12 @@ export default function Invoices() {
   useEffect(() => { setPage(1); load(); }, [filters]);
 
   const calcPreviewPos = useCallback((cx, cy) => {
-    const pw = 320, ph = 320, gap = 12;
-    let left = cx + gap;
-    if (left + pw > window.innerWidth - 8) left = cx - pw - gap;
+    const pw = 320, ph = 320, off = 16;
+    let left = cx + off;
+    let top = cy + off;
+    if (left + pw > window.innerWidth - 8) left = cx - pw - off;
     if (left < 8) left = 8;
-    let top = cy - 20;
-    if (top + ph > window.innerHeight - 8) top = window.innerHeight - ph - 8;
+    if (top + ph > window.innerHeight - 8) top = cy - ph - off;
     if (top < 8) top = 8;
     return { top, left };
   }, []);
