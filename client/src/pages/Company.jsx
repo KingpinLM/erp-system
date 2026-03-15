@@ -451,7 +451,22 @@ export default function Company() {
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(false);
   const [hoveredLayout, setHoveredLayout] = useState(null);
-  const hoverRef = useRef(null);
+  const layoutPreviewRef = useRef(null);
+  const lastLayoutMouse = useRef({ x: 0, y: 0 });
+
+  const moveLayoutPreview = useCallback((cx, cy) => {
+    const el = layoutPreviewRef.current;
+    if (!el) return;
+    const pw = 380, ph = 500, off = 16;
+    let left = cx + off;
+    let top = cy + off;
+    if (left + pw > window.innerWidth - 8) left = cx - pw - off;
+    if (left < 8) left = 8;
+    if (top + ph > window.innerHeight - 8) top = cy - ph - off;
+    if (top < 8) top = 8;
+    el.style.left = left + 'px';
+    el.style.top = top + 'px';
+  }, []);
   const [bankAccounts, setBankAccounts] = useState([]);
   const [bankForm, setBankForm] = useState(null); // null = hidden, object = editing/creating
   const [bankError, setBankError] = useState('');
@@ -593,7 +608,8 @@ export default function Company() {
               return (
                 <div key={layout.key}
                   onClick={() => setForm(f => ({ ...f, invoice_layout: layout.key }))}
-                  onMouseEnter={(e) => { setHoveredLayout(layout.key); hoverRef.current = e.currentTarget; }}
+                  onMouseEnter={(e) => { lastLayoutMouse.current = { x: e.clientX, y: e.clientY }; setHoveredLayout(layout.key); }}
+                  onMouseMove={(e) => { lastLayoutMouse.current = { x: e.clientX, y: e.clientY }; moveLayoutPreview(e.clientX, e.clientY); }}
                   onMouseLeave={() => setHoveredLayout(null)}
                   style={{
                     border: selected ? `2px solid ${effectiveAccent}` : '2px solid var(--gray-200)',
@@ -632,14 +648,16 @@ export default function Company() {
             if (!layout) return null;
             const hoverAccent = (form.invoice_color && layout.key !== 'minimalisticky' && layout.key !== 'korporatni') ? form.invoice_color : layout.accent;
             return (
-              <div style={{
-                position: 'fixed', right: 40, top: '50%', transform: 'translateY(-50%)',
+              <div ref={(el) => {
+                layoutPreviewRef.current = el;
+                if (el) moveLayoutPreview(lastLayoutMouse.current.x, lastLayoutMouse.current.y);
+              }} style={{
+                position: 'fixed', top: -9999, left: -9999,
                 width: 380, maxHeight: '85vh', overflowY: 'auto',
                 background: 'white', borderRadius: 'var(--radius-lg)',
                 border: `2px solid ${hoverAccent}30`,
                 boxShadow: '0 25px 60px rgba(0,0,0,0.15), 0 8px 20px rgba(0,0,0,0.08)',
                 zIndex: 1000, overflow: 'hidden', pointerEvents: 'none',
-                animation: 'fadeIn 0.15s ease-out',
               }}>
                 <div style={{ padding: '8px 16px', fontSize: '0.7rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: 6 }}>
                   <div style={{ width: 6, height: 6, borderRadius: '50%', background: hoverAccent }} />
