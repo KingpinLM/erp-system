@@ -19,16 +19,15 @@ const fmtDate = (d) => { if (!d) return '—'; const p = d.slice(0,10).split('-'
 
 const typeLabels = { regular: 'Faktura', proforma: 'Proforma', credit_note: 'Dobropis' };
 
-function InvoiceHoverPreview({ invoice, style }) {
+const InvoiceHoverPreview = React.forwardRef(({ invoice }, ref) => {
   if (!invoice) return null;
   const items = invoice.items || [];
   return (
-    <div className="hover-preview-mobile-hide" style={{
+    <div ref={ref} className="hover-preview-mobile-hide" style={{
       position: 'fixed', zIndex: 9999, pointerEvents: 'none',
       width: Math.min(320, window.innerWidth - 32), background: 'white', borderRadius: 12,
       border: '1px solid #e2e8f0', boxShadow: '0 20px 50px rgba(0,0,0,0.15), 0 4px 12px rgba(0,0,0,0.08)',
-      overflow: 'hidden', animation: 'fadeIn 0.12s ease-out',
-      ...style,
+      overflow: 'hidden', top: -9999, left: -9999,
     }}>
       {/* Header */}
       <div style={{ padding: '12px 16px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -82,7 +81,7 @@ function InvoiceHoverPreview({ invoice, style }) {
       </div>
     </div>
   );
-}
+});
 
 export default function Invoices() {
   const [invoices, setInvoices] = useState([]);
@@ -98,10 +97,11 @@ export default function Invoices() {
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(20);
   const [hoveredInv, setHoveredInv] = useState(null);
-  const [hoverPos, setHoverPos] = useState({ top: 0, left: 0 });
   const [hoverDetail, setHoverDetail] = useState(null);
   const hoverTimer = useRef(null);
   const hoverCache = useRef({});
+  const previewRef = useRef(null);
+  const lastMouse = useRef({ x: 0, y: 0 });
   const [tapPreview, setTapPreview] = useState(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const swipe = useSwipeDismiss(() => setTapPreview(null));
@@ -116,7 +116,11 @@ export default function Invoices() {
 
   useEffect(() => { setPage(1); load(); }, [filters]);
 
-  const calcPreviewPos = useCallback((cx, cy) => {
+  const abortRef = useRef(null);
+
+  const movePreview = useCallback((cx, cy) => {
+    const el = previewRef.current;
+    if (!el) return;
     const pw = 320, ph = 320, off = 16;
     let left = cx + off;
     let top = cy + off;
@@ -124,21 +128,17 @@ export default function Invoices() {
     if (left < 8) left = 8;
     if (top + ph > window.innerHeight - 8) top = cy - ph - off;
     if (top < 8) top = 8;
-    return { top, left };
+    el.style.left = left + 'px';
+    el.style.top = top + 'px';
   }, []);
 
-  const abortRef = useRef(null);
-  const moveThrottle = useRef(0);
-
   const handleRowMouseMove = useCallback((e) => {
-    const now = Date.now();
-    if (now - moveThrottle.current < 32) return;
-    moveThrottle.current = now;
-    setHoverPos(calcPreviewPos(e.clientX, e.clientY));
-  }, [calcPreviewPos]);
+    lastMouse.current = { x: e.clientX, y: e.clientY };
+    movePreview(e.clientX, e.clientY);
+  }, [movePreview]);
 
   const handleRowMouseEnter = useCallback((inv, e) => {
-    setHoverPos(calcPreviewPos(e.clientX, e.clientY));
+    lastMouse.current = { x: e.clientX, y: e.clientY };
     setHoveredInv(inv.id);
 
     if (hoverCache.current[inv.id]) {
@@ -351,7 +351,10 @@ export default function Invoices() {
 
       {/* Hover preview (desktop) */}
       {hoveredInv && hoverDetail && hoverDetail.id === hoveredInv && (
-        <InvoiceHoverPreview invoice={hoverDetail} style={{ top: hoverPos.top, left: hoverPos.left }} />
+        <InvoiceHoverPreview invoice={hoverDetail} ref={(el) => {
+          previewRef.current = el;
+          if (el) movePreview(lastMouse.current.x, lastMouse.current.y);
+        }} />
       )}
 
       {/* Tap preview (mobile bottom sheet) */}

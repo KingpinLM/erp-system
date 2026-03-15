@@ -17,18 +17,17 @@ const statusLabels = { draft: 'Koncept', sent: 'Odesláno', paid: 'Zaplaceno', o
 const statusColors = { draft: '#64748b', sent: '#4f46e5', paid: '#059669', overdue: '#dc2626', cancelled: '#d97706' };
 const statusBg = { draft: '#f1f5f9', sent: '#eef2ff', paid: '#ecfdf5', overdue: '#fef2f2', cancelled: '#fffbeb' };
 
-function ClientHoverPreview({ client, invoices, style }) {
+const ClientHoverPreview = React.forwardRef(({ client, invoices }, ref) => {
   if (!client) return null;
   const totalInvoiced = (invoices || []).reduce((s, i) => s + (i.total_czk || 0), 0);
   const totalPaid = (invoices || []).filter(i => i.status === 'paid').reduce((s, i) => s + (i.total_czk || 0), 0);
   const unpaidCount = (invoices || []).filter(i => ['sent', 'overdue'].includes(i.status)).length;
   return (
-    <div className="hover-preview-mobile-hide" style={{
+    <div ref={ref} className="hover-preview-mobile-hide" style={{
       position: 'fixed', zIndex: 9999, pointerEvents: 'none',
       width: Math.min(300, window.innerWidth - 32), background: 'white', borderRadius: 12,
       border: '1px solid #e2e8f0', boxShadow: '0 20px 50px rgba(0,0,0,0.15), 0 4px 12px rgba(0,0,0,0.08)',
-      overflow: 'hidden', animation: 'fadeIn 0.12s ease-out',
-      ...style,
+      overflow: 'hidden', top: -9999, left: -9999,
     }}>
       {/* Header */}
       <div style={{ padding: '12px 16px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
@@ -106,7 +105,7 @@ function ClientHoverPreview({ client, invoices, style }) {
       </div>
     </div>
   );
-}
+});
 
 export default function Clients() {
   const [clients, setClients] = useState([]);
@@ -136,14 +135,16 @@ export default function Clients() {
 
   // Hover preview state
   const [hoveredId, setHoveredId] = useState(null);
-  const [hoverPos, setHoverPos] = useState({ top: 0, left: 0 });
   const [hoverDetail, setHoverDetail] = useState(null);
   const hoverTimer = useRef(null);
   const hoverCache = useRef({});
   const abortRef = useRef(null);
-  const moveThrottle = useRef(0);
+  const clientPreviewRef = useRef(null);
+  const lastMouse = useRef({ x: 0, y: 0 });
 
-  const calcPreviewPos = useCallback((cx, cy) => {
+  const movePreview = useCallback((cx, cy) => {
+    const el = clientPreviewRef.current;
+    if (!el) return;
     const pw = 300, ph = 360, off = 16;
     let left = cx + off;
     let top = cy + off;
@@ -151,11 +152,12 @@ export default function Clients() {
     if (left < 8) left = 8;
     if (top + ph > window.innerHeight - 8) top = cy - ph - off;
     if (top < 8) top = 8;
-    return { top, left };
+    el.style.left = left + 'px';
+    el.style.top = top + 'px';
   }, []);
 
   const handleRowMouseEnter = useCallback((c, e) => {
-    setHoverPos(calcPreviewPos(e.clientX, e.clientY));
+    lastMouse.current = { x: e.clientX, y: e.clientY };
     setHoveredId(c.id);
     if (hoverCache.current[c.id]) {
       setHoverDetail(hoverCache.current[c.id]);
@@ -176,14 +178,12 @@ export default function Clients() {
           }
         }).catch(() => {});
     }, 300);
-  }, [calcPreviewPos]);
+  }, [movePreview]);
 
   const handleRowMouseMove = useCallback((e) => {
-    const now = Date.now();
-    if (now - moveThrottle.current < 32) return;
-    moveThrottle.current = now;
-    setHoverPos(calcPreviewPos(e.clientX, e.clientY));
-  }, [calcPreviewPos]);
+    lastMouse.current = { x: e.clientX, y: e.clientY };
+    movePreview(e.clientX, e.clientY);
+  }, [movePreview]);
 
   const handleRowMouseLeave = useCallback(() => {
     clearTimeout(hoverTimer.current);
@@ -372,7 +372,10 @@ export default function Clients() {
 
       {/* Hover preview */}
       {hoveredId && hoverDetail && hoverDetail.client?.id === hoveredId && (
-        <ClientHoverPreview client={hoverDetail.client} invoices={hoverDetail.invoices} style={{ top: hoverPos.top, left: hoverPos.left }} />
+        <ClientHoverPreview client={hoverDetail.client} invoices={hoverDetail.invoices} ref={(el) => {
+          clientPreviewRef.current = el;
+          if (el) movePreview(lastMouse.current.x, lastMouse.current.y);
+        }} />
       )}
 
       {/* Tap preview (mobile bottom sheet) */}
