@@ -457,15 +457,13 @@ export default function Company() {
   const moveLayoutPreview = useCallback((cx, cy) => {
     const el = layoutPreviewRef.current;
     if (!el) return;
-    const rect = el.getBoundingClientRect();
-    const pw = rect.width || 380, ph = rect.height || 500;
-    const gap = 6;
-    let left = cx + gap;
-    let top = cy - 20;
-    if (left + pw > window.innerWidth - 4) left = cx - pw - gap;
-    if (left < 4) left = 4;
-    if (top + ph > window.innerHeight - 4) top = window.innerHeight - ph - 4;
-    if (top < 4) top = 4;
+    const pw = 380, ph = 500, off = 16;
+    let left = cx + off;
+    let top = cy + off;
+    if (left + pw > window.innerWidth - 8) left = cx - pw - off;
+    if (left < 8) left = 8;
+    if (top + ph > window.innerHeight - 8) top = cy - ph - off;
+    if (top < 8) top = 8;
     el.style.left = left + 'px';
     el.style.top = top + 'px';
   }, []);
@@ -644,31 +642,6 @@ export default function Company() {
               );
             })}
           </div>
-          {/* Large hover preview popup - realistic invoice */}
-          {hoveredLayout && (() => {
-            const layout = invoiceLayouts.find(l => l.key === hoveredLayout);
-            if (!layout) return null;
-            const hoverAccent = (form.invoice_color && layout.key !== 'minimalisticky' && layout.key !== 'korporatni') ? form.invoice_color : layout.accent;
-            return (
-              <div ref={(el) => {
-                layoutPreviewRef.current = el;
-                if (el) moveLayoutPreview(lastLayoutMouse.current.x, lastLayoutMouse.current.y);
-              }} style={{
-                position: 'fixed', top: -9999, left: -9999,
-                width: 380, maxHeight: '85vh', overflowY: 'auto',
-                background: 'white', borderRadius: 'var(--radius-lg)',
-                border: `2px solid ${hoverAccent}30`,
-                boxShadow: '0 25px 60px rgba(0,0,0,0.15), 0 8px 20px rgba(0,0,0,0.08)',
-                zIndex: 1000, overflow: 'hidden', pointerEvents: 'none',
-              }}>
-                <div style={{ padding: '8px 16px', fontSize: '0.7rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <div style={{ width: 6, height: 6, borderRadius: '50%', background: hoverAccent }} />
-                  Náhled: {layout.name}
-                </div>
-                <InvoicePreview layout={layout} companyName={form.name} customColor={form.invoice_color} />
-              </div>
-            );
-          })()}
         </div>
         <div className="card">
           <div className="card-title" style={{ marginBottom: '0.5rem' }}>Barva faktury</div>
@@ -796,6 +769,32 @@ export default function Company() {
         <a href="/api/backup" className="btn btn-outline" download>Stáhnout zálohu databáze</a>
         <small style={{ color: 'var(--gray-500)', fontSize: '0.75rem', display: 'block', marginTop: '0.5rem' }}>Stáhne kompletní zálohu databáze (SQLite soubor)</small>
       </div>
+
+      {/* Layout hover preview popup — rendered outside cards to avoid CSS containment issues */}
+      {hoveredLayout && (() => {
+        const layout = invoiceLayouts.find(l => l.key === hoveredLayout);
+        if (!layout) return null;
+        const hoverAccent = (form.invoice_color && layout.key !== 'minimalisticky' && layout.key !== 'korporatni') ? form.invoice_color : layout.accent;
+        return (
+          <div ref={(el) => {
+            layoutPreviewRef.current = el;
+            if (el) moveLayoutPreview(lastLayoutMouse.current.x, lastLayoutMouse.current.y);
+          }} style={{
+            position: 'fixed', top: -9999, left: -9999,
+            width: 380, maxHeight: '85vh',
+            background: 'white', borderRadius: 'var(--radius-lg)',
+            border: `2px solid ${hoverAccent}30`,
+            boxShadow: '0 25px 60px rgba(0,0,0,0.15), 0 8px 20px rgba(0,0,0,0.08)',
+            zIndex: 1000, overflow: 'hidden', pointerEvents: 'none',
+          }}>
+            <div style={{ padding: '8px 16px', fontSize: '0.7rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{ width: 6, height: 6, borderRadius: '50%', background: hoverAccent }} />
+              Náhled: {layout.name}
+            </div>
+            <InvoicePreview layout={layout} companyName={form.name} customColor={form.invoice_color} />
+          </div>
+        );
+      })()}
 
     </div>
   );
