@@ -155,37 +155,68 @@ function generateInvoicePDF(invoice, company, items) {
     doc.moveTo(margin, y).lineTo(555, y).stroke(layout.divider);
     y += 6;
 
+    // Korporatni: render payment sidebar alongside items
+    const isKorporatni = co.invoice_layout === 'korporatni';
+    const itemsRight = isKorporatni && (co.bank_account || co.iban) ? 410 : 555;
+
     const rowFontSize = isKompaktni ? 8 : 9;
     const rowHeight = isKompaktni ? 14 : 16;
+    const itemsStartY = y;
+
+    // Items table columns adjust for korporatni sidebar
     doc.font('Helvetica').fontSize(rowFontSize).fillColor('#0f172a');
     (items || []).forEach(item => {
       if (y > 720) { doc.addPage(); y = 40; }
-      doc.text(item.description || '', margin + 4, y, { width: 250 });
-      doc.text(String(item.quantity), 300, y, { width: 40, align: 'right' });
-      doc.text(item.unit || 'ks', 345, y, { width: 30, align: 'center' });
-      doc.text(item.unit_price.toFixed(2), 380, y, { width: 60, align: 'right' });
-      doc.text(String(item.tax_rate || 0), 445, y, { width: 35, align: 'right' });
+      const descW = isKorporatni ? 150 : 250;
+      doc.text(item.description || '', margin + 4, y, { width: descW });
+      const qCol = isKorporatni ? 210 : 300;
+      doc.text(String(item.quantity), qCol, y, { width: 40, align: 'right' });
+      doc.text(item.unit || 'ks', qCol + 45, y, { width: 30, align: 'center' });
+      doc.text(item.unit_price.toFixed(2), qCol + 80, y, { width: 60, align: 'right' });
+      if (!isKorporatni) {
+        doc.text(String(item.tax_rate || 0), 445, y, { width: 35, align: 'right' });
+      }
       const lineTotal = item.total_with_tax || item.total || 0;
-      doc.text(lineTotal.toFixed(2), 485, y, { width: 70, align: 'right' });
+      const totalCol = isKorporatni ? 350 : 485;
+      doc.text(lineTotal.toFixed(2), totalCol, y, { width: isKorporatni ? 50 : 70, align: 'right' });
       y += rowHeight;
     });
 
+    // Korporatni sidebar
+    if (isKorporatni && (co.bank_account || co.iban)) {
+      const sx = 420;
+      let sy = itemsStartY - 20;
+      doc.moveTo(sx - 8, sy).lineTo(sx - 8, y + 60).stroke('#334155');
+      doc.fontSize(8).font('Helvetica-Bold').fillColor('#0f172a').text('PLATEBNÍ ÚDAJE', sx, sy);
+      sy += 14;
+      doc.font('Helvetica').fontSize(8).fillColor('#334155');
+      if (co.bank_account) { doc.text(`Účet: ${co.bank_account}${co.bank_code ? '/' + co.bank_code : ''}`, sx, sy); sy += 11; }
+      if (co.iban) { doc.text(`IBAN: ${co.iban}`, sx, sy); sy += 11; }
+      if (co.swift) { doc.text(`SWIFT: ${co.swift}`, sx, sy); sy += 11; }
+      if (invoice.variable_symbol) { doc.text(`VS: ${invoice.variable_symbol}`, sx, sy); sy += 11; }
+      sy += 6;
+      doc.font('Helvetica-Bold').fontSize(9).fillColor('#0f172a').text('K úhradě:', sx, sy);
+      sy += 12;
+      doc.fontSize(12).text(`${invoice.total.toFixed(2)} ${invoice.currency}`, sx, sy);
+    }
+
     // Totals
     y += 5;
-    doc.moveTo(350, y).lineTo(555, y).stroke(layout.divider);
+    const totalsLeft = isKorporatni ? 220 : 350;
+    doc.moveTo(totalsLeft, y).lineTo(itemsRight, y).stroke(layout.divider);
     y += 8;
     doc.fontSize(9);
-    doc.font('Helvetica').fillColor('#64748b').text('Základ:', 350, y);
-    doc.font('Helvetica-Bold').fillColor('#0f172a').text(`${invoice.subtotal.toFixed(2)} ${invoice.currency}`, 485, y, { width: 70, align: 'right' });
+    doc.font('Helvetica').fillColor('#64748b').text('Základ:', totalsLeft, y);
+    doc.font('Helvetica-Bold').fillColor('#0f172a').text(`${invoice.subtotal.toFixed(2)} ${invoice.currency}`, itemsRight - 70, y, { width: 70, align: 'right' });
     y += 14;
-    doc.font('Helvetica').fillColor('#64748b').text('DPH:', 350, y);
-    doc.font('Helvetica-Bold').fillColor('#0f172a').text(`${invoice.tax_amount.toFixed(2)} ${invoice.currency}`, 485, y, { width: 70, align: 'right' });
+    doc.font('Helvetica').fillColor('#64748b').text('DPH:', totalsLeft, y);
+    doc.font('Helvetica-Bold').fillColor('#0f172a').text(`${invoice.tax_amount.toFixed(2)} ${invoice.currency}`, itemsRight - 70, y, { width: 70, align: 'right' });
     y += 14;
-    doc.moveTo(350, y).lineTo(555, y).stroke(layout.totalColor);
+    doc.moveTo(totalsLeft, y).lineTo(itemsRight, y).stroke(layout.totalColor);
     y += 8;
     doc.fontSize(12).font('Helvetica-Bold').fillColor(layout.totalColor);
-    doc.text('Celkem k úhradě:', 350, y);
-    doc.text(`${invoice.total.toFixed(2)} ${invoice.currency}`, 445, y, { width: 110, align: 'right' });
+    doc.text('Celkem k úhradě:', totalsLeft, y);
+    doc.text(`${invoice.total.toFixed(2)} ${invoice.currency}`, itemsRight - 110, y, { width: 110, align: 'right' });
 
     if (invoice.currency !== 'CZK' && invoice.total_czk) {
       y += 18;

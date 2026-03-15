@@ -141,11 +141,25 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Robo
 .inv-layout-elegantni .inv-items thead th { color: #7c3aed; border-bottom-color: #e9d5ff; border-top-color: #e9d5ff; }
 .inv-layout-elegantni .inv-items tbody td { border-bottom-color: #f3e8ff; }
 .inv-layout-elegantni .inv-items tbody tr:last-child td { border-bottom-color: #e9d5ff; }
-.inv-layout-elegantni .inv-sum { justify-content: center; }
-.inv-layout-elegantni .inv-sum-total { border-top-color: #7c3aed; color: #1e1b4b; }
+.inv-layout-elegantni .inv-eleg-total-box { display: flex; justify-content: center; padding: 20px 0 28px; }
+.inv-layout-elegantni .inv-eleg-total-inner { width: 320px; background: linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%); border: 1.5px solid #e9d5ff; border-radius: 16px; padding: 18px 24px; }
+.inv-layout-elegantni .inv-eleg-total-inner .inv-sum-row { font-size: 12px; color: #7c3aed; opacity: 0.8; }
+.inv-layout-elegantni .inv-eleg-total-inner .inv-sum-row span:last-child { font-weight: 600; }
+.inv-layout-elegantni .inv-eleg-total-main { display: flex; justify-content: space-between; padding: 12px 0 4px; font-size: 20px; font-weight: 800; color: #1e1b4b; border-top: 2px solid #7c3aed; margin-top: 8px; }
 .inv-layout-elegantni .inv-note { background: #faf5ff; border-color: #e9d5ff; border-radius: 16px; }
 .inv-layout-elegantni .inv-bottom { border-top-color: #e9d5ff; justify-content: center; text-align: center; display: block; }
 .inv-layout-elegantni .inv-bottom .inv-foot { text-align: center; margin-top: 12px; }
+
+/* Korporatni - sidebar layout */
+.inv-layout-korporatni .inv-corp-body { display: grid; grid-template-columns: 1fr 200px; gap: 0; margin-bottom: 24px; border: 1px solid #334155; border-radius: 4px; overflow: hidden; }
+.inv-layout-korporatni .inv-corp-main { min-width: 0; }
+.inv-layout-korporatni .inv-corp-main .inv-items { margin-bottom: 0; }
+.inv-layout-korporatni .inv-corp-main .inv-sum { padding: 12px 14px 16px; }
+.inv-layout-korporatni .inv-corp-sidebar { background: #f8fafc; border-left: 1px solid #334155; padding: 16px; }
+.inv-layout-korporatni .inv-corp-sidebar .inv-pay-title { color: #0f172a; font-size: 9px; margin-bottom: 10px; }
+.inv-layout-korporatni .inv-corp-sidebar .inv-pay-table td { font-size: 10.5px; padding: 2px 0; }
+.inv-layout-korporatni .inv-corp-sidebar .inv-pay-table td:first-child { width: 80px; font-size: 9.5px; }
+.inv-layout-korporatni .inv-corp-sidebar .inv-pay-table .inv-pay-total td:last-child { font-size: 14px; color: #0f172a; }
 
 /* Kompaktni */
 .inv-layout-kompaktni { padding: 32px 36px 24px; font-size: 12px; }
@@ -363,6 +377,10 @@ export default function InvoiceDetail() {
   const footerInfo = <div className="inv-foot">{co.name}{co.ico && ` · IČ ${co.ico}`}{co.dic && ` · DIČ ${co.dic}`}</div>;
 
   // Layout-specific body renderers
+
+  // KLASICKY: Traditional Czech invoice (Fakturoid/iDoklad style)
+  // Two-column header: title+number left, company right
+  // Two-column parties, date grid, payment box, items table, totals right-aligned
   const renderKlasicky = () => (
     <>
       <div className="inv-accent"></div>
@@ -395,9 +413,11 @@ export default function InvoiceDetail() {
     </>
   );
 
+  // MINIMALISTICKY: Stripe/Notion inspired
+  // Centered large number, horizontal rules only, no boxes/borders
+  // Clean sans-serif, generous whitespace, totals centered
   const renderMinimalisticky = () => (
     <>
-      {/* Centered header - no accent bars, large light number */}
       <div className="inv-head">
         <h1>{invTitle}</h1>
         <div className="inv-num">{invoice.invoice_number}</div>
@@ -405,17 +425,13 @@ export default function InvoiceDetail() {
         <div className="inv-company-sub">{co.name}{co.ico && ` · IČ ${co.ico}`}{co.dic && ` · DIČ ${co.dic}`}</div>
       </div>
       <hr className="inv-hr" />
-      {/* Parties without borders */}
       <div className="inv-parties">
         <div className="inv-party"><div className="inv-party-tag">Dodavatel</div><div className="inv-party-name">{co.name || '—'}</div>{supplierDetail}</div>
         <div className="inv-party"><div className="inv-party-tag">Odběratel</div><div className="inv-party-name">{invoice.client_name || '—'}</div>{clientDetail}</div>
       </div>
       <hr className="inv-hr" />
-      {/* Dates strip - transparent */}
       <div className="inv-dates">{datesContent}</div>
-      {/* Payment - subtle border */}
       {hasBankDetails && <div className="inv-pay"><div className="inv-pay-details"><div className="inv-pay-title">Platební údaje</div><table className="inv-pay-table">{paymentRows}</table></div>{qrData?.qr && <div className="inv-pay-qr"><img src={qrData.qr} alt="QR Platba" /><span>QR Platba</span></div>}</div>}
-      {/* Items - minimal header */}
       <table className="inv-items"><thead>{itemsHeader}</thead><tbody>{itemsRows}</tbody></table>
       <div className="inv-sum">{totalsContent}</div>
       {noteContent}
@@ -424,9 +440,10 @@ export default function InvoiceDetail() {
     </>
   );
 
+  // KORPORATNI: SAP/Oracle corporate style
+  // Dark full-width banner, payment sidebar next to items, dense professional layout
   const renderKorporatni = () => (
     <>
-      {/* Full-bleed dark header */}
       <div className="inv-dark-header">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div className="inv-head-left">
@@ -444,27 +461,36 @@ export default function InvoiceDetail() {
           </div>
         </div>
       </div>
-      {/* Payment first - prominent position */}
-      {hasBankDetails && <div className="inv-pay"><div className="inv-pay-details"><div className="inv-pay-title">Platební údaje</div><table className="inv-pay-table">{paymentRows}</table></div>{qrData?.qr && <div className="inv-pay-qr"><img src={qrData.qr} alt="QR Platba" /><span>QR Platba</span></div>}</div>}
-      {/* Parties */}
       <div className="inv-parties">
         <div className="inv-party"><div className="inv-party-tag">Dodavatel</div><div className="inv-party-name">{co.name || '—'}</div>{supplierDetail}</div>
         <div className="inv-party"><div className="inv-party-tag">Odběratel</div><div className="inv-party-name">{invoice.client_name || '—'}</div>{clientDetail}</div>
       </div>
-      {/* Dates */}
       <div className="inv-dates">{datesContent}</div>
-      {/* Items with dark header */}
-      <table className="inv-items"><thead>{itemsHeader}</thead><tbody>{itemsRows}</tbody></table>
-      <div className="inv-sum">{totalsContent}</div>
+      {/* Side-by-side: Items + Payment sidebar */}
+      <div className="inv-corp-body">
+        <div className="inv-corp-main">
+          <table className="inv-items"><thead>{itemsHeader}</thead><tbody>{itemsRows}</tbody></table>
+          <div className="inv-sum">{totalsContent}</div>
+        </div>
+        {hasBankDetails && (
+          <div className="inv-corp-sidebar">
+            <div className="inv-pay-title">Platební údaje</div>
+            <table className="inv-pay-table">{paymentRows}</table>
+            {qrData?.qr && <div style={{ marginTop: 12, textAlign: 'center' }}><img src={qrData.qr} alt="QR" style={{ width: 80, height: 80 }} /><div style={{ fontSize: 8, color: '#94a3b8', marginTop: 2, textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 600 }}>QR Platba</div></div>}
+          </div>
+        )}
+      </div>
       {noteContent}
       <div className="inv-bottom">{issuerContent}<div />{footerInfo}</div>
     </>
   );
 
+  // ELEGANTNI: FreshBooks/Wave style
+  // Accent gradient top, centered logo, card-based sections with subtle backgrounds
+  // Totals in a colored highlight box, rounded everything
   const renderElegantni = () => (
     <>
       <div className="inv-accent"></div>
-      {/* Centered header with logo */}
       <div className="inv-head">
         {co.logo && <img src={co.logo} alt="Logo" style={{ maxWidth: 120, maxHeight: 40, objectFit: 'contain', margin: '0 auto 12px', display: 'block' }} />}
         <h1>{invTitle}</h1>
@@ -472,19 +498,30 @@ export default function InvoiceDetail() {
         {statusBadge}
         <div className="inv-company-sub">{co.name}</div>
       </div>
-      {/* Parties with purple background */}
       <div className="inv-parties">
         <div className="inv-party"><div className="inv-party-tag">Dodavatel</div><div className="inv-party-name">{co.name || '—'}</div>{supplierDetail}</div>
         <div className="inv-party"><div className="inv-party-tag">Odběratel</div><div className="inv-party-name">{invoice.client_name || '—'}</div>{clientDetail}</div>
       </div>
-      {/* Payment */}
-      {hasBankDetails && <div className="inv-pay"><div className="inv-pay-details"><div className="inv-pay-title">Platební údaje</div><table className="inv-pay-table">{paymentRows}</table></div>{qrData?.qr && <div className="inv-pay-qr"><img src={qrData.qr} alt="QR Platba" /><span>QR Platba</span></div>}</div>}
-      {/* Dates with purple */}
+      {/* Dates as pill chips */}
       <div className="inv-dates">{datesContent}</div>
       {/* Items */}
       <table className="inv-items"><thead>{itemsHeader}</thead><tbody>{itemsRows}</tbody></table>
-      {/* Centered totals */}
-      <div className="inv-sum">{totalsContent}</div>
+      {/* Totals in highlight box */}
+      <div className="inv-eleg-total-box">
+        <div className="inv-eleg-total-inner">
+          {isVatPayer && <div className="inv-sum-row"><span>Základ</span><span>{fmt(invoice.subtotal, invoice.currency)}</span></div>}
+          {isVatPayer && Object.entries(taxByRate).map(([rate, vals]) => (
+            <div className="inv-sum-row" key={rate}><span>DPH {rate}%</span><span>{fmt(vals.tax, invoice.currency)}</span></div>
+          ))}
+          <div className="inv-eleg-total-main">
+            <span>Celkem k úhradě</span>
+            <span>{fmt(invoice.total, invoice.currency)}</span>
+          </div>
+          {invoice.currency !== 'CZK' && <div className="inv-sum-czk" style={{ justifyContent: 'flex-end' }}><span>{fmt(invoice.total_czk, 'CZK')}</span></div>}
+        </div>
+      </div>
+      {/* Payment */}
+      {hasBankDetails && <div className="inv-pay"><div className="inv-pay-details"><div className="inv-pay-title">Platební údaje</div><table className="inv-pay-table">{paymentRows}</table></div>{qrData?.qr && <div className="inv-pay-qr"><img src={qrData.qr} alt="QR Platba" /><span>QR Platba</span></div>}</div>}
       {noteContent}
       <div className="inv-bottom">
         <div style={{ textAlign: 'center', width: '100%' }}>
@@ -496,10 +533,11 @@ export default function InvoiceDetail() {
     </>
   );
 
+  // KOMPAKTNI: German DIN-inspired ultra-dense
+  // 3-column top (supplier, client, payment), inline dates, compact items, everything visible at once
   const renderKompaktni = () => (
     <>
       <div className="inv-accent"></div>
-      {/* Compact header */}
       <div className="inv-head">
         <div className="inv-head-left">
           <h1>{invTitle}</h1>
@@ -512,7 +550,6 @@ export default function InvoiceDetail() {
           <div className="inv-company-info">{co.ico && <>IČ: {co.ico}</>}{co.dic && <> · DIČ: {co.dic}</>}</div>
         </div>
       </div>
-      {/* 3-column: Supplier | Client | Payment */}
       <div className="inv-compact-top">
         <div className="inv-party"><div className="inv-party-tag">Dodavatel</div><div className="inv-party-name">{co.name || '—'}</div>{supplierDetail}</div>
         <div className="inv-party"><div className="inv-party-tag">Odběratel</div><div className="inv-party-name">{invoice.client_name || '—'}</div>{clientDetail}</div>
@@ -520,9 +557,7 @@ export default function InvoiceDetail() {
           <div className="inv-pay-details"><div className="inv-pay-title">Platební údaje</div><table className="inv-pay-table">{paymentRows}</table></div>
         ) : <div />}
       </div>
-      {/* Inline dates */}
       <div className="inv-dates-inline">{datesContent}</div>
-      {/* Compact items */}
       <table className="inv-items"><thead>{itemsHeader}</thead><tbody>{itemsRows}</tbody></table>
       <div className="inv-sum">{totalsContent}</div>
       {noteContent}
@@ -664,11 +699,17 @@ export default function InvoiceDetail() {
 .inv-layout-korporatni .inv-dark-header .inv-badge-sent { background: rgba(99,102,241,0.3); color: #c7d2fe; }
 .inv-layout-korporatni .inv-dark-header .inv-badge-paid { background: rgba(16,185,129,0.3); color: #a7f3d0; }
 .inv-layout-korporatni .inv-dark-header .inv-badge-overdue { background: rgba(239,68,68,0.3); color: #fecaca; }
-.inv-layout-korporatni .inv-pay { border-color: #0f172a; border-width: 2px; }
-.inv-layout-korporatni .inv-pay-title { color: #0f172a; }
-.inv-layout-korporatni .inv-pay-table .inv-pay-total td:last-child { color: #0f172a; }
 .inv-layout-korporatni .inv-parties { border-color: #334155; border-radius: 4px; }
 .inv-layout-korporatni .inv-party:first-child { border-right-color: #334155; }
+.inv-layout-korporatni .inv-corp-body { display: grid; grid-template-columns: 1fr 200px; gap: 0; margin-bottom: 24px; border: 1px solid #334155; border-radius: 4px; overflow: hidden; }
+.inv-layout-korporatni .inv-corp-main { min-width: 0; }
+.inv-layout-korporatni .inv-corp-main .inv-items { margin-bottom: 0; }
+.inv-layout-korporatni .inv-corp-main .inv-sum { padding: 12px 14px 16px; }
+.inv-layout-korporatni .inv-corp-sidebar { background: #f8fafc; border-left: 1px solid #334155; padding: 16px; }
+.inv-layout-korporatni .inv-corp-sidebar .inv-pay-title { color: #0f172a; font-size: 9px; margin-bottom: 10px; }
+.inv-layout-korporatni .inv-corp-sidebar .inv-pay-table td { font-size: 10.5px; padding: 2px 0; }
+.inv-layout-korporatni .inv-corp-sidebar .inv-pay-table td:first-child { width: 80px; font-size: 9.5px; }
+.inv-layout-korporatni .inv-corp-sidebar .inv-pay-table .inv-pay-total td:last-child { font-size: 14px; color: #0f172a; }
 .inv-layout-korporatni .inv-items thead { background: #0f172a; }
 .inv-layout-korporatni .inv-items thead th { color: #e2e8f0; border-bottom-color: #0f172a; border-top-color: #0f172a; }
 .inv-layout-korporatni .inv-sum-total { border-top-color: #0f172a; }
@@ -695,8 +736,11 @@ export default function InvoiceDetail() {
 .inv-layout-elegantni .inv-items thead th { color: #7c3aed; border-bottom-color: #e9d5ff; border-top-color: #e9d5ff; }
 .inv-layout-elegantni .inv-items tbody td { border-bottom-color: #f3e8ff; }
 .inv-layout-elegantni .inv-items tbody tr:last-child td { border-bottom-color: #e9d5ff; }
-.inv-layout-elegantni .inv-sum { justify-content: center; }
-.inv-layout-elegantni .inv-sum-total { border-top-color: #7c3aed; color: #1e1b4b; }
+.inv-layout-elegantni .inv-eleg-total-box { display: flex; justify-content: center; padding: 20px 0 28px; }
+.inv-layout-elegantni .inv-eleg-total-inner { width: 320px; background: linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%); border: 1.5px solid #e9d5ff; border-radius: 16px; padding: 18px 24px; }
+.inv-layout-elegantni .inv-eleg-total-inner .inv-sum-row { font-size: 12px; color: #7c3aed; opacity: 0.8; }
+.inv-layout-elegantni .inv-eleg-total-inner .inv-sum-row span:last-child { font-weight: 600; }
+.inv-layout-elegantni .inv-eleg-total-main { display: flex; justify-content: space-between; padding: 12px 0 4px; font-size: 20px; font-weight: 800; color: #1e1b4b; border-top: 2px solid #7c3aed; margin-top: 8px; letter-spacing: -0.02em; }
 .inv-layout-elegantni .inv-note { background: #faf5ff; border-color: #e9d5ff; border-radius: 16px; }
 .inv-layout-elegantni .inv-bottom { border-top-color: #e9d5ff; justify-content: center; text-align: center; display: block; }
 .inv-layout-elegantni .inv-bottom .inv-foot { text-align: center; margin-top: 12px; }
