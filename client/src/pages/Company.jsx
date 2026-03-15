@@ -457,12 +457,12 @@ export default function Company() {
   const moveLayoutPreview = useCallback((cx, cy) => {
     const el = layoutPreviewRef.current;
     if (!el) return;
-    const pw = 380, ph = 500, off = 16;
+    const pw = 380, ph = el.offsetHeight || 500, off = 8;
     let left = cx + off;
-    let top = cy + off;
+    let top = cy - ph / 2;
     if (left + pw > window.innerWidth - 8) left = cx - pw - off;
     if (left < 8) left = 8;
-    if (top + ph > window.innerHeight - 8) top = cy - ph - off;
+    if (top + ph > window.innerHeight - 8) top = window.innerHeight - ph - 8;
     if (top < 8) top = 8;
     el.style.left = left + 'px';
     el.style.top = top + 'px';
