@@ -1116,18 +1116,18 @@ app.get('/api/company', ...tenanted, (req, res) => {
 });
 
 app.put('/api/company', ...tenanted, authorize('admin'), (req, res) => {
-  const { name, ico, dic, email, phone, address, city, zip, country, bank_account, bank_code, iban, swift, invoice_prefix, invoice_counter, default_due_days, vat_payer, invoice_format, invoice_separator, invoice_padding, invoice_year_format, logo } = req.body;
+  const { name, ico, dic, email, phone, address, city, zip, country, bank_account, bank_code, iban, swift, invoice_prefix, invoice_counter, default_due_days, vat_payer, invoice_format, invoice_separator, invoice_padding, invoice_year_format, invoice_layout, invoice_color, logo } = req.body;
   // Handle logo separately if provided
   if (logo !== undefined) {
     db.prepare('UPDATE company SET logo = ? WHERE tenant_id = ?').run(logo, req.tenant_id);
   }
   const existing = db.prepare('SELECT id FROM company WHERE tenant_id = ?').get(req.tenant_id);
   if (existing) {
-    db.prepare('UPDATE company SET name=?,ico=?,dic=?,email=?,phone=?,address=?,city=?,zip=?,country=?,bank_account=?,bank_code=?,iban=?,swift=?,invoice_prefix=?,invoice_counter=?,default_due_days=?,vat_payer=?,invoice_format=?,invoice_separator=?,invoice_padding=?,invoice_year_format=? WHERE tenant_id=?')
-      .run(name,ico||null,dic||null,email||null,phone||null,address||null,city||null,zip||null,country||'CZ',bank_account||null,bank_code||null,iban||null,swift||null,invoice_prefix||'FV',invoice_counter||1,default_due_days||14,vat_payer?1:0,invoice_format||'{prefix}{sep}{year}{sep}{num}',invoice_separator||'-',invoice_padding||3,invoice_year_format||'full',req.tenant_id);
+    db.prepare('UPDATE company SET name=?,ico=?,dic=?,email=?,phone=?,address=?,city=?,zip=?,country=?,bank_account=?,bank_code=?,iban=?,swift=?,invoice_prefix=?,invoice_counter=?,default_due_days=?,vat_payer=?,invoice_format=?,invoice_separator=?,invoice_padding=?,invoice_year_format=?,invoice_layout=?,invoice_color=? WHERE tenant_id=?')
+      .run(name,ico||null,dic||null,email||null,phone||null,address||null,city||null,zip||null,country||'CZ',bank_account||null,bank_code||null,iban||null,swift||null,invoice_prefix||'FV',invoice_counter||1,default_due_days||14,vat_payer?1:0,invoice_format||'{prefix}{sep}{year}{sep}{num}',invoice_separator||'-',invoice_padding||3,invoice_year_format||'full',invoice_layout||'klasicky',invoice_color||null,req.tenant_id);
   } else {
-    db.prepare('INSERT INTO company (tenant_id,name,ico,dic,email,phone,address,city,zip,country,bank_account,bank_code,iban,swift,invoice_prefix,invoice_counter,default_due_days,vat_payer,invoice_format,invoice_separator,invoice_padding,invoice_year_format) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
-      .run(req.tenant_id,name,ico||null,dic||null,email||null,phone||null,address||null,city||null,zip||null,country||'CZ',bank_account||null,bank_code||null,iban||null,swift||null,invoice_prefix||'FV',invoice_counter||1,default_due_days||14,vat_payer?1:0,invoice_format||'{prefix}{sep}{year}{sep}{num}',invoice_separator||'-',invoice_padding||3,invoice_year_format||'full');
+    db.prepare('INSERT INTO company (tenant_id,name,ico,dic,email,phone,address,city,zip,country,bank_account,bank_code,iban,swift,invoice_prefix,invoice_counter,default_due_days,vat_payer,invoice_format,invoice_separator,invoice_padding,invoice_year_format,invoice_layout,invoice_color) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+      .run(req.tenant_id,name,ico||null,dic||null,email||null,phone||null,address||null,city||null,zip||null,country||'CZ',bank_account||null,bank_code||null,iban||null,swift||null,invoice_prefix||'FV',invoice_counter||1,default_due_days||14,vat_payer?1:0,invoice_format||'{prefix}{sep}{year}{sep}{num}',invoice_separator||'-',invoice_padding||3,invoice_year_format||'full',invoice_layout||'klasicky',invoice_color||null);
   }
   res.json({ ok: true });
 });

@@ -40,8 +40,37 @@ const invoiceLayouts = [
   },
 ];
 
+const colorPalettes = [
+  { color: '#6366f1', name: 'Indigo' },
+  { color: '#2563eb', name: 'Modrá' },
+  { color: '#0d9488', name: 'Tyrkysová' },
+  { color: '#059669', name: 'Smaragdová' },
+  { color: '#8b5cf6', name: 'Fialová' },
+  { color: '#ec4899', name: 'Růžová' },
+  { color: '#dc2626', name: 'Červená' },
+  { color: '#ea580c', name: 'Oranžová' },
+  { color: '#d97706', name: 'Jantarová' },
+  { color: '#475569', name: 'Břidlicová' },
+];
+
+const layoutDefaults = {
+  klasicky: '#6366f1',
+  minimalisticky: null,
+  korporatni: '#0f172a',
+  elegantni: '#8b5cf6',
+  kompaktni: '#059669',
+};
+
+function lightenHex(hex, amt) {
+  const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+  const nr = Math.min(255, r + Math.round((255-r)*amt));
+  const ng = Math.min(255, g + Math.round((255-g)*amt));
+  const nb = Math.min(255, b + Math.round((255-b)*amt));
+  return `#${nr.toString(16).padStart(2,'0')}${ng.toString(16).padStart(2,'0')}${nb.toString(16).padStart(2,'0')}`;
+}
+
 // Realistic invoice preview renderer - each layout has distinct structure
-function InvoicePreview({ layout, companyName }) {
+function InvoicePreview({ layout, companyName, customColor }) {
   const name = companyName || 'Firma s.r.o.';
   const items = [
     { desc: 'Webový design — kompletní redesign', qty: 1, price: 25000 },
@@ -58,11 +87,20 @@ function InvoicePreview({ layout, companyName }) {
   const isEleg = layout.key === 'elegantni';
   const isComp = layout.key === 'kompaktni';
 
+  // Use custom color if provided, otherwise layout default
+  const accent = (customColor && !isMin && !isKorp) ? customColor : layout.accent;
+  const accentGrad = (customColor && !isMin && !isKorp)
+    ? `linear-gradient(90deg, ${customColor}, ${lightenHex(customColor, 0.25)})`
+    : layout.accentGrad;
+  const accentBorder = customColor && !isMin && !isKorp
+    ? lightenHex(customColor, 0.6)
+    : (isEleg ? '#e9d5ff' : '#e2e8f0');
+
   const fs = isComp ? 0.85 : 1;
   const pad = isComp ? 14 : 20;
   const text = '#1e293b';
   const muted = '#94a3b8';
-  const border = isEleg ? '#e9d5ff' : '#e2e8f0';
+  const border = accentBorder;
 
   // Shared: items table rows
   const itemsTable = (headerBg, headerColor, rowBorder) => (
@@ -123,10 +161,10 @@ function InvoicePreview({ layout, companyName }) {
   if (!isKorp && !isMin && !isEleg && !isComp) {
     return (
       <div style={{ padding: pad, background: 'white', fontSize: 10, color: text, fontFamily: "'Inter', sans-serif", lineHeight: 1.5 }}>
-        <div style={{ height: 3, background: layout.accentGrad, borderRadius: 2, marginBottom: 14 }} />
+        <div style={{ height: 3, background: accentGrad || accent, borderRadius: 2, marginBottom: 14 }} />
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
           <div>
-            <div style={{ fontSize: 7, fontWeight: 800, color: layout.accent, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Faktura</div>
+            <div style={{ fontSize: 7, fontWeight: 800, color: accent, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Faktura</div>
             <div style={{ fontSize: 17, fontWeight: 800, color: text, letterSpacing: '-0.02em' }}>FV-2026-001</div>
           </div>
           <div style={{ textAlign: 'right' }}>
@@ -145,7 +183,7 @@ function InvoicePreview({ layout, companyName }) {
         </div>
         {itemsTable('#f8fafc', muted, '#f1f5f9')}
         {totalsBlock(text, text)}
-        <div style={{ height: 2, background: layout.accentGrad, borderRadius: 1, marginTop: 12, opacity: 0.4 }} />
+        <div style={{ height: 2, background: accentGrad || accent, borderRadius: 1, marginTop: 12, opacity: 0.4 }} />
       </div>
     );
   }
@@ -210,19 +248,19 @@ function InvoicePreview({ layout, companyName }) {
   if (isEleg) {
     return (
       <div style={{ padding: pad, background: 'white', fontSize: 10, color: text, fontFamily: "'Inter', sans-serif", lineHeight: 1.5 }}>
-        <div style={{ height: 1.5, background: layout.accentGrad, borderRadius: 2, marginBottom: 14 }} />
+        <div style={{ height: 1.5, background: accentGrad || accent, borderRadius: 2, marginBottom: 14 }} />
         <div style={{ textAlign: 'center', marginBottom: 14 }}>
-          <div style={{ fontSize: 7, fontWeight: 600, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.15em' }}>Faktura</div>
+          <div style={{ fontSize: 7, fontWeight: 600, color: accent, textTransform: 'uppercase', letterSpacing: '0.15em' }}>Faktura</div>
           <div style={{ fontSize: 20, fontWeight: 300, color: '#1e1b4b', letterSpacing: '-0.01em' }}>FV-2026-001</div>
-          <div style={{ fontSize: 7, color: '#a78bfa', marginTop: 2 }}>{name}</div>
+          <div style={{ fontSize: 7, color: lightenHex(accent, 0.3), marginTop: 2 }}>{name}</div>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0, marginBottom: 12, border: `1px solid #e9d5ff`, borderRadius: 8, overflow: 'hidden' }}>
-          {partyBlock('Dodavatel', name, 'Ulice 123, Praha', 'IČ: 12345678', '#7c3aed', { padding: '8px 10px', borderRight: '1px solid #e9d5ff', background: '#faf5ff' })}
-          {partyBlock('Odběratel', 'Klient a.s.', 'Firemní 456, Brno', 'IČ: 87654321', '#7c3aed', { padding: '8px 10px', background: '#faf5ff' })}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0, marginBottom: 12, border: `1px solid ${accentBorder}`, borderRadius: 8, overflow: 'hidden' }}>
+          {partyBlock('Dodavatel', name, 'Ulice 123, Praha', 'IČ: 12345678', accent, { padding: '8px 10px', borderRight: `1px solid ${accentBorder}`, background: lightenHex(accent, 0.92) })}
+          {partyBlock('Odběratel', 'Klient a.s.', 'Firemní 456, Brno', 'IČ: 87654321', accent, { padding: '8px 10px', background: lightenHex(accent, 0.92) })}
         </div>
-        {itemsTable('#faf5ff', '#7c3aed', '#f3e8ff')}
-        {totalsBlock('#1e1b4b', '#7c3aed', 'center')}
-        <div style={{ height: 1, background: layout.accentGrad, borderRadius: 1, marginTop: 12, opacity: 0.4 }} />
+        {itemsTable(lightenHex(accent, 0.92), accent, lightenHex(accent, 0.85))}
+        {totalsBlock('#1e1b4b', accent, 'center')}
+        <div style={{ height: 1, background: accentGrad || accent, borderRadius: 1, marginTop: 12, opacity: 0.4 }} />
       </div>
     );
   }
@@ -231,10 +269,10 @@ function InvoicePreview({ layout, companyName }) {
   if (isComp) {
     return (
       <div style={{ padding: 14, background: 'white', fontSize: 8.5, color: text, fontFamily: "'Inter', sans-serif", lineHeight: 1.5 }}>
-        <div style={{ height: 2, background: '#059669', marginBottom: 8 }} />
+        <div style={{ height: 2, background: accent, marginBottom: 8 }} />
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
           <div>
-            <div style={{ fontSize: 6, fontWeight: 800, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Faktura</div>
+            <div style={{ fontSize: 6, fontWeight: 800, color: accent, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Faktura</div>
             <div style={{ fontSize: 14, fontWeight: 800, color: text }}>FV-2026-001</div>
           </div>
           <div style={{ textAlign: 'right' }}>
@@ -247,20 +285,20 @@ function InvoicePreview({ layout, companyName }) {
           {partyBlock('Dodavatel', name, 'Ulice 123, Praha', 'IČ: 12345678', muted, { })}
           {partyBlock('Odběratel', 'Klient a.s.', 'Firemní 456, Brno', 'IČ: 87654321', muted, { })}
           <div>
-            <div style={{ fontSize: 6, fontWeight: 700, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>Platba</div>
+            <div style={{ fontSize: 6, fontWeight: 700, color: accent, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>Platba</div>
             <div style={{ fontSize: 6, color: muted }}>123456789/0800</div>
-            <div style={{ fontSize: 8, fontWeight: 800, color: '#059669', marginTop: 2 }}>{fmtN(total)} Kč</div>
+            <div style={{ fontSize: 8, fontWeight: 800, color: accent, marginTop: 2 }}>{fmtN(total)} Kč</div>
           </div>
         </div>
         {/* Inline dates */}
-        <div style={{ display: 'flex', gap: 8, marginBottom: 8, padding: '4px 6px', background: '#f0fdf4', borderRadius: 4, border: '1px solid #d1fae5' }}>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 8, padding: '4px 6px', background: lightenHex(accent, 0.92), borderRadius: 4, border: `1px solid ${lightenHex(accent, 0.75)}` }}>
           {[{ l: 'Vystaveno', v: '01.03.2026' }, { l: 'Splatnost', v: '15.03.2026' }, { l: 'Způsob', v: 'Převodem' }].map((m, i) => (
-            <div key={i} style={{ flex: 1 }}><div style={{ fontSize: 5, fontWeight: 700, color: '#059669', textTransform: 'uppercase' }}>{m.l}</div><div style={{ fontSize: 6, fontWeight: 600, color: text }}>{m.v}</div></div>
+            <div key={i} style={{ flex: 1 }}><div style={{ fontSize: 5, fontWeight: 700, color: accent, textTransform: 'uppercase' }}>{m.l}</div><div style={{ fontSize: 6, fontWeight: 600, color: text }}>{m.v}</div></div>
           ))}
         </div>
         {itemsTable('#f8fafc', muted, '#f1f5f9')}
         {totalsBlock(text, text)}
-        <div style={{ height: 1.5, background: '#059669', marginTop: 8, opacity: 0.4 }} />
+        <div style={{ height: 1.5, background: accent, marginTop: 8, opacity: 0.4 }} />
       </div>
     );
   }
@@ -551,32 +589,33 @@ export default function Company() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.75rem' }}>
             {invoiceLayouts.map(layout => {
               const selected = (form.invoice_layout || 'klasicky') === layout.key;
+              const effectiveAccent = (form.invoice_color && layout.key !== 'minimalisticky' && layout.key !== 'korporatni') ? form.invoice_color : layout.accent;
               return (
                 <div key={layout.key}
                   onClick={() => setForm(f => ({ ...f, invoice_layout: layout.key }))}
                   onMouseEnter={(e) => { setHoveredLayout(layout.key); hoverRef.current = e.currentTarget; }}
                   onMouseLeave={() => setHoveredLayout(null)}
                   style={{
-                    border: selected ? `2px solid ${layout.accent}` : '2px solid var(--gray-200)',
+                    border: selected ? `2px solid ${effectiveAccent}` : '2px solid var(--gray-200)',
                     borderRadius: 'var(--radius-lg)', padding: 0, cursor: 'pointer',
                     transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)', overflow: 'hidden',
-                    boxShadow: selected ? `0 4px 16px ${layout.accent}20` : 'none',
+                    boxShadow: selected ? `0 4px 16px ${effectiveAccent}20` : 'none',
                     transform: selected ? 'translateY(-2px)' : 'none',
                   }}
                 >
                   {/* Mini realistic preview thumbnail — fixed height for grid alignment */}
-                  <div style={{ height: 180, background: selected ? `${layout.accent}06` : '#fff', borderBottom: `1px solid ${selected ? layout.accent + '30' : 'var(--gray-200)'}`, padding: 6, overflow: 'hidden' }}>
+                  <div style={{ height: 180, background: selected ? `${effectiveAccent}06` : '#fff', borderBottom: `1px solid ${selected ? effectiveAccent + '30' : 'var(--gray-200)'}`, padding: 6, overflow: 'hidden' }}>
                     <div style={{ transform: 'scale(0.52)', transformOrigin: 'top left', width: '192%', pointerEvents: 'none' }}>
-                      <InvoicePreview layout={layout} companyName={form.name} />
+                      <InvoicePreview layout={layout} companyName={form.name} customColor={form.invoice_color} />
                     </div>
                   </div>
                   {/* Label */}
                   <div style={{ padding: '10px 14px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: 2 }}>
-                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: layout.accent, flexShrink: 0 }} />
+                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: effectiveAccent, flexShrink: 0 }} />
                       <span style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--gray-900)' }}>{layout.name}</span>
                       {selected && (
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill={layout.accent} style={{ marginLeft: 'auto' }}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill={effectiveAccent} style={{ marginLeft: 'auto' }}>
                           <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
                         </svg>
                       )}
@@ -591,24 +630,70 @@ export default function Company() {
           {hoveredLayout && (() => {
             const layout = invoiceLayouts.find(l => l.key === hoveredLayout);
             if (!layout) return null;
+            const hoverAccent = (form.invoice_color && layout.key !== 'minimalisticky' && layout.key !== 'korporatni') ? form.invoice_color : layout.accent;
             return (
               <div style={{
                 position: 'fixed', right: 40, top: '50%', transform: 'translateY(-50%)',
                 width: 380, maxHeight: '85vh', overflowY: 'auto',
                 background: 'white', borderRadius: 'var(--radius-lg)',
-                border: `2px solid ${layout.accent}30`,
+                border: `2px solid ${hoverAccent}30`,
                 boxShadow: '0 25px 60px rgba(0,0,0,0.15), 0 8px 20px rgba(0,0,0,0.08)',
                 zIndex: 1000, overflow: 'hidden', pointerEvents: 'none',
                 animation: 'fadeIn 0.15s ease-out',
               }}>
                 <div style={{ padding: '8px 16px', fontSize: '0.7rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <div style={{ width: 6, height: 6, borderRadius: '50%', background: layout.accent }} />
+                  <div style={{ width: 6, height: 6, borderRadius: '50%', background: hoverAccent }} />
                   Náhled: {layout.name}
                 </div>
-                <InvoicePreview layout={layout} companyName={form.name} />
+                <InvoicePreview layout={layout} companyName={form.name} customColor={form.invoice_color} />
               </div>
             );
           })()}
+        </div>
+        <div className="card">
+          <div className="card-title" style={{ marginBottom: '0.5rem' }}>Barva faktury</div>
+          <p style={{ fontSize: '0.8rem', color: 'var(--gray-500)', marginBottom: '1rem' }}>Zvolte doplňkovou barvu, která se použije na akcentech faktury. Nemá vliv na styly Minimalistický a Korporátní.</p>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+            {colorPalettes.map(cp => {
+              const isSelected = form.invoice_color === cp.color;
+              return (
+                <button key={cp.color} type="button" title={cp.name}
+                  onClick={() => setForm(f => ({ ...f, invoice_color: cp.color }))}
+                  style={{
+                    width: 36, height: 36, borderRadius: '50%', border: isSelected ? `3px solid ${cp.color}` : '2px solid var(--gray-200)',
+                    background: cp.color, cursor: 'pointer', padding: 0, position: 'relative',
+                    outline: isSelected ? `2px solid ${cp.color}40` : 'none', outlineOffset: 2,
+                    transition: 'all 0.15s ease',
+                  }}>
+                  {isSelected && (
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="white" style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}>
+                      <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                    </svg>
+                  )}
+                </button>
+              );
+            })}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginLeft: '0.5rem' }}>
+              <label style={{ fontSize: '0.8rem', color: 'var(--gray-600)', cursor: 'pointer' }}>
+                Vlastní:
+                <input type="color" value={form.invoice_color || '#6366f1'}
+                  onChange={e => setForm(f => ({ ...f, invoice_color: e.target.value }))}
+                  style={{ width: 32, height: 32, border: 'none', padding: 0, cursor: 'pointer', verticalAlign: 'middle', marginLeft: 4 }}
+                />
+              </label>
+            </div>
+            {form.invoice_color && (
+              <button type="button" className="btn btn-outline btn-sm" style={{ marginLeft: '0.5rem' }}
+                onClick={() => setForm(f => ({ ...f, invoice_color: null }))}>
+                Výchozí barva
+              </button>
+            )}
+          </div>
+          {form.invoice_color && (
+            <div style={{ marginTop: '0.75rem', fontSize: '0.8rem', color: 'var(--gray-500)' }}>
+              Vybraná barva: <span style={{ display: 'inline-block', width: 12, height: 12, borderRadius: '50%', background: form.invoice_color, verticalAlign: 'middle', marginRight: 4 }} />{form.invoice_color}
+            </div>
+          )}
         </div>
         <button type="submit" className="btn btn-primary">Uložit nastavení</button>
       </form>

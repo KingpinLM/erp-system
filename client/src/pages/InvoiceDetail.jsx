@@ -4,6 +4,62 @@ import { api } from '../api';
 import { useAuth, usePageTitle } from '../App';
 import { useToast } from '../components/Toast';
 
+function hexRGB(hex) {
+  return [parseInt(hex.slice(1,3),16), parseInt(hex.slice(3,5),16), parseInt(hex.slice(5,7),16)];
+}
+function lighten(hex, amt) {
+  const [r,g,b] = hexRGB(hex);
+  return `rgb(${Math.min(255,Math.round(r+(255-r)*amt))},${Math.min(255,Math.round(g+(255-g)*amt))},${Math.min(255,Math.round(b+(255-b)*amt))})`;
+}
+function accentCSS(layout, hex) {
+  if (!hex) return '';
+  const [r,g,b] = hexRGB(hex);
+  const rgba = (a) => `rgba(${r},${g},${b},${a})`;
+  const grad = `linear-gradient(90deg, ${hex}, ${lighten(hex, 0.25)})`;
+  const gradSym = `linear-gradient(90deg, ${lighten(hex, 0.4)}, ${hex}, ${lighten(hex, 0.4)})`;
+
+  if (layout === 'klasicky') return `
+.inv-accent{background:${grad}}.inv-accent-bottom{background:${grad}}
+.inv-head-left h1{color:${hex}}.inv-pay{border-color:${hex}}.inv-pay-title{color:${hex}}
+.inv-pay-table .inv-pay-total td:last-child{color:${hex}}.inv-badge-sent{background:${rgba(0.1)};color:${hex}}`;
+
+  if (layout === 'elegantni') return `
+.inv-layout-elegantni .inv-accent{background:${gradSym}}
+.inv-layout-elegantni .inv-accent-bottom{background:${gradSym}}
+.inv-layout-elegantni .inv-head h1{color:${hex}}
+.inv-layout-elegantni .inv-head .inv-company-sub{color:${lighten(hex,0.3)}}
+.inv-layout-elegantni .inv-parties{border-color:${rgba(0.2)}}
+.inv-layout-elegantni .inv-party{background:${rgba(0.03)}}
+.inv-layout-elegantni .inv-party:first-child{border-right-color:${rgba(0.2)}}
+.inv-layout-elegantni .inv-party-tag{color:${hex}}
+.inv-layout-elegantni .inv-pay{border-color:${lighten(hex,0.35)}}
+.inv-layout-elegantni .inv-pay-title{color:${hex}}
+.inv-layout-elegantni .inv-pay-table .inv-pay-total td:last-child{color:${hex}}
+.inv-layout-elegantni .inv-dates{border-color:${rgba(0.2)};background:${rgba(0.03)}}
+.inv-layout-elegantni .inv-date{border-right-color:${rgba(0.2)}}
+.inv-layout-elegantni .inv-date-label{color:${hex}}
+.inv-layout-elegantni .inv-items thead{background:${rgba(0.03)}}
+.inv-layout-elegantni .inv-items thead th{color:${hex};border-bottom-color:${rgba(0.2)};border-top-color:${rgba(0.2)}}
+.inv-layout-elegantni .inv-items tbody td{border-bottom-color:${rgba(0.06)}}
+.inv-layout-elegantni .inv-items tbody tr:last-child td{border-bottom-color:${rgba(0.2)}}
+.inv-layout-elegantni .inv-eleg-total-inner{background:linear-gradient(135deg,${rgba(0.03)},${rgba(0.06)});border-color:${rgba(0.2)}}
+.inv-layout-elegantni .inv-eleg-total-inner .inv-sum-row{color:${hex}}
+.inv-layout-elegantni .inv-eleg-total-main{border-top-color:${hex}}
+.inv-layout-elegantni .inv-note{background:${rgba(0.03)};border-color:${rgba(0.2)}}
+.inv-layout-elegantni .inv-bottom{border-top-color:${rgba(0.2)}}`;
+
+  if (layout === 'kompaktni') return `
+.inv-layout-kompaktni .inv-accent{background:${hex}}
+.inv-layout-kompaktni .inv-accent-bottom{background:${hex}}
+.inv-layout-kompaktni .inv-head-left h1{color:${hex}}
+.inv-layout-kompaktni .inv-compact-top .inv-pay-title{color:${hex}}
+.inv-layout-kompaktni .inv-compact-top .inv-pay-table .inv-pay-total td:last-child{color:${hex}}
+.inv-layout-kompaktni .inv-dates-inline{background:${rgba(0.05)};border-color:${rgba(0.15)}}
+.inv-layout-kompaktni .inv-dates-inline .inv-date-label{color:${hex}}`;
+
+  return '';
+}
+
 const statusLabels = { draft: 'Koncept', sent: 'Odesláno', paid: 'Zaplaceno', overdue: 'Po splatnosti', cancelled: 'Zrušeno' };
 const paymentLabels = { bank_transfer: 'Bankovní převod', cash: 'Hotově', card: 'Kartou', other: 'Jiný' };
 const fmt = (n, cur = 'CZK') => new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: cur, maximumFractionDigits: 2 }).format(n);
@@ -255,6 +311,7 @@ export default function InvoiceDetail() {
 
   const co = company || {};
   const layout = co.invoice_layout || 'klasicky';
+  const customColor = co.invoice_color;
   const isVatPayer = !!co.vat_payer;
   const bankFull = co.bank_account ? (co.bank_code ? `${co.bank_account}/${co.bank_code}` : co.bank_account) : null;
   const hasBankDetails = bankFull || co.iban;
@@ -772,6 +829,7 @@ export default function InvoiceDetail() {
 .inv-layout-kompaktni .inv-sum { padding: 10px 0 16px; }
 .inv-layout-kompaktni .inv-note { padding: 10px 14px; border-radius: 6px; }
 .inv-layout-kompaktni .inv-bottom { padding-top: 14px; }
+${accentCSS(layout, customColor)}
       ` }} />
 
       <div ref={invoiceRef}>

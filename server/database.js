@@ -503,6 +503,7 @@ safeAlter('ALTER TABLE company ADD COLUMN cash_counter INTEGER DEFAULT 1');
 safeAlter('ALTER TABLE company ADD COLUMN journal_prefix TEXT DEFAULT \'UD\'');
 safeAlter('ALTER TABLE company ADD COLUMN journal_counter INTEGER DEFAULT 1');
 safeAlter("ALTER TABLE company ADD COLUMN invoice_layout TEXT DEFAULT 'klasicky'");
+safeAlter("ALTER TABLE company ADD COLUMN invoice_color TEXT");
 
 // Migrate full_name → first_name + last_name
 try {

@@ -17,7 +17,27 @@ function generateInvoicePDF(invoice, company, items) {
     doc.on('error', reject);
 
     const co = company || {};
-    const layout = layoutConfigs[co.invoice_layout] || layoutConfigs.klasicky;
+    const layout = { ...(layoutConfigs[co.invoice_layout] || layoutConfigs.klasicky) };
+
+    // Override accent colors with custom invoice_color (not for minimalisticky/korporatni)
+    if (co.invoice_color && co.invoice_layout !== 'minimalisticky' && co.invoice_layout !== 'korporatni') {
+      const hex = co.invoice_color;
+      layout.accent = hex;
+      layout.accentEnd = null;
+      layout.headingColor = hex;
+      layout.tableHeadColor = hex;
+      // Generate light background from hex
+      const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+      const lr = Math.min(255, Math.round(r + (255 - r) * 0.93));
+      const lg = Math.min(255, Math.round(g + (255 - g) * 0.93));
+      const lb = Math.min(255, Math.round(b + (255 - b) * 0.93));
+      layout.tableHeadBg = `#${lr.toString(16).padStart(2,'0')}${lg.toString(16).padStart(2,'0')}${lb.toString(16).padStart(2,'0')}`;
+      const dr = Math.min(255, Math.round(r + (255 - r) * 0.8));
+      const dg = Math.min(255, Math.round(g + (255 - g) * 0.8));
+      const db = Math.min(255, Math.round(b + (255 - b) * 0.8));
+      layout.divider = `#${dr.toString(16).padStart(2,'0')}${dg.toString(16).padStart(2,'0')}${db.toString(16).padStart(2,'0')}`;
+    }
+
     const isCredit = invoice.invoice_type === 'credit_note';
     const isProforma = invoice.invoice_type === 'proforma';
     const title = isCredit ? 'DOBROPIS' : isProforma ? 'PROFORMA FAKTURA' : 'FAKTURA';
