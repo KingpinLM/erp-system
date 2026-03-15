@@ -158,7 +158,7 @@ export default function Invoices() {
         }
       }).catch(() => {});
     }, 300);
-  }, [calcPreviewPos]);
+  }, [movePreview]);
 
   const handleRowMouseLeave = useCallback(() => {
     clearTimeout(hoverTimer.current);
