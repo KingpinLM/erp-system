@@ -627,6 +627,95 @@ tr { transition: background 0.1s ease; }
 }
 .login-error { background: var(--danger-light); color: var(--danger-dark); padding: 0.75rem; border-radius: 10px; margin-bottom: 1rem; font-size: 0.85rem; text-align: center; }
 
+/* ─── ONBOARDING OPTION BUTTONS ────────────────── */
+.onboarding-option-btn {
+  display: flex; align-items: center; gap: 1rem; width: 100%;
+  padding: 1rem 1.25rem; border-radius: 14px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  cursor: pointer; transition: all 0.2s ease;
+  text-decoration: none;
+}
+.onboarding-option-btn:hover {
+  background: rgba(255,255,255,0.08);
+  border-color: rgba(255,255,255,0.15);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+}
+.onboarding-option-icon {
+  width: 44px; height: 44px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.onboarding-option-title {
+  font-size: 0.92rem; font-weight: 700; color: white; margin-bottom: 2px;
+}
+.onboarding-option-desc {
+  font-size: 0.76rem; color: rgba(255,255,255,0.4);
+}
+
+/* ─── PENDING APPROVAL ─────────────────────────── */
+.pending-icon-wrap {
+  position: relative; width: 72px; height: 72px; margin: 0 auto 1.5rem;
+}
+.pending-icon {
+  position: absolute; inset: 0; border-radius: 50%;
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 8px 24px rgba(245,158,11,0.3);
+}
+.pending-icon-pulse {
+  position: absolute; inset: -8px; border-radius: 50%;
+  background: rgba(245,158,11,0.15);
+  animation: pendingPulse 2s ease-in-out infinite;
+}
+@keyframes pendingPulse {
+  0%, 100% { transform: scale(1); opacity: 0.5; }
+  50% { transform: scale(1.15); opacity: 0; }
+}
+
+.pending-steps {
+  display: flex; flex-direction: column; align-items: flex-start;
+  max-width: 280px; margin: 0 auto;
+  text-align: left;
+}
+.pending-step {
+  display: flex; align-items: center; gap: 0.75rem;
+}
+.pending-step-icon {
+  width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.pending-step-icon.done {
+  background: rgba(45,212,191,0.15); color: #2dd4bf;
+}
+.pending-step-icon.active {
+  background: rgba(245,158,11,0.15);
+}
+.pending-step-label {
+  font-size: 0.85rem; font-weight: 600; color: rgba(255,255,255,0.7);
+}
+.pending-step-desc {
+  font-size: 0.72rem; color: rgba(255,255,255,0.3);
+}
+.pending-step-line {
+  width: 2px; height: 20px; margin-left: 15px;
+  border-radius: 1px;
+}
+.pending-step-line.done { background: rgba(45,212,191,0.3); }
+.pending-step-line.active {
+  background: linear-gradient(to bottom, rgba(45,212,191,0.3), rgba(245,158,11,0.3));
+}
+
+.pending-spinner {
+  width: 16px; height: 16px; border-radius: 50%;
+  border: 2px solid rgba(245,158,11,0.2);
+  border-top-color: #f59e0b;
+  animation: pendingSpin 1s linear infinite;
+}
+@keyframes pendingSpin {
+  to { transform: rotate(360deg); }
+}
+
 /* ─── PAGE HEADER ───────────────────────────────── */
 .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 0.75rem; }
 .page-title { font-size: 1.5rem; font-weight: 800; color: var(--gray-900); letter-spacing: -0.02em; }
