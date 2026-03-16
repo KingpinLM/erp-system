@@ -408,6 +408,18 @@ db.exec(`
   );
 `);
 
+// ─── DASHBOARD LAYOUTS ───────────────────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS dashboard_layouts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    tenant_id INTEGER NOT NULL REFERENCES tenants(id),
+    layout TEXT NOT NULL DEFAULT '[]',
+    updated_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(user_id, tenant_id)
+  );
+`);
+
 // ─── CUSTOM ROLES ────────────────────────────────────────
 db.exec(`
   CREATE TABLE IF NOT EXISTS custom_roles (

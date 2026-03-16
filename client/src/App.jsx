@@ -25,6 +25,7 @@ import SearchResults from './pages/SearchResults';
 import ChatWidget from './components/ChatWidget';
 import ChatbotSettings from './pages/ChatbotSettings';
 import FinancniUrad from './pages/FinancniUrad';
+import CustomDashboard from './pages/CustomDashboard';
 import { ToastProvider } from './components/Toast';
 import { ConfirmProvider } from './components/ConfirmDialog';
 import { useKeyboardShortcuts, ShortcutsHelp } from './components/KeyboardShortcuts';
@@ -138,6 +139,7 @@ function Sidebar({ open, onClose }) {
     {
       items: [
         { to: '/', label: 'Dashboard', icon: 'dashboard' },
+        { to: '/my-dashboard', label: 'Můj dashboard', icon: 'dashboard' },
       ]
     },
     {
@@ -247,6 +249,7 @@ export function usePageTitle(subtitle) {
 // Route → section mapping
 const routeSections = [
   { match: /^\/$/, title: 'Dashboard', sub: 'Finanční přehled a analytika', home: '/' },
+  { match: /^\/my-dashboard/, title: 'Můj dashboard', sub: 'Vlastní rozložení widgetů', home: '/my-dashboard' },
   { match: /^\/invoices\/new/, title: 'Nová faktura', section: 'Faktury', home: '/invoices' },
   { match: /^\/invoices\/(\d+)\/edit/, title: 'Úprava faktury', section: 'Faktury', home: '/invoices' },
   { match: /^\/invoices\/(\d+)/, title: 'Detail faktury', section: 'Faktury', home: '/invoices' },
@@ -342,6 +345,7 @@ export default function App() {
               <Layout>
                 <Routes>
                   <Route path="/" element={<Dashboard />} />
+                  <Route path="/my-dashboard" element={<CustomDashboard />} />
                   <Route path="/search" element={<SearchResults />} />
                   <Route path="/invoices" element={<Invoices />} />
                   <Route path="/invoices/new" element={<InvoiceForm />} />

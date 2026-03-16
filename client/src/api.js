@@ -45,6 +45,8 @@ export const api = {
     const qs = new URLSearchParams(params).toString();
     return request(`/dashboard${qs ? '?' + qs : ''}`);
   },
+  getDashboardLayout: () => request('/dashboard-layout'),
+  saveDashboardLayout: (layout) => request('/dashboard-layout', { method: 'PUT', body: JSON.stringify({ layout }) }),
 
   // Currencies
   getCurrencies: () => request('/currencies'),

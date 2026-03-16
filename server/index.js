@@ -580,6 +580,29 @@ app.get('/api/users/:id/signature', ...tenanted, (req, res) => {
   res.json({ signature: row?.signature || null });
 });
 
+// ─── DASHBOARD LAYOUT (custom per-user) ─────────────────────
+app.get('/api/dashboard-layout', ...tenanted, (req, res) => {
+  const row = db.prepare('SELECT layout FROM dashboard_layouts WHERE user_id = ? AND tenant_id = ?')
+    .get(req.user.id, req.tenant_id);
+  res.json({ layout: row ? JSON.parse(row.layout) : null });
+});
+
+app.put('/api/dashboard-layout', ...tenanted, (req, res) => {
+  const { layout } = req.body;
+  if (!Array.isArray(layout)) return res.status(400).json({ error: 'Layout musí být pole' });
+  const json = JSON.stringify(layout);
+  const existing = db.prepare('SELECT id FROM dashboard_layouts WHERE user_id = ? AND tenant_id = ?')
+    .get(req.user.id, req.tenant_id);
+  if (existing) {
+    db.prepare("UPDATE dashboard_layouts SET layout = ?, updated_at = datetime('now') WHERE user_id = ? AND tenant_id = ?")
+      .run(json, req.user.id, req.tenant_id);
+  } else {
+    db.prepare('INSERT INTO dashboard_layouts (user_id, tenant_id, layout) VALUES (?, ?, ?)')
+      .run(req.user.id, req.tenant_id, json);
+  }
+  res.json({ ok: true });
+});
+
 // ─── DASHBOARD ───────────────────────────────────────────────
 app.get('/api/dashboard', ...tenanted, (req, res) => {
   const tid = req.tenant_id;
