@@ -325,7 +325,7 @@ export default function Invoices() {
                     onTouchEnd={(e) => { if (e.target.closest('a, button, input')) return; handleRowTap(inv); }}
                   >
                     <td><input type="checkbox" checked={selected.has(inv.id)} onChange={e => { const s = new Set(selected); if (e.target.checked) s.add(inv.id); else s.delete(inv.id); setSelected(s); }} /></td>
-                    <td><Link to={`/invoices/${inv.id}`} style={{ color: 'var(--primary)', fontWeight: 600 }}>{inv.invoice_number}</Link>{inv.invoice_type && inv.invoice_type !== 'regular' && <span style={{ fontSize: 10, color: '#94a3b8', marginLeft: 4 }}>({typeLabels[inv.invoice_type]})</span>}</td>
+                    <td style={{ whiteSpace: 'nowrap' }}><Link to={`/invoices/${inv.id}`} style={{ color: 'var(--primary)', fontWeight: 600 }}>{inv.invoice_number}</Link>{inv.invoice_type && inv.invoice_type !== 'regular' && <span style={{ fontSize: 10, color: '#94a3b8', marginLeft: 4 }}>({typeLabels[inv.invoice_type]})</span>}</td>
                     <td>{inv.client_name}</td>
                     <td className="hide-mobile">{fmtDate(inv.issue_date)}</td>
                     <td className="hide-mobile">{fmtDate(inv.due_date)}</td>
