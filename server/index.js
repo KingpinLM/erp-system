@@ -778,7 +778,7 @@ app.post('/api/clients', ...tenanted, authorize('admin', 'accountant', 'manager'
 });
 
 app.put('/api/clients/:id', ...tenanted, authorize('admin', 'accountant', 'manager'), (req, res) => {
-  const { name, ico, dic, email, phone, address, city, zip, country } = req.body;
+  const { name, ico, dic, email, phone, address, city, zip, country, note } = req.body;
   if (!name || !name.trim()) return res.status(400).json({ error: 'Název klienta je povinný' });
   const existingName = db.prepare('SELECT id, name FROM clients WHERE tenant_id = ? AND name = ? AND id != ?').get(req.tenant_id, name.trim(), req.params.id);
   if (existingName) return res.status(400).json({ error: `Klient s názvem "${name}" již existuje.` });
@@ -786,8 +786,8 @@ app.put('/api/clients/:id', ...tenanted, authorize('admin', 'accountant', 'manag
     const existingIco = db.prepare('SELECT id, name FROM clients WHERE tenant_id = ? AND ico = ? AND id != ?').get(req.tenant_id, ico, req.params.id);
     if (existingIco) return res.status(400).json({ error: `Klient s IČO "${ico}" již existuje (${existingIco.name}).` });
   }
-  db.prepare('UPDATE clients SET name=?, ico=?, dic=?, email=?, phone=?, address=?, city=?, zip=?, country=? WHERE id=? AND tenant_id=?')
-    .run(name.trim(), ico, dic, email, phone, address, city, zip, country, req.params.id, req.tenant_id);
+  db.prepare('UPDATE clients SET name=?, ico=?, dic=?, email=?, phone=?, address=?, city=?, zip=?, country=?, note=? WHERE id=? AND tenant_id=?')
+    .run(name.trim(), ico, dic, email, phone, address, city, zip, country, note || null, req.params.id, req.tenant_id);
   res.json({ ok: true });
 });
 
