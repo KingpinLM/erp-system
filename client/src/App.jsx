@@ -302,15 +302,7 @@ function Layout({ children }) {
             {section.sub && !subtitle && <span className="topbar-subtitle">{section.sub}</span>}
           </div>
           <div style={{ flex: 1 }} />
-          <button
-            className="cmd-k-hint"
-            onClick={() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }))}
-            title="Hledat (Ctrl+K)"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <span>Hledat...</span>
-            <kbd>⌘K</kbd>
-          </button>
+          <CommandPalette />
           <button className="dark-toggle" aria-label="Přepnout tmavý/světlý režim" onClick={() => {
             const html = document.documentElement;
             const next = html.getAttribute('data-theme') === 'dark' ? '' : 'dark';
@@ -322,7 +314,6 @@ function Layout({ children }) {
         </header>
         <main id="main-content" className="content">{children}</main>
         <ChatWidget />
-        <CommandPalette />
         <ShortcutsHelpWrapper />
       </div>
     </div>
