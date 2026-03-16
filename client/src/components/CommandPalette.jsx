@@ -19,6 +19,16 @@ const navItems = [
   { id: 'profile', label: 'Můj profil', desc: 'Osobní nastavení', path: '/profile', icon: '⚙️', section: 'Správa' },
 ];
 
+const statusLabels = { draft: 'Koncept', sent: 'Odesláno', paid: 'Zaplaceno', overdue: 'Po splatnosti', cancelled: 'Zrušeno' };
+
+function Highlight({ text, query }) {
+  if (!text || !query) return <>{text}</>;
+  const str = String(text);
+  const idx = str.toLowerCase().indexOf(query.toLowerCase());
+  if (idx === -1) return <>{str}</>;
+  return <>{str.slice(0, idx)}<mark style={{ background: '#fef08a', padding: 0, borderRadius: 2 }}>{str.slice(idx, idx + query.length)}</mark>{str.slice(idx + query.length)}</>;
+}
+
 export default function CommandPalette() {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState('');
@@ -30,7 +40,7 @@ export default function CommandPalette() {
   const navigate = useNavigate();
   const searchTimer = useRef(null);
 
-  // Cmd+K / Ctrl+K to open
+  // Ctrl+K / Cmd+K to toggle
   useEffect(() => {
     const handler = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
@@ -69,27 +79,51 @@ export default function CommandPalette() {
     return () => clearTimeout(searchTimer.current);
   }, [q]);
 
-  const filteredNav = navItems.filter(item =>
-    item.label.toLowerCase().includes(q.toLowerCase()) ||
-    item.desc.toLowerCase().includes(q.toLowerCase())
-  );
+  // Filter nav items by query
+  const filteredNav = q.length > 0
+    ? navItems.filter(item =>
+        item.label.toLowerCase().includes(q.toLowerCase()) ||
+        item.desc.toLowerCase().includes(q.toLowerCase())
+      )
+    : navItems;
 
   // Build combined result list
   const allItems = [];
-  if (filteredNav.length > 0) {
+
+  // When no query, show quick nav; when typing, show matching nav
+  if (q.length === 0 || filteredNav.length > 0) {
     filteredNav.forEach(n => allItems.push({ type: 'nav', ...n }));
   }
+
+  // Add API search results (invoices, clients, evidence)
   if (searchResults) {
     (searchResults.invoices || []).forEach(inv =>
-      allItems.push({ type: 'invoice', label: inv.invoice_number, desc: `${inv.client_name || ''} — ${inv.total || 0} ${inv.currency || 'CZK'}`, path: `/invoices/${inv.id}`, icon: '📄', section: 'Faktury' })
+      allItems.push({
+        type: 'invoice', label: inv.invoice_number,
+        desc: `${inv.client_name || ''} — ${inv.total || 0} ${inv.currency || 'CZK'}`,
+        status: inv.status,
+        path: `/invoices/${inv.id}`, icon: '📄', section: 'Faktury',
+      })
     );
     (searchResults.clients || []).forEach(c =>
-      allItems.push({ type: 'client', label: c.name, desc: c.ico ? `IČ: ${c.ico}` : c.email || '', path: `/clients/${c.id}`, icon: '👤', section: 'Klienti' })
+      allItems.push({
+        type: 'client', label: c.name,
+        desc: c.ico ? `IČ: ${c.ico}` : c.email || '',
+        path: `/clients/${c.id}`, icon: '👤', section: 'Klienti',
+      })
     );
     (searchResults.evidence || []).forEach(e =>
-      allItems.push({ type: 'evidence', label: e.title, desc: `${e.amount || ''} ${e.currency || ''}`, path: '/evidence', icon: '📋', section: 'Evidence' })
+      allItems.push({
+        type: 'evidence', label: e.title,
+        desc: `${e.amount || ''} ${e.currency || ''}`.trim(),
+        path: '/evidence', icon: '📋', section: 'Evidence',
+      })
     );
   }
+
+  const hasApiResults = searchResults && (
+    (searchResults.invoices?.length || 0) + (searchResults.clients?.length || 0) + (searchResults.evidence?.length || 0)
+  ) > 0;
 
   const go = useCallback((path) => {
     setOpen(false);
@@ -103,16 +137,20 @@ export default function CommandPalette() {
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       setActiveIdx(prev => Math.max(prev - 1, 0));
-    } else if (e.key === 'Enter' && allItems[activeIdx]) {
+    } else if (e.key === 'Enter') {
       e.preventDefault();
-      go(allItems[activeIdx].path);
+      if (allItems[activeIdx]) {
+        go(allItems[activeIdx].path);
+      } else if (q.length >= 2) {
+        go(`/search?q=${encodeURIComponent(q)}`);
+      }
     }
   };
 
   // Scroll active item into view
   useEffect(() => {
     if (listRef.current) {
-      const el = listRef.current.children[activeIdx];
+      const el = listRef.current.querySelector(`[data-idx="${activeIdx}"]`);
       if (el) el.scrollIntoView({ block: 'nearest' });
     }
   }, [activeIdx]);
@@ -136,7 +174,7 @@ export default function CommandPalette() {
         position: 'fixed', inset: 0, zIndex: 10002,
         background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)',
         display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
-        paddingTop: 'max(3vh, 16px)',
+        paddingTop: 'max(8vh, 32px)',
         animation: 'fadeIn 0.1s ease-out',
       }}
       onClick={() => setOpen(false)}
@@ -146,7 +184,7 @@ export default function CommandPalette() {
         style={{
           background: 'var(--card-bg, white)', borderRadius: 16,
           boxShadow: '0 24px 80px rgba(0,0,0,0.25)',
-          width: '100%', maxWidth: 560, margin: '0 12px',
+          width: '100%', maxWidth: 580, margin: '0 12px',
           overflow: 'hidden',
           animation: 'scaleIn 0.15s ease-out',
         }}
@@ -167,6 +205,7 @@ export default function CommandPalette() {
               background: 'transparent', color: 'var(--gray-900, #0f172a)',
             }}
           />
+          {searching && <span className="search-spinner" />}
           <kbd style={{
             padding: '2px 8px', borderRadius: 6,
             background: 'var(--gray-100, #f1f5f9)',
@@ -177,17 +216,15 @@ export default function CommandPalette() {
         </div>
 
         {/* Results */}
-        <div ref={listRef} style={{ maxHeight: 380, overflowY: 'auto', padding: '8px 0' }}>
+        <div ref={listRef} style={{ maxHeight: 420, overflowY: 'auto', padding: '8px 0' }}>
+          {/* No results state */}
           {allItems.length === 0 && q.length >= 2 && !searching && (
             <div style={{ padding: '24px 18px', textAlign: 'center', color: 'var(--gray-400, #94a3b8)', fontSize: 14 }}>
               Žádné výsledky pro „{q}"
             </div>
           )}
-          {searching && (
-            <div style={{ padding: '12px 18px', textAlign: 'center', color: 'var(--gray-400, #94a3b8)', fontSize: 13 }}>
-              Hledám...
-            </div>
-          )}
+
+          {/* Grouped results */}
           {sections.map(sec => (
             <div key={sec}>
               <div style={{
@@ -198,6 +235,7 @@ export default function CommandPalette() {
               {sectionMap[sec].map(item => (
                 <div
                   key={item.globalIdx}
+                  data-idx={item.globalIdx}
                   onClick={() => go(item.path)}
                   onMouseEnter={() => setActiveIdx(item.globalIdx)}
                   style={{
@@ -209,32 +247,51 @@ export default function CommandPalette() {
                 >
                   <span style={{ fontSize: 18, width: 28, textAlign: 'center', flexShrink: 0 }}>{item.icon}</span>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--gray-900, #0f172a)' }}>{item.label}</div>
-                    <div style={{ fontSize: 12, color: 'var(--gray-500, #64748b)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.desc}</div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--gray-900, #0f172a)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      <Highlight text={item.label} query={q} />
+                    </div>
+                    <div style={{ fontSize: 12, color: 'var(--gray-500, #64748b)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      <Highlight text={item.desc} query={q} />
+                    </div>
                   </div>
+                  {/* Status badge for invoices */}
+                  {item.status && (
+                    <span className={`badge badge-${item.status}`} style={{ fontSize: 10, flexShrink: 0 }}>
+                      {statusLabels[item.status] || item.status}
+                    </span>
+                  )}
                   {activeIdx === item.globalIdx && (
-                    <span style={{ fontSize: 11, color: 'var(--gray-400, #94a3b8)' }}>↵</span>
+                    <span style={{ fontSize: 11, color: 'var(--gray-400, #94a3b8)', flexShrink: 0 }}>↵</span>
                   )}
                 </div>
               ))}
             </div>
           ))}
-          {allItems.length === 0 && q.length < 2 && (
-            <>
-              {sections.length === 0 && navItems.slice(0, 8).map((item, idx) => (
-                <div key={item.id}>
-                  {idx === 0 && <div style={{ padding: '8px 18px 4px', fontSize: 10, fontWeight: 700, color: 'var(--gray-400)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Rychlá navigace</div>}
-                </div>
-              ))}
-            </>
-          )}
-          {q.length < 2 && allItems.length > 0 && null}
-          {q.length < 2 && filteredNav.length === navItems.length && (
-            <div style={{ padding: '12px 18px', textAlign: 'center', color: 'var(--gray-400, #94a3b8)', fontSize: 12 }}>
+
+          {/* Hint text when no query */}
+          {q.length < 2 && (
+            <div style={{ padding: '8px 18px', textAlign: 'center', color: 'var(--gray-400, #94a3b8)', fontSize: 12 }}>
               Zadejte text pro hledání faktur a klientů
             </div>
           )}
         </div>
+
+        {/* Show all results link */}
+        {q.length >= 2 && hasApiResults && (
+          <div
+            onClick={() => go(`/search?q=${encodeURIComponent(q)}`)}
+            style={{
+              padding: '10px 18px', cursor: 'pointer',
+              borderTop: '1px solid var(--gray-200, #e2e8f0)',
+              textAlign: 'center', color: 'var(--primary)', fontSize: 13, fontWeight: 600,
+              transition: 'background 0.1s',
+            }}
+            onMouseOver={e => e.currentTarget.style.background = 'var(--primary-50, #eef2ff)'}
+            onMouseOut={e => e.currentTarget.style.background = ''}
+          >
+            Zobrazit všechny výsledky pro „{q}"
+          </div>
+        )}
 
         {/* Footer */}
         <div style={{
