@@ -892,6 +892,7 @@ app.get('/api/invoices/:id/qr', ...tenanted, async (req, res) => {
     const bankAccount = db.prepare('SELECT * FROM bank_accounts WHERE tenant_id = ? AND currency = ? AND active = 1').get(req.tenant_id, invoice.currency || 'CZK');
     if (bankAccount) {
       company.bank_account = bankAccount.account_number;
+      company.bank_code = null;
       company.iban = bankAccount.iban;
     }
 
@@ -1586,6 +1587,7 @@ app.get('/api/invoices/:id/pdf', ...tenanted, async (req, res) => {
     const bankAccount = db.prepare('SELECT * FROM bank_accounts WHERE tenant_id = ? AND currency = ? AND active = 1').get(req.tenant_id, invoice.currency || 'CZK');
     if (bankAccount) {
       company.bank_account = bankAccount.account_number;
+      company.bank_code = null;
       company.iban = bankAccount.iban;
     }
     const pdfBuffer = await generateInvoicePDF(invoice, company, items);

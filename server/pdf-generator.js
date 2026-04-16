@@ -12,6 +12,8 @@ const layoutConfigs = {
   kompaktni: { accent: '#059669', accentEnd: null, headerBg: null, headerText: '#000', headingColor: '#059669', totalColor: '#0f172a', tableHeadBg: '#f0fdf4', tableHeadColor: '#059669', divider: '#d1fae5' },
 };
 
+const fmtNum = (n) => new Intl.NumberFormat('cs-CZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+
 function generateInvoicePDF(invoice, company, items) {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: 'A4', margin: 40, info: { Title: `Faktura ${invoice.invoice_number}`, Author: company?.name || 'ERP System' } });
@@ -67,7 +69,7 @@ function generateInvoicePDF(invoice, company, items) {
       doc.fontSize(20).font('Bold').fillColor(layout.headerText).text(title, margin, headerY);
       doc.fontSize(12).font('Regular').fillColor('#94a3b8').text(invoice.invoice_number, margin, headerY + 25);
 
-      const statusMap = { draft: 'Koncept', sent: 'Odesláno', paid: 'Uhrazeno', overdue: 'Po splatnosti', cancelled: 'Stornováno' };
+      const statusMap = { draft: 'Koncept', sent: 'Odesláno', paid: 'Uhrazeno', cancelled: 'Stornováno' };
       doc.fontSize(10).fillColor('#e2e8f0').text(statusMap[invoice.status] || invoice.status, 400, headerY + 5, { align: 'right', width: 155 });
       headerY += 55;
     } else {
@@ -76,7 +78,7 @@ function generateInvoicePDF(invoice, company, items) {
       doc.fontSize(titleSize).font('Bold').fillColor(layout.headingColor).text(title, margin, headerY);
       doc.fontSize(12).font('Regular').fillColor('#334155').text(invoice.invoice_number, margin, headerY + (isKompaktni ? 22 : 25));
 
-      const statusMap = { draft: 'Koncept', sent: 'Odesláno', paid: 'Uhrazeno', overdue: 'Po splatnosti', cancelled: 'Stornováno' };
+      const statusMap = { draft: 'Koncept', sent: 'Odesláno', paid: 'Uhrazeno', cancelled: 'Stornováno' };
       doc.fontSize(10).fillColor('#64748b').text(statusMap[invoice.status] || invoice.status, 400, headerY + 5, { align: 'right', width: 155 });
       headerY += isKompaktni ? 40 : 45;
     }
@@ -198,13 +200,13 @@ function generateInvoicePDF(invoice, company, items) {
       const qCol = isKorporatni ? 210 : 300;
       doc.text(String(item.quantity), qCol, y, { width: 40, align: 'right' });
       doc.text(item.unit || 'ks', qCol + 45, y, { width: 30, align: 'center' });
-      doc.text(item.unit_price.toFixed(2), qCol + 80, y, { width: 60, align: 'right' });
+      doc.text(fmtNum(item.unit_price), qCol + 80, y, { width: 60, align: 'right' });
       if (!isKorporatni) {
         doc.text(String(item.tax_rate || 0), 445, y, { width: 35, align: 'right' });
       }
       const lineTotal = item.total_with_tax || item.total || 0;
       const totalCol = isKorporatni ? 350 : 485;
-      doc.text(lineTotal.toFixed(2), totalCol, y, { width: isKorporatni ? 50 : 70, align: 'right' });
+      doc.text(fmtNum(lineTotal), totalCol, y, { width: isKorporatni ? 50 : 70, align: 'right' });
       y += rowHeight;
     });
 
@@ -223,7 +225,7 @@ function generateInvoicePDF(invoice, company, items) {
       sy += 6;
       doc.font('Bold').fontSize(9).fillColor('#0f172a').text('K úhradě:', sx, sy);
       sy += 12;
-      doc.fontSize(12).text(`${invoice.total.toFixed(2)} ${invoice.currency}`, sx, sy);
+      doc.fontSize(12).text(`${fmtNum(invoice.total)} ${invoice.currency}`, sx, sy);
     }
 
     // Totals
@@ -234,21 +236,21 @@ function generateInvoicePDF(invoice, company, items) {
     y += 8;
     doc.fontSize(9);
     doc.font('Regular').fillColor('#64748b').text('Základ:', totalsLeft, y);
-    doc.font('Bold').fillColor('#0f172a').text(`${invoice.subtotal.toFixed(2)} ${invoice.currency}`, itemsRight - amountW, y, { width: amountW, align: 'right' });
+    doc.font('Bold').fillColor('#0f172a').text(`${fmtNum(invoice.subtotal)} ${invoice.currency}`, itemsRight - amountW, y, { width: amountW, align: 'right' });
     y += 16;
     doc.font('Regular').fillColor('#64748b').text('DPH:', totalsLeft, y);
-    doc.font('Bold').fillColor('#0f172a').text(`${invoice.tax_amount.toFixed(2)} ${invoice.currency}`, itemsRight - amountW, y, { width: amountW, align: 'right' });
+    doc.font('Bold').fillColor('#0f172a').text(`${fmtNum(invoice.tax_amount)} ${invoice.currency}`, itemsRight - amountW, y, { width: amountW, align: 'right' });
     y += 16;
     doc.moveTo(totalsLeft, y).lineTo(itemsRight, y).stroke(layout.totalColor);
     y += 10;
     doc.fontSize(11).font('Bold').fillColor(layout.totalColor);
     doc.text('Celkem k úhradě:', totalsLeft, y);
     y += 16;
-    doc.fontSize(14).text(`${invoice.total.toFixed(2)} ${invoice.currency}`, totalsLeft, y, { width: itemsRight - totalsLeft, align: 'right' });
+    doc.fontSize(14).text(`${fmtNum(invoice.total)} ${invoice.currency}`, totalsLeft, y, { width: itemsRight - totalsLeft, align: 'right' });
 
     if (invoice.currency !== 'CZK' && invoice.total_czk) {
       y += 20;
-      doc.fontSize(9).font('Regular').fillColor('#64748b').text(`(${invoice.total_czk.toFixed(2)} CZK)`, totalsLeft, y, { width: itemsRight - totalsLeft, align: 'right' });
+      doc.fontSize(9).font('Regular').fillColor('#64748b').text(`(${fmtNum(invoice.total_czk)} CZK)`, totalsLeft, y, { width: itemsRight - totalsLeft, align: 'right' });
     }
 
     // Note
