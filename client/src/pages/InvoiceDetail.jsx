@@ -275,8 +275,15 @@ export default function InvoiceDetail() {
   usePageTitle(invoice ? `Faktura ${invoice.invoice_number}` : undefined);
 
   useEffect(() => {
-    Promise.all([api.getInvoice(id), api.getCompany()])
-      .then(([inv, comp]) => {
+    Promise.all([api.getInvoice(id), api.getCompany(), api.getBankAccounts()])
+      .then(([inv, comp, bankAccounts]) => {
+        // Override company bank details with currency-specific bank account (same logic as PDF endpoint)
+        const matchingBank = (bankAccounts || []).find(ba => ba.currency === (inv.currency || 'CZK') && ba.active !== 0);
+        if (matchingBank) {
+          comp.bank_account = matchingBank.account_number;
+          comp.iban = matchingBank.iban;
+          comp.bank_code = null;
+        }
         setInvoice(inv); setCompany(comp);
         api.getInvoiceQR(id).then(setQrData).catch(() => {});
         api.getInvoicePayments(id).then(setPayments).catch(() => {});

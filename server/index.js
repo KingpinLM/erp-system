@@ -888,6 +888,13 @@ app.get('/api/invoices/:id/qr', ...tenanted, async (req, res) => {
     const company = db.prepare('SELECT * FROM company WHERE tenant_id = ?').get(req.tenant_id);
     if (!company) return res.status(400).json({ error: 'Není nastavena společnost' });
 
+    // Override with currency-specific bank account
+    const bankAccount = db.prepare('SELECT * FROM bank_accounts WHERE tenant_id = ? AND currency = ? AND active = 1').get(req.tenant_id, invoice.currency || 'CZK');
+    if (bankAccount) {
+      company.bank_account = bankAccount.account_number;
+      company.iban = bankAccount.iban;
+    }
+
     const parts = ['SPD*1.0'];
     if (company.iban) {
       parts.push(`ACC:${company.iban.replace(/\s/g, '')}`);
