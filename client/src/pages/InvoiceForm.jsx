@@ -198,10 +198,12 @@ export default function InvoiceForm() {
     setIsDirty(true);
     setForm(f => {
       const updated = { ...f, [field]: value };
-      if (field === 'issue_date' && !isEdit) {
+      if (field === 'issue_date' && !isEdit && value) {
         const d = new Date(value);
-        d.setDate(d.getDate() + defaultDueDays);
-        updated.due_date = d.toISOString().slice(0, 10);
+        if (!isNaN(d.getTime())) {
+          d.setDate(d.getDate() + defaultDueDays);
+          updated.due_date = d.toISOString().slice(0, 10);
+        }
         updated.supply_date = value;
       }
       return updated;
