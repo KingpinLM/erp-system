@@ -1,4 +1,8 @@
 const PDFDocument = require('pdfkit');
+const path = require('path');
+
+const FONT_REGULAR = path.join(__dirname, 'fonts', 'DejaVuSans.ttf');
+const FONT_BOLD = path.join(__dirname, 'fonts', 'DejaVuSans-Bold.ttf');
 
 const layoutConfigs = {
   klasicky: { accent: '#6366f1', accentEnd: '#8b5cf6', headerBg: null, headerText: '#000', headingColor: '#6366f1', totalColor: '#0f172a', tableHeadBg: '#f8fafc', tableHeadColor: '#64748b', divider: '#e2e8f0' },
@@ -11,6 +15,8 @@ const layoutConfigs = {
 function generateInvoicePDF(invoice, company, items) {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: 'A4', margin: 40, info: { Title: `Faktura ${invoice.invoice_number}`, Author: company?.name || 'ERP System' } });
+    doc.registerFont('Regular', FONT_REGULAR);
+    doc.registerFont('Bold', FONT_BOLD);
     const buffers = [];
     doc.on('data', b => buffers.push(b));
     doc.on('end', () => resolve(Buffer.concat(buffers)));
@@ -58,8 +64,8 @@ function generateInvoicePDF(invoice, company, items) {
       doc.save();
       doc.rect(0, headerY - 6, 612, 55).fill(layout.headerBg);
       doc.restore();
-      doc.fontSize(20).font('Helvetica-Bold').fillColor(layout.headerText).text(title, margin, headerY);
-      doc.fontSize(12).font('Helvetica').fillColor('#94a3b8').text(invoice.invoice_number, margin, headerY + 25);
+      doc.fontSize(20).font('Bold').fillColor(layout.headerText).text(title, margin, headerY);
+      doc.fontSize(12).font('Regular').fillColor('#94a3b8').text(invoice.invoice_number, margin, headerY + 25);
 
       const statusMap = { draft: 'Koncept', sent: 'Odesláno', paid: 'Uhrazeno', overdue: 'Po splatnosti', cancelled: 'Stornováno' };
       doc.fontSize(10).fillColor('#e2e8f0').text(statusMap[invoice.status] || invoice.status, 400, headerY + 5, { align: 'right', width: 155 });
@@ -67,8 +73,8 @@ function generateInvoicePDF(invoice, company, items) {
     } else {
       // Standard header
       const titleSize = isKompaktni ? 17 : 20;
-      doc.fontSize(titleSize).font('Helvetica-Bold').fillColor(layout.headingColor).text(title, margin, headerY);
-      doc.fontSize(12).font('Helvetica').fillColor('#334155').text(invoice.invoice_number, margin, headerY + (isKompaktni ? 22 : 25));
+      doc.fontSize(titleSize).font('Bold').fillColor(layout.headingColor).text(title, margin, headerY);
+      doc.fontSize(12).font('Regular').fillColor('#334155').text(invoice.invoice_number, margin, headerY + (isKompaktni ? 22 : 25));
 
       const statusMap = { draft: 'Koncept', sent: 'Odesláno', paid: 'Uhrazeno', overdue: 'Po splatnosti', cancelled: 'Stornováno' };
       doc.fontSize(10).fillColor('#64748b').text(statusMap[invoice.status] || invoice.status, 400, headerY + 5, { align: 'right', width: 155 });
@@ -80,14 +86,14 @@ function generateInvoicePDF(invoice, company, items) {
 
     // Supplier & Customer columns
     let y = headerY + 10;
-    doc.fontSize(9).font('Helvetica-Bold').fillColor('#64748b').text('DODAVATEL', margin, y);
+    doc.fontSize(9).font('Bold').fillColor('#64748b').text('DODAVATEL', margin, y);
     doc.text('ODBĚRATEL', 300, y);
     y += 15;
-    doc.font('Helvetica-Bold').fontSize(11).fillColor('#000');
+    doc.font('Bold').fontSize(11).fillColor('#000');
     doc.text(co.name || '—', margin, y);
     doc.text(invoice.client_name || '—', 300, y);
     y += 15;
-    doc.font('Helvetica').fontSize(9).fillColor('#334155');
+    doc.font('Regular').fontSize(9).fillColor('#334155');
 
     // Supplier details
     const supplierLines = [];
@@ -130,8 +136,8 @@ function generateInvoicePDF(invoice, company, items) {
       const row = Math.floor(i / 3);
       const x = margin + col * 175;
       const dy = y + row * 24;
-      doc.font('Helvetica').text(d[0], x, dy);
-      doc.font('Helvetica-Bold').fillColor('#0f172a').text(d[1], x, dy + 10);
+      doc.font('Regular').text(d[0], x, dy);
+      doc.font('Bold').fillColor('#0f172a').text(d[1], x, dy + 10);
       doc.fillColor('#64748b');
     });
 
@@ -141,9 +147,9 @@ function generateInvoicePDF(invoice, company, items) {
     if (co.bank_account || co.iban) {
       doc.moveTo(margin, y).lineTo(555, y).stroke(layout.divider);
       y += 10;
-      doc.fontSize(9).font('Helvetica-Bold').fillColor('#64748b').text('PLATEBNÍ ÚDAJE', margin, y);
+      doc.fontSize(9).font('Bold').fillColor('#64748b').text('PLATEBNÍ ÚDAJE', margin, y);
       y += 14;
-      doc.font('Helvetica').fillColor('#334155');
+      doc.font('Regular').fillColor('#334155');
       if (co.bank_account) { doc.text(`Číslo účtu: ${co.bank_account}${co.bank_code ? '/' + co.bank_code : ''}`, margin, y); y += 12; }
       if (co.iban) { doc.text(`IBAN: ${co.iban}`, margin, y); y += 12; }
       if (co.swift) { doc.text(`SWIFT: ${co.swift}`, margin, y); y += 12; }
@@ -164,7 +170,7 @@ function generateInvoicePDF(invoice, company, items) {
 
     y += 4;
     const thFontSize = isKompaktni ? 7 : 8;
-    doc.fontSize(thFontSize).font('Helvetica-Bold').fillColor(layout.tableHeadColor);
+    doc.fontSize(thFontSize).font('Bold').fillColor(layout.tableHeadColor);
     doc.text('Popis', margin + 4, y);
     doc.text('Mn.', 300, y, { width: 40, align: 'right' });
     doc.text('Jed.', 345, y, { width: 30, align: 'center' });
@@ -184,7 +190,7 @@ function generateInvoicePDF(invoice, company, items) {
     const itemsStartY = y;
 
     // Items table columns adjust for korporatni sidebar
-    doc.font('Helvetica').fontSize(rowFontSize).fillColor('#0f172a');
+    doc.font('Regular').fontSize(rowFontSize).fillColor('#0f172a');
     (items || []).forEach(item => {
       if (y > 720) { doc.addPage(); y = 40; }
       const descW = isKorporatni ? 150 : 250;
@@ -207,15 +213,15 @@ function generateInvoicePDF(invoice, company, items) {
       const sx = 420;
       let sy = itemsStartY - 20;
       doc.moveTo(sx - 8, sy).lineTo(sx - 8, y + 60).stroke('#334155');
-      doc.fontSize(8).font('Helvetica-Bold').fillColor('#0f172a').text('PLATEBNÍ ÚDAJE', sx, sy);
+      doc.fontSize(8).font('Bold').fillColor('#0f172a').text('PLATEBNÍ ÚDAJE', sx, sy);
       sy += 14;
-      doc.font('Helvetica').fontSize(8).fillColor('#334155');
+      doc.font('Regular').fontSize(8).fillColor('#334155');
       if (co.bank_account) { doc.text(`Účet: ${co.bank_account}${co.bank_code ? '/' + co.bank_code : ''}`, sx, sy); sy += 11; }
       if (co.iban) { doc.text(`IBAN: ${co.iban}`, sx, sy); sy += 11; }
       if (co.swift) { doc.text(`SWIFT: ${co.swift}`, sx, sy); sy += 11; }
       if (invoice.variable_symbol) { doc.text(`VS: ${invoice.variable_symbol}`, sx, sy); sy += 11; }
       sy += 6;
-      doc.font('Helvetica-Bold').fontSize(9).fillColor('#0f172a').text('K úhradě:', sx, sy);
+      doc.font('Bold').fontSize(9).fillColor('#0f172a').text('K úhradě:', sx, sy);
       sy += 12;
       doc.fontSize(12).text(`${invoice.total.toFixed(2)} ${invoice.currency}`, sx, sy);
     }
@@ -226,29 +232,29 @@ function generateInvoicePDF(invoice, company, items) {
     doc.moveTo(totalsLeft, y).lineTo(itemsRight, y).stroke(layout.divider);
     y += 8;
     doc.fontSize(9);
-    doc.font('Helvetica').fillColor('#64748b').text('Základ:', totalsLeft, y);
-    doc.font('Helvetica-Bold').fillColor('#0f172a').text(`${invoice.subtotal.toFixed(2)} ${invoice.currency}`, itemsRight - 70, y, { width: 70, align: 'right' });
+    doc.font('Regular').fillColor('#64748b').text('Základ:', totalsLeft, y);
+    doc.font('Bold').fillColor('#0f172a').text(`${invoice.subtotal.toFixed(2)} ${invoice.currency}`, itemsRight - 70, y, { width: 70, align: 'right' });
     y += 14;
-    doc.font('Helvetica').fillColor('#64748b').text('DPH:', totalsLeft, y);
-    doc.font('Helvetica-Bold').fillColor('#0f172a').text(`${invoice.tax_amount.toFixed(2)} ${invoice.currency}`, itemsRight - 70, y, { width: 70, align: 'right' });
+    doc.font('Regular').fillColor('#64748b').text('DPH:', totalsLeft, y);
+    doc.font('Bold').fillColor('#0f172a').text(`${invoice.tax_amount.toFixed(2)} ${invoice.currency}`, itemsRight - 70, y, { width: 70, align: 'right' });
     y += 14;
     doc.moveTo(totalsLeft, y).lineTo(itemsRight, y).stroke(layout.totalColor);
     y += 8;
-    doc.fontSize(12).font('Helvetica-Bold').fillColor(layout.totalColor);
+    doc.fontSize(12).font('Bold').fillColor(layout.totalColor);
     doc.text('Celkem k úhradě:', totalsLeft, y);
     doc.text(`${invoice.total.toFixed(2)} ${invoice.currency}`, itemsRight - 110, y, { width: 110, align: 'right' });
 
     if (invoice.currency !== 'CZK' && invoice.total_czk) {
       y += 18;
-      doc.fontSize(9).font('Helvetica').fillColor('#64748b').text(`(${invoice.total_czk.toFixed(2)} CZK)`, 485, y, { width: 70, align: 'right' });
+      doc.fontSize(9).font('Regular').fillColor('#64748b').text(`(${invoice.total_czk.toFixed(2)} CZK)`, 485, y, { width: 70, align: 'right' });
     }
 
     // Note
     if (invoice.note) {
       y += 30;
-      doc.fontSize(8).font('Helvetica-Bold').fillColor('#64748b').text('POZNÁMKA', margin, y);
+      doc.fontSize(8).font('Bold').fillColor('#64748b').text('POZNÁMKA', margin, y);
       y += 12;
-      doc.font('Helvetica').fillColor('#334155').text(invoice.note, margin, y, { width: 515 });
+      doc.font('Regular').fillColor('#334155').text(invoice.note, margin, y, { width: 515 });
     }
 
     // Footer accent line
@@ -259,7 +265,7 @@ function generateInvoicePDF(invoice, company, items) {
     }
 
     // Footer
-    doc.fontSize(7).font('Helvetica').fillColor('#94a3b8')
+    doc.fontSize(7).font('Regular').fillColor('#94a3b8')
       .text(`Vygenerováno: ${new Date().toLocaleString('cs-CZ')} | ${co.name || 'ERP System'}`, margin, 780, { align: 'center', width: 515 });
 
     doc.end();
