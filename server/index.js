@@ -935,6 +935,7 @@ app.get('/api/invoices/:id', ...tenanted, (req, res) => {
 });
 
 app.post('/api/invoices', ...tenanted, authorize('admin', 'accountant'), (req, res) => {
+  try {
   const { invoice_number, client_id, issue_date, due_date, supply_date, payment_method, status, currency, note, items, variable_symbol, invoice_type } = req.body;
   const curr = db.prepare('SELECT rate_to_czk FROM currencies WHERE code = ?').get(currency || 'CZK');
   const rate = curr ? curr.rate_to_czk : 1; // kurz platný při vystavení faktury
@@ -951,6 +952,12 @@ app.post('/api/invoices', ...tenanted, authorize('admin', 'accountant'), (req, r
   }
   if (!finalVS) {
     finalVS = generateVariableSymbol(comp);
+  }
+
+  // Check for duplicate invoice number
+  const existing = db.prepare('SELECT id FROM invoices WHERE tenant_id = ? AND invoice_number = ?').get(req.tenant_id, finalNumber);
+  if (existing) {
+    return res.status(409).json({ error: `Faktura s číslem ${finalNumber} již existuje. Zvolte jiné číslo faktury.` });
   }
 
   let subtotal = 0;
@@ -982,6 +989,13 @@ app.post('/api/invoices', ...tenanted, authorize('admin', 'accountant'), (req, r
 
   db.prepare("INSERT INTO audit_log (tenant_id, user_id, action, entity, entity_id, details) VALUES (?, ?, 'create', 'invoice', ?, ?)").run(req.tenant_id, req.user.id, invoiceId, `Vytvořena faktura ${finalNumber}`);
   res.json({ id: invoiceId });
+  } catch (err) {
+    if (err.message?.includes('UNIQUE constraint failed')) {
+      return res.status(409).json({ error: `Faktura s tímto číslem již existuje. Zvolte jiné číslo faktury.` });
+    }
+    console.error('Error creating invoice:', err);
+    res.status(500).json({ error: 'Nepodařilo se vytvořit fakturu: ' + err.message });
+  }
 });
 
 app.put('/api/invoices/:id', ...tenanted, authorize('admin', 'accountant'), (req, res) => {
