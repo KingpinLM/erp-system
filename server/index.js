@@ -2797,8 +2797,19 @@ if (tenantCount === 0) {
   require('child_process').execSync('node server/seed.js', { cwd: path.join(__dirname, '..'), stdio: 'inherit' });
 }
 
+// ─── PREVENT PROCESS CRASHES ─────────────────────────────────
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught exception:', err.message, err.stack);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled rejection:', reason);
+});
+
 const PORT = process.env.PORT || 3001;
-const server = app.listen(PORT, '0.0.0.0', () => console.log(`ERP server running on http://0.0.0.0:${PORT}`));
+const server = app.listen(PORT, '0.0.0.0', () => {
+  console.log(`ERP server running on http://0.0.0.0:${PORT}`);
+  console.log(`Database path: ${db.name}`);
+});
 server.keepAliveTimeout = 65000;
 server.headersTimeout = 66000;
 server.maxConnections = 200;
