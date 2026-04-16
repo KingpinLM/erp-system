@@ -1,8 +1,8 @@
 const PDFDocument = require('pdfkit');
 const path = require('path');
 
-const FONT_REGULAR = path.join(__dirname, 'fonts', 'DejaVuSans.ttf');
-const FONT_BOLD = path.join(__dirname, 'fonts', 'DejaVuSans-Bold.ttf');
+const FONT_REGULAR = path.join(__dirname, 'fonts', 'Poppins-Regular.ttf');
+const FONT_BOLD = path.join(__dirname, 'fonts', 'Poppins-SemiBold.ttf');
 
 const layoutConfigs = {
   klasicky: { accent: '#6366f1', accentEnd: '#8b5cf6', headerBg: null, headerText: '#000', headingColor: '#6366f1', totalColor: '#0f172a', tableHeadBg: '#f8fafc', tableHeadColor: '#64748b', divider: '#e2e8f0' },
@@ -228,25 +228,27 @@ function generateInvoicePDF(invoice, company, items) {
 
     // Totals
     y += 5;
-    const totalsLeft = isKorporatni ? 220 : 350;
+    const totalsLeft = isKorporatni ? 220 : 330;
+    const amountW = isKorporatni ? 80 : 140;
     doc.moveTo(totalsLeft, y).lineTo(itemsRight, y).stroke(layout.divider);
     y += 8;
     doc.fontSize(9);
     doc.font('Regular').fillColor('#64748b').text('Základ:', totalsLeft, y);
-    doc.font('Bold').fillColor('#0f172a').text(`${invoice.subtotal.toFixed(2)} ${invoice.currency}`, itemsRight - 70, y, { width: 70, align: 'right' });
-    y += 14;
+    doc.font('Bold').fillColor('#0f172a').text(`${invoice.subtotal.toFixed(2)} ${invoice.currency}`, itemsRight - amountW, y, { width: amountW, align: 'right' });
+    y += 16;
     doc.font('Regular').fillColor('#64748b').text('DPH:', totalsLeft, y);
-    doc.font('Bold').fillColor('#0f172a').text(`${invoice.tax_amount.toFixed(2)} ${invoice.currency}`, itemsRight - 70, y, { width: 70, align: 'right' });
-    y += 14;
+    doc.font('Bold').fillColor('#0f172a').text(`${invoice.tax_amount.toFixed(2)} ${invoice.currency}`, itemsRight - amountW, y, { width: amountW, align: 'right' });
+    y += 16;
     doc.moveTo(totalsLeft, y).lineTo(itemsRight, y).stroke(layout.totalColor);
-    y += 8;
-    doc.fontSize(12).font('Bold').fillColor(layout.totalColor);
+    y += 10;
+    doc.fontSize(11).font('Bold').fillColor(layout.totalColor);
     doc.text('Celkem k úhradě:', totalsLeft, y);
-    doc.text(`${invoice.total.toFixed(2)} ${invoice.currency}`, itemsRight - 110, y, { width: 110, align: 'right' });
+    y += 16;
+    doc.fontSize(14).text(`${invoice.total.toFixed(2)} ${invoice.currency}`, totalsLeft, y, { width: itemsRight - totalsLeft, align: 'right' });
 
     if (invoice.currency !== 'CZK' && invoice.total_czk) {
-      y += 18;
-      doc.fontSize(9).font('Regular').fillColor('#64748b').text(`(${invoice.total_czk.toFixed(2)} CZK)`, 485, y, { width: 70, align: 'right' });
+      y += 20;
+      doc.fontSize(9).font('Regular').fillColor('#64748b').text(`(${invoice.total_czk.toFixed(2)} CZK)`, totalsLeft, y, { width: itemsRight - totalsLeft, align: 'right' });
     }
 
     // Note
