@@ -58,53 +58,56 @@ function generateInvoicePDF(invoice, company, items, qrDataUrl) {
 
     // ─── DODAVATEL / ODBĚRATEL (bordered box) ───────────────
     const boxTop = y;
-    const boxH = 110;
     const midX = margin + (pageW - margin) / 2;
+    const boxPad = 16;
 
-    // Outer border
+    // Calculate content heights first
+    const supplierLines = [];
+    supplierLines.push({ text: 'DODAVATEL', type: 'label' });
+    supplierLines.push({ text: co.name || '—', type: 'name' });
+    if (co.ico) supplierLines.push({ text: `IČ: ${co.ico}`, type: 'detail' });
+    if (co.dic) supplierLines.push({ text: `DIČ: ${co.dic}`, type: 'detail' });
+    if (co.address) supplierLines.push({ text: co.address, type: 'detail' });
+    if (co.city) supplierLines.push({ text: `${co.city} ${co.zip || ''}`.trim(), type: 'detail' });
+    if (co.email) supplierLines.push({ text: co.email, type: 'detail' });
+    if (co.phone) supplierLines.push({ text: co.phone, type: 'detail' });
+
+    const clientLines = [];
+    clientLines.push({ text: 'ODBĚRATEL', type: 'label' });
+    clientLines.push({ text: invoice.client_name || '—', type: 'name' });
+    if (invoice.client_ico) clientLines.push({ text: `IČ: ${invoice.client_ico}`, type: 'detail' });
+    if (invoice.client_dic) clientLines.push({ text: `DIČ: ${invoice.client_dic}`, type: 'detail' });
+    if (invoice.client_address) clientLines.push({ text: invoice.client_address, type: 'detail' });
+    if (invoice.client_city) clientLines.push({ text: `${invoice.client_city} ${invoice.client_zip || ''}`.trim(), type: 'detail' });
+    if (invoice.client_email) clientLines.push({ text: invoice.client_email, type: 'detail' });
+
+    const calcH = (lines) => lines.reduce((h, l) => h + (l.type === 'label' ? 14 : l.type === 'name' ? 18 : 12), 0);
+    const boxH = Math.max(100, Math.max(calcH(supplierLines), calcH(clientLines)) + 24);
+
+    // Draw box first
     doc.roundedRect(margin, boxTop, pageW - margin, boxH, 6).stroke('#e2e8f0');
-    // Vertical separator
     doc.moveTo(midX, boxTop + 1).lineTo(midX, boxTop + boxH - 1).stroke('#e2e8f0');
 
-    // Supplier (left)
-    let sy = boxTop + 12;
-    doc.fontSize(8).font('Bold').fillColor('#64748b').text('DODAVATEL', margin + 16, sy);
-    sy += 14;
-    doc.fontSize(11).font('Bold').fillColor('#0f172a').text(co.name || '—', margin + 16, sy);
-    sy += 16;
-    doc.fontSize(8.5).font('Regular').fillColor('#334155');
-    if (co.ico) { doc.text(`IČ: ${co.ico}`, margin + 16, sy); sy += 12; }
-    if (co.dic) { doc.text(`DIČ: ${co.dic}`, margin + 16, sy); sy += 12; }
-    if (co.address) { doc.text(co.address, margin + 16, sy); sy += 12; }
-    if (co.city) { doc.text(`${co.city} ${co.zip || ''}`.trim(), margin + 16, sy); sy += 12; }
-    if (co.email) { doc.text(co.email, margin + 16, sy); sy += 12; }
-    if (co.phone) { doc.text(co.phone, margin + 16, sy); sy += 12; }
+    // Render supplier (left)
+    const renderLines = (lines, startX, startY) => {
+      let ly = startY;
+      lines.forEach(l => {
+        if (l.type === 'label') {
+          doc.fontSize(8).font('Bold').fillColor('#64748b').text(l.text, startX, ly);
+          ly += 14;
+        } else if (l.type === 'name') {
+          doc.fontSize(11).font('Bold').fillColor('#0f172a').text(l.text, startX, ly);
+          ly += 18;
+        } else {
+          doc.fontSize(8.5).font('Regular').fillColor('#334155').text(l.text, startX, ly);
+          ly += 12;
+        }
+      });
+    };
+    renderLines(supplierLines, margin + boxPad, boxTop + 12);
+    renderLines(clientLines, midX + boxPad, boxTop + 12);
 
-    // Customer (right)
-    let cy = boxTop + 12;
-    doc.fontSize(8).font('Bold').fillColor('#64748b').text('ODBĚRATEL', midX + 16, cy);
-    cy += 14;
-    doc.fontSize(11).font('Bold').fillColor('#0f172a').text(invoice.client_name || '—', midX + 16, cy);
-    cy += 16;
-    doc.fontSize(8.5).font('Regular').fillColor('#334155');
-    if (invoice.client_ico) { doc.text(`IČ: ${invoice.client_ico}`, midX + 16, cy); cy += 12; }
-    if (invoice.client_dic) { doc.text(`DIČ: ${invoice.client_dic}`, midX + 16, cy); cy += 12; }
-    if (invoice.client_address) { doc.text(invoice.client_address, midX + 16, cy); cy += 12; }
-    if (invoice.client_city) { doc.text(`${invoice.client_city} ${invoice.client_zip || ''}`.trim(), midX + 16, cy); cy += 12; }
-    if (invoice.client_email) { doc.text(invoice.client_email, midX + 16, cy); cy += 12; }
-
-    // Adjust box height if content overflows
-    const actualBoxH = Math.max(boxH, Math.max(sy, cy) - boxTop + 12);
-    if (actualBoxH > boxH) {
-      doc.save();
-      doc.rect(margin - 1, boxTop - 1, pageW - margin + 2, boxH + 2).fill('#ffffff');
-      doc.restore();
-      doc.roundedRect(margin, boxTop, pageW - margin, actualBoxH, 6).stroke('#e2e8f0');
-      doc.moveTo(midX, boxTop + 1).lineTo(midX, boxTop + actualBoxH - 1).stroke('#e2e8f0');
-      // Re-render content (simplified - recalculate)
-    }
-
-    y = boxTop + actualBoxH + 16;
+    y = boxTop + boxH + 16;
 
     // ─── PLATEBNÍ ÚDAJE (bordered box with QR) ──────────────
     if (co.bank_account || co.iban) {
