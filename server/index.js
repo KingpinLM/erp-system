@@ -2783,6 +2783,13 @@ app.use((err, req, res, _next) => {
   res.status(err.status || 500).json({ error: 'Interní chyba serveru' });
 });
 
+// ─── AUTO-SEED ON FIRST RUN ─────────────────────────────────
+const tenantCount = db.prepare('SELECT COUNT(*) as cnt FROM tenants').get().cnt;
+if (tenantCount === 0) {
+  console.log('Empty database detected, running initial seed...');
+  require('child_process').execSync('node server/seed.js', { cwd: path.join(__dirname, '..'), stdio: 'inherit' });
+}
+
 const PORT = process.env.PORT || 3001;
 const server = app.listen(PORT, '0.0.0.0', () => console.log(`ERP server running on http://0.0.0.0:${PORT}`));
 server.keepAliveTimeout = 65000;

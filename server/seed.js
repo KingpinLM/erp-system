@@ -228,37 +228,32 @@ const evidenceData = [
 ];
 evidenceData.forEach(e => insertEvidence.run(tenantId, ...e));
 
-// ─── VAT RECORDS (auto-generate from invoices) ──────────────
-// Generujeme DPH záznamy ze všech faktur (vydaných = output, přijatých = input)
-// Používáme DUZP (supply_date) jako datum pro DPH
-// Sekce dle kontrolního hlášení: A.4/B.2 = nad 10000 Kč vč. DPH, A.5/B.3 = do 10000 Kč
-db.prepare('DELETE FROM vat_records WHERE tenant_id = ?').run(tenantId);
+// ─── VAT RECORDS (auto-generate from invoices, only if none exist) ──
+const existingVatCount = db.prepare('SELECT COUNT(*) as cnt FROM vat_records WHERE tenant_id = ?').get(tenantId).cnt;
+if (existingVatCount === 0) {
+  const allInvoicesForVat = db.prepare(`
+    SELECT i.id, i.type, i.supply_date, i.issue_date, i.status, i.total,
+      ii.total as item_base, ii.tax_rate, ii.tax_amount
+    FROM invoices i
+    JOIN invoice_items ii ON i.id = ii.invoice_id
+    WHERE i.tenant_id = ? AND i.status != 'cancelled' AND ii.tax_rate > 0
+  `).all(tenantId);
 
-const allInvoicesForVat = db.prepare(`
-  SELECT i.id, i.type, i.supply_date, i.issue_date, i.status, i.total,
-    ii.total as item_base, ii.tax_rate, ii.tax_amount
-  FROM invoices i
-  JOIN invoice_items ii ON i.id = ii.invoice_id
-  WHERE i.tenant_id = ? AND i.status != 'cancelled' AND ii.tax_rate > 0
-`).all(tenantId);
-
-const insertVat = db.prepare('INSERT INTO vat_records (tenant_id, invoice_id, type, tax_base, tax_amount, vat_rate, date, section) VALUES (?,?,?,?,?,?,?,?)');
-allInvoicesForVat.forEach(r => {
-  const vatDate = r.supply_date || r.issue_date;
-  const isOutput = r.type === 'issued';
-  const vatType = isOutput ? 'output' : 'input';
-  // Sekce kontrolního hlášení (od 2024):
-  // A.4 = výstup nad 10000, A.5 = výstup do 10000
-  // B.2 = vstup nad 10000, B.3 = vstup do 10000
-  const totalWithTax = Math.abs(r.item_base) + Math.abs(r.tax_amount);
-  let section;
-  if (isOutput) {
-    section = totalWithTax >= 10000 ? 'A4' : 'A5';
-  } else {
-    section = totalWithTax >= 10000 ? 'B2' : 'B3';
-  }
-  insertVat.run(tenantId, r.id, vatType, Math.abs(r.item_base), Math.abs(r.tax_amount), r.tax_rate, vatDate, section);
-});
+  const insertVat = db.prepare('INSERT INTO vat_records (tenant_id, invoice_id, type, tax_base, tax_amount, vat_rate, date, section) VALUES (?,?,?,?,?,?,?,?)');
+  allInvoicesForVat.forEach(r => {
+    const vatDate = r.supply_date || r.issue_date;
+    const isOutput = r.type === 'issued';
+    const vatType = isOutput ? 'output' : 'input';
+    const totalWithTax = Math.abs(r.item_base) + Math.abs(r.tax_amount);
+    let section;
+    if (isOutput) {
+      section = totalWithTax >= 10000 ? 'A4' : 'A5';
+    } else {
+      section = totalWithTax >= 10000 ? 'B2' : 'B3';
+    }
+    insertVat.run(tenantId, r.id, vatType, Math.abs(r.item_base), Math.abs(r.tax_amount), r.tax_rate, vatDate, section);
+  });
+}
 
 // ─── COMPANY (tenant-scoped) ────────────────────────────────
 // Rainbow Family Investment brand logo (Prismatic Spectrum, white background)
@@ -268,21 +263,6 @@ const brandLogo = 'data:image/svg+xml;base64,' + Buffer.from(brandLogoSvg).toStr
 const existingCompany = db.prepare('SELECT id FROM company WHERE tenant_id = ?').get(tenantId);
 if (!existingCompany) {
   db.prepare(`INSERT INTO company (tenant_id, name, ico, dic, email, phone, address, city, zip, bank_account, bank_code, iban, invoice_prefix, invoice_counter, vat_payer, default_due_days, logo) VALUES (?, 'Rainbow Family Investment s.r.o.', '23486899', 'CZ23486899', 'info@rfi.cz', '+420 222 333 444', 'Václavské náměstí 1', 'Praha', '11000', '1234567890', '0100', 'CZ6501000000001234567890', 'FV', 46, 1, 14, ?)`).run(tenantId, brandLogo);
-} else {
-  // Ensure all company details are populated
-  db.prepare(`UPDATE company SET
-    bank_account = COALESCE(NULLIF(bank_account,''), '1234567890'),
-    bank_code = COALESCE(NULLIF(bank_code,''), '0100'),
-    iban = COALESCE(NULLIF(iban,''), 'CZ6501000000001234567890'),
-    email = COALESCE(NULLIF(email,''), 'info@rfi.cz'),
-    phone = COALESCE(NULLIF(phone,''), '+420 222 333 444'),
-    address = COALESCE(NULLIF(address,''), 'Václavské náměstí 1'),
-    city = COALESCE(NULLIF(city,''), 'Praha'),
-    zip = COALESCE(NULLIF(zip,''), '11000'),
-    vat_payer = 1,
-    default_due_days = COALESCE(default_due_days, 14),
-    logo = ?
-  WHERE tenant_id = ?`).run(brandLogo, tenantId);
 }
 
 // ─── CHATBOT KNOWLEDGE BASE (comprehensive FAQ) ─────────────
