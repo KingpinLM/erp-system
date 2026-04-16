@@ -1590,7 +1590,23 @@ app.get('/api/invoices/:id/pdf', ...tenanted, async (req, res) => {
       company.bank_code = null;
       company.iban = bankAccount.iban;
     }
-    const pdfBuffer = await generateInvoicePDF(invoice, company, items);
+    // Generate QR code for PDF
+    let qrDataUrl = null;
+    try {
+      const parts = ['SPD*1.0'];
+      if (company.iban) {
+        parts.push(`ACC:${company.iban.replace(/\s/g, '')}`);
+      } else if (company.bank_account) {
+        parts.push(`ACC:${company.bank_account.replace(/\s/g, '')}`);
+      }
+      parts.push(`AM:${invoice.total.toFixed(2)}`);
+      parts.push(`CC:${invoice.currency}`);
+      if (invoice.variable_symbol) parts.push(`X-VS:${invoice.variable_symbol}`);
+      if (company.name) parts.push(`RN:${company.name.slice(0, 35)}`);
+      if (invoice.due_date) parts.push(`DT:${invoice.due_date.replace(/-/g, '')}`);
+      qrDataUrl = await QRCode.toDataURL(parts.join('*'), { width: 200, margin: 1, errorCorrectionLevel: 'M' });
+    } catch {}
+    const pdfBuffer = await generateInvoicePDF(invoice, company, items, qrDataUrl);
     res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename=${invoice.invoice_number}.pdf` });
     res.send(pdfBuffer);
   } catch (e) {
